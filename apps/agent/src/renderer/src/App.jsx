@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import DocViewer from './docs/DocViewer.jsx';
 import NoteEditor from './editor/NoteEditor.jsx';
 import PluginUiMount from './plugin/PluginUiMount.jsx';
 import { hasUi } from './plugin/pluginUi.js';
@@ -19,7 +18,6 @@ function formatTime(value) {
 
 const SUB_NAV = [
   { id: 'workspace', label: '工作台' },
-  { id: 'docs', label: '文档' },
   { id: 'history', label: '历史' },
 ];
 
@@ -647,8 +645,6 @@ useEffect(() => {
                   onLogin={openLogin}
                 />
               )}
-
-              {view === 'docs' && <DocViewer />}
 
               {view === 'history' && (
                 <OperationHistory
