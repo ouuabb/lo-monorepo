@@ -28,11 +28,8 @@ export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState(220);
   const [resizing, setResizing] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
-  const [commandOpen, setCommandOpen] = useState(false);
-  const [viewOpen, setViewOpen] = useState(false);
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [pluginsOpen, setPluginsOpen] = useState(false);
+  const [pluginView, setPluginView] = useState(false);
+  const [pluginTab, setPluginTab] = useState('commands');
   const [config, setConfig] = useState({ host: '127.0.0.1', port: 8765, protocol: 'http' });
   const [privateKeyPath, setPrivateKeyPath] = useState('');
   const [busy, setBusy] = useState(false);
@@ -139,6 +136,7 @@ export default function App() {
   const openResource = useCallback(
     async (n) => {
       if (!api || !n) return;
+      setPluginView(false);
       const existing = tabs.find((t) => t.rid === n.rid);
       if (existing) {
         setActiveKey(existing.key);
@@ -414,67 +412,6 @@ useEffect(() => {
         </button>
         <div className="topbar-spacer" />
         <button
-          className="rail-btn"
-          type="button"
-          title="插件命令"
-          aria-label="插件命令"
-          onClick={() => setCommandOpen(true)}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-            <path d="M4 17h6M14 17h6M9 11h6M4 5h6M14 5h6" />
-          </svg>
-        </button>
-        <button
-          className="rail-btn"
-          type="button"
-          title="插件视图"
-          aria-label="插件视图"
-          onClick={() => setViewOpen(true)}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-            <rect x="3" y="3" width="18" height="7" rx="1" />
-            <rect x="3" y="14" width="18" height="7" rx="1" />
-          </svg>
-        </button>
-        <button
-          className="rail-btn"
-          type="button"
-          title="插件面板"
-          aria-label="插件面板"
-          onClick={() => setPanelOpen(true)}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-            <rect x="3" y="3" width="7" height="18" rx="1" />
-            <rect x="14" y="3" width="7" height="8" rx="1" />
-            <rect x="14" y="15" width="7" height="6" rx="1" />
-          </svg>
-        </button>
-        <button
-          className="rail-btn"
-          type="button"
-          title="插件编辑器"
-          aria-label="插件编辑器"
-          onClick={() => setEditorOpen(true)}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-          </svg>
-        </button>
-        <button
-          className="rail-btn"
-          type="button"
-          title="插件管理"
-          aria-label="插件管理"
-          onClick={() => setPluginsOpen(true)}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-            <path d="M4 5h16M4 12h10M4 19h7M14 12h6M11 19h9" />
-            <circle cx="10" cy="5" r="1.6" />
-            <circle cx="12" cy="12" r="1.6" />
-            <circle cx="9" cy="19" r="1.6" />
-          </svg>
-        </button>
-        <button
           className={`conn-dot ${authenticated ? 'on' : ''}`}
           type="button"
           title={authenticated ? '已登录，点击重新登录/登出' : '未连接，点击登录'}
@@ -487,10 +424,26 @@ useEffect(() => {
         <aside className="app-rail">
           <div className="rail-spacer" />
           <button
-            className="rail-btn"
+            className={`rail-btn ${pluginView ? 'active' : ''}`}
+            aria-label="插件"
+            title="插件"
+            onClick={() => {
+              setSubOpen(false);
+              setPluginView((v) => !v);
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M15 4.95703C15 4.58711 14.8563 4.24054 14.5949 3.97992L12.0096 1.39234C11.4879 0.86922 10.5788 0.86922 10.0571 1.39234L8 3.45119V3.32321C8 2.55068 7.37187 1.922 6.6 1.922H2.4C1.62813 1.922 1 2.55068 1 3.32321V13.5988C1 14.3713 1.62813 15 2.4 15H12.6667C13.4385 15 14.0667 14.3713 14.0667 13.5988V9.39514C14.0667 8.62261 13.4385 7.99393 12.6667 7.99393H12.5379L14.5949 5.93508C14.8553 5.67445 15 5.32602 15 4.95703ZM2.4 2.85521H6.6C6.85667 2.85521 7.06667 3.06446 7.06667 3.32228V7.99299H1.93333V3.32228C1.93333 3.06446 2.14333 2.85521 2.4 2.85521ZM1.93333 13.5979V8.92714H7.06667V14.0649H2.4C2.14333 14.0649 1.93333 13.8547 1.93333 13.5979ZM13.1333 9.39421V13.5979C13.1333 13.8547 12.9233 14.0649 12.6667 14.0649H8V8.92714H12.6667C12.9233 8.92714 13.1333 9.13638 13.1333 9.39421ZM8 7.99299V6.46287L9.5288 7.99299H8ZM13.9351 5.2737L11.3488 7.86221C11.1789 8.03223 10.8859 8.03223 10.716 7.86221L8.12973 5.2737C8.0448 5.18963 7.99813 5.07753 7.99813 4.95796C7.99813 4.83839 8.0448 4.7263 8.12973 4.64129L10.716 2.05278C10.8009 1.96777 10.9129 1.92106 11.0324 1.92106C11.1519 1.92106 11.2639 1.96777 11.3488 2.05278L13.9351 4.64129C14.02 4.72536 14.0667 4.83746 14.0667 4.95703C14.0667 5.0766 14.02 5.1887 13.9351 5.2737Z" />
+            </svg>
+          </button>
+          <button
+            className={`rail-btn ${subOpen ? 'active' : ''}`}
             aria-label="展开功能面板"
             title="功能面板"
-            onClick={() => setSubOpen(true)}
+            onClick={() => {
+              setPluginView(false);
+              setSubOpen((v) => !v);
+            }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -561,7 +514,13 @@ useEffect(() => {
           </div>
         )}
 
-        {activeTab ? (
+        {pluginView ? (
+          <PluginCenter
+            tab={pluginTab}
+            onTab={setPluginTab}
+            onNotify={notify}
+          />
+        ) : activeTab ? (
           <div className="editor-panel">
             <div className="editor-toolbar">
               <div className="editor-toolbar-title">
@@ -688,36 +647,6 @@ useEffect(() => {
                 </button>
               </div>
             </div>
-          </Modal>
-        )}
-
-        {commandOpen && (
-          <Modal title="插件命令" onClose={() => setCommandOpen(false)}>
-            <CommandPanel onNotify={notify} onClose={() => setCommandOpen(false)} />
-          </Modal>
-        )}
-
-        {viewOpen && (
-          <Modal title="插件视图" onClose={() => setViewOpen(false)}>
-            <ViewPanel onNotify={notify} />
-          </Modal>
-        )}
-
-        {panelOpen && (
-          <Modal title="插件面板" onClose={() => setPanelOpen(false)}>
-            <PanelPanel onNotify={notify} />
-          </Modal>
-        )}
-
-        {editorOpen && (
-          <Modal title="插件编辑器" onClose={() => setEditorOpen(false)}>
-            <EditorPanel onNotify={notify} />
-          </Modal>
-        )}
-
-        {pluginsOpen && (
-          <Modal title="插件管理" onClose={() => setPluginsOpen(false)}>
-            <PluginPanel onNotify={notify} />
           </Modal>
         )}
       </div>
@@ -1057,7 +986,7 @@ function PluginPanel(props) {
           </button>
         </div>
         {services.length === 0 ? (
-          <p className="empty">暂无插件服务</p>
+          <p className="empty">暂无插件服务（安装插件后自动注册）</p>
         ) : (
           <ul className="command-list">
             {services.map((s) => (
@@ -1099,8 +1028,56 @@ function PluginPanel(props) {
   );
 }
 
+function PluginCenter(props) {
+  const { tab, onTab, onNotify } = props;
+  const goManage = () => onTab('manage');
+  const tabs = [
+    { id: 'commands', label: '命令' },
+    { id: 'views', label: '视图' },
+    { id: 'panels', label: '面板' },
+    { id: 'editors', label: '编辑器' },
+    { id: 'manage', label: '管理' },
+  ];
+  return (
+    <div className="sub-panel">
+      <div className="sub-nav" role="tablist">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            className={tab === t.id ? 'active' : ''}
+            onClick={() => onTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div className="sub-body">
+        {tab === 'commands' && <CommandPanel onNotify={onNotify} onGoManage={goManage} />}
+        {tab === 'views' && <ViewPanel onNotify={onNotify} onGoManage={goManage} />}
+        {tab === 'panels' && <PanelPanel onNotify={onNotify} onGoManage={goManage} />}
+        {tab === 'editors' && <EditorPanel onNotify={onNotify} onGoManage={goManage} />}
+        {tab === 'manage' && <PluginPanel onNotify={onNotify} />}
+      </div>
+    </div>
+  );
+}
+
+function PluginEmptyState({ onGoManage }) {
+  return (
+    <div className="plugin-empty">
+      <p>尚未安装插件，该列表为空。</p>
+      <button className="btn primary" type="button" onClick={onGoManage}>
+        去插件管理安装插件
+      </button>
+    </div>
+  );
+}
+
 function ViewPanel(props) {
-  const { onNotify } = props;
+  const { onNotify, onGoManage } = props;
   const [views, setViews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState(null);
@@ -1161,7 +1138,11 @@ function ViewPanel(props) {
         </button>
       </div>
       {views.length === 0 ? (
-        <p className="empty">{loading ? '加载中…' : '暂无插件视图'}</p>
+        loading ? (
+          <p className="empty">加载中…</p>
+        ) : (
+          <PluginEmptyState onGoManage={onGoManage} />
+        )
       ) : (
         <>
           <ul className="command-list">
@@ -1201,7 +1182,7 @@ function ViewPanel(props) {
 }
 
 function PanelPanel(props) {
-  const { onNotify } = props;
+  const { onNotify, onGoManage } = props;
   const [panels, setPanels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState(null);
@@ -1262,7 +1243,11 @@ function PanelPanel(props) {
         </button>
       </div>
       {panels.length === 0 ? (
-        <p className="empty">{loading ? '加载中…' : '暂无插件面板'}</p>
+        loading ? (
+          <p className="empty">加载中…</p>
+        ) : (
+          <PluginEmptyState onGoManage={onGoManage} />
+        )
       ) : (
         <>
           <ul className="command-list">
@@ -1302,7 +1287,7 @@ function PanelPanel(props) {
 }
 
 function EditorPanel(props) {
-  const { onNotify } = props;
+  const { onNotify, onGoManage } = props;
   const [editors, setEditors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState(null);
@@ -1363,7 +1348,11 @@ function EditorPanel(props) {
         </button>
       </div>
       {editors.length === 0 ? (
-        <p className="empty">{loading ? '加载中…' : '暂无插件编辑器'}</p>
+        loading ? (
+          <p className="empty">加载中…</p>
+        ) : (
+          <PluginEmptyState onGoManage={onGoManage} />
+        )
       ) : (
         <>
           <ul className="command-list">
@@ -1403,7 +1392,7 @@ function EditorPanel(props) {
 }
 
 function CommandPanel(props) {
-  const { onNotify, onClose } = props;
+  const { onNotify, onClose, onGoManage } = props;
   const [commands, setCommands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -1449,7 +1438,11 @@ function CommandPanel(props) {
         </button>
       </div>
       {commands.length === 0 ? (
-        <p className="empty">{loading ? '加载中…' : '暂无插件命令'}</p>
+        loading ? (
+          <p className="empty">加载中…</p>
+        ) : (
+          <PluginEmptyState onGoManage={onGoManage} />
+        )
       ) : (
         <ul className="command-list">
           {commands.map((c) => (

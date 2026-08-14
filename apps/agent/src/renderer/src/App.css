@@ -176,11 +176,18 @@ body {
   background: var(--panel);
   color: var(--muted);
   cursor: pointer;
+  -webkit-app-region: no-drag;
 }
 
 .rail-btn:hover {
   border-color: var(--border-strong);
   color: var(--text);
+}
+
+.rail-btn.active {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--bg);
 }
 
 .app-sidebar {
@@ -501,6 +508,20 @@ select {
   padding: 8px 0;
   color: var(--muted);
   font-size: 13px;
+}
+
+.plugin-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.plugin-empty .btn {
+  min-width: 160px;
 }
 
 .command-list {
