@@ -36,6 +36,17 @@ describe('ResourceType', () => {
     expect(ResourceType.fromPath('test.mp4')).toBe('video');
   });
 
+  test('should detect bmp/mkv/flac/aac from path', () => {
+    expect(ResourceType.fromPath('a.bmp')).toBe('image');
+    expect(ResourceType.fromPath('a.mkv')).toBe('video');
+    expect(ResourceType.fromPath('a.flac')).toBe('audio');
+    expect(ResourceType.fromPath('a.aac')).toBe('audio');
+    expect(ResourceType.getExtensions('image')).toContain('.bmp');
+    expect(ResourceType.getExtensions('video')).toContain('.mkv');
+    expect(ResourceType.getExtensions('audio')).toContain('.flac');
+    expect(ResourceType.getExtensions('audio')).toContain('.aac');
+  });
+
   test('should return unknown for unknown type', () => {
     expect(ResourceType.fromPath('test.unknown')).toBe('unknown');
   });

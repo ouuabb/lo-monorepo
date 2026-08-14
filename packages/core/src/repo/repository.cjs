@@ -532,7 +532,11 @@ class Repository {
 
     const CryptoUtils = require("../utils/crypto.cjs");
 
-    const ext = ResourceType.getExtensions(type)[0] || ".md";
+    // 类型认定（唯一事实源 ResourceType.fromPath）：
+    //   显式 type 优先；无 type 且有来源名 → 按扩展名认定；否则默认 note
+    const finalType =
+      type || (filename ? ResourceType.fromPath(filename) : "note");
+    const ext = ResourceType.getExtensions(finalType)[0] || ".md";
     const name = filename || `${Date.now()}${ext}`;
     const filePath = path.join(this.repoPath, "resources", name);
 
@@ -599,7 +603,7 @@ class Repository {
     }
 
     const { result } = await this.operationEngine.execute("resource.create", {
-      type,
+      type: finalType,
       path: filePath,
       metadata: finalMeta,
       schema,
@@ -614,7 +618,7 @@ class Repository {
         {
           name: result.name,
           layer: result.layer || 0,
-          type,
+          type: finalType,
           path: relPath,
           hash: result.hash,
           metadata: result.metadata,

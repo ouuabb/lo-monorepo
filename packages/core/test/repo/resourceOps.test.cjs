@@ -40,6 +40,31 @@ describe('System Operations (resource & definition)', () => {
       const after = await repo.resourceService.getByRid(r.rid);
       expect(after).toBeNull(); // 软删除后 getByRid 不可见
     });
+
+    test('类型认定：显式 type 优先，不因 filename 覆盖', async () => {
+      const r = await repo.createResource('note', 'x', { filename: 'a.png' });
+      expect(r.type).toBe('note');
+    });
+
+    test('类型认定：无 type + .md → note', async () => {
+      const r = await repo.createResource(null, '# t', { filename: 'a.md' });
+      expect(r.type).toBe('note');
+    });
+
+    test('类型认定：无 type + .png → image', async () => {
+      const r = await repo.createResource(null, 'x', { filename: 'a.png' });
+      expect(r.type).toBe('image');
+    });
+
+    test('类型认定：无 type + .zip → unknown', async () => {
+      const r = await repo.createResource(null, 'x', { filename: 'a.zip' });
+      expect(r.type).toBe('unknown');
+    });
+
+    test('类型认定：无 type + 无 filename → note', async () => {
+      const r = await repo.createResource(null, 'hello');
+      expect(r.type).toBe('note');
+    });
   });
 
   // ─── resource.update ───

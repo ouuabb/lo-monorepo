@@ -463,17 +463,10 @@ route("POST", "/api/notes/upload", async (req, res, { repo }) => {
         .filter(Boolean);
     }
 
-    // 推断资源类型
-    let type = "file";
-    if (/\.(png|jpg|jpeg|gif|webp|svg|bmp)$/i.test(file.filename))
-      type = "image";
-    else if (/\.(mp4|mov|avi|mkv|webm)$/i.test(file.filename)) type = "video";
-    else if (/\.(mp3|wav|ogg|flac|aac)$/i.test(file.filename)) type = "audio";
-    else if (/\.(pdf|doc|docx|xls|xlsx|ppt|pptx)$/i.test(file.filename))
-      type = "document";
+    // 资源类型由 Core 模型层按 filename 认定（createResource 内部），此处不推断
 
     try {
-      const result = await repo.createResource(type, file.data, {
+      const result = await repo.createResource(null, file.data, {
         filename: file.filename,
         metadata: {
           title,
@@ -507,7 +500,7 @@ route("POST", "/api/notes", async (req, res, { repo }) => {
     return badRequest(res, e.message);
   }
 
-  const { type = "note", content, metadata = {}, filename } = body;
+  const { type, content, metadata = {}, filename } = body;
   if (!content && !body.title)
     return badRequest(res, 'Missing "content" or "title" field');
 
