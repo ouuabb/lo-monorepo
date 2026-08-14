@@ -413,7 +413,54 @@ function createNotesApi(client) {
     remove(rid, query) {
       return client.del(`/api/notes/${encodeURIComponent(rid)}`, query).then((r) => r.body);
     },
+    /**
+     * 导入文件(multipart/form-data,构造细节内部封装)
+     * @param {Array<{ name: string, data: Buffer|Uint8Array|ArrayBuffer, contentType?: string }>} files
+     * @param {object} [options] — { title?, tags? } 应用到所有文件
+     */
+    upload(files, options = {}) {
+      const parts = buildMultipartBody(files, {
+        title: options.title,
+        tags: options.tags,
+      });
+      return client
+        .post('/api/notes/upload', parts.body, null, {
+          headers: { 'Content-Type': `multipart/form-data; boundary=${parts.boundary}` },
+        })
+        .then((r) => r.body);
+    },
   };
+}
+
+/**
+ * 构造 multipart/form-data 请求体（RFC 2046，与 core parseMultipart 兼容）
+ * 字段部分无 Content-Type；文件部分带 filename 与 Content-Type。
+ */
+function buildMultipartBody(files, fields = {}) {
+  const boundary = `----loBoundary${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
+  const chunks = [];
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined || value === null) continue;
+    const v = Array.isArray(value) ? value.join(',') : String(value);
+    chunks.push(
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${v}\r\n`,
+      ),
+    );
+  }
+  for (const file of files || []) {
+    const filename = String(file.name || 'file').replace(/"/g, '%22');
+    const contentType = file.contentType || 'application/octet-stream';
+    chunks.push(
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${contentType}\r\n\r\n`,
+      ),
+    );
+    chunks.push(Buffer.isBuffer(file.data) ? file.data : Buffer.from(file.data));
+    chunks.push(Buffer.from('\r\n'));
+  }
+  chunks.push(Buffer.from(`--${boundary}--\r\n`));
+  return { boundary, body: Buffer.concat(chunks) };
 }
 
 function createSearchApi(client) {

@@ -72,9 +72,11 @@ function request(method, url, options = {}) {
     const body =
       options.body === undefined || options.body === null
         ? null
-        : typeof options.body === 'string'
+        : Buffer.isBuffer(options.body)
           ? options.body
-          : JSON.stringify(options.body);
+          : typeof options.body === 'string'
+            ? options.body
+            : JSON.stringify(options.body);
     const timeout = options.timeout || DEFAULT_TIMEOUT;
 
     const req = transport.request(

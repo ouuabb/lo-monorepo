@@ -170,6 +170,15 @@ export interface NotesApi {
   create(body: object): Promise<LoBody>;
   update(rid: string, body: object): Promise<LoBody>;
   remove(rid: string, query?: object): Promise<LoBody>;
+  /** 导入文件(multipart/form-data，构造细节由 SDK 封装) */
+  upload(
+    files: Array<{
+      name: string;
+      data: Buffer | Uint8Array | ArrayBuffer;
+      contentType?: string;
+    }>,
+    options?: { title?: string; tags?: string[] },
+  ): Promise<LoBody>;
 }
 
 export interface SearchApi {

@@ -742,3 +742,112 @@ describe('events namespace', () => {
     }
   });
 });
+
+describe('notes.upload（multipart 构造）', () => {
+  /** 与 core serve.cjs parseMultipart 相同规则的解析（验证 SDK 构造兼容性） */
+  function parseMultipart(body, boundary) {
+    const fields = {};
+    const files = [];
+    const fullBoundary = Buffer.from(`--${boundary}`);
+    let pos = body.indexOf(fullBoundary);
+    while (pos !== -1) {
+      let start = pos + fullBoundary.length;
+      if (body[start] === 0x0d && body[start + 1] === 0x0a) start += 2;
+      const nextBoundary = body.indexOf(fullBoundary, start);
+      if (nextBoundary === -1) break;
+      let partEnd = nextBoundary - 2;
+      if (!(body[partEnd] === 0x0d && body[partEnd + 1] === 0x0a)) partEnd = nextBoundary;
+      const part = body.slice(start, partEnd);
+      const headerEnd = part.indexOf(Buffer.from('\r\n\r\n'));
+      if (headerEnd === -1) {
+        pos = nextBoundary;
+        continue;
+      }
+      const headerText = part.slice(0, headerEnd).toString('utf-8');
+      const data = part.slice(headerEnd + 4);
+      const nameMatch = headerText.match(/name="([^"]+)"/);
+      if (!nameMatch) {
+        pos = nextBoundary;
+        continue;
+      }
+      const filenameMatch = headerText.match(/filename="([^"]+)"/);
+      const contentTypeMatch = headerText.match(/Content-Type:\s*([^\r\n]+)/i);
+      if (filenameMatch) {
+        files.push({
+          name: nameMatch[1],
+          filename: decodeURIComponent(filenameMatch[1]),
+          contentType: contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream',
+          data,
+        });
+      } else {
+        fields[nameMatch[1]] = data.toString('utf-8');
+      }
+      pos = nextBoundary;
+    }
+    return { fields, files };
+  }
+
+  it('构造 multipart 并可被 parseMultipart 规则完整还原', async () => {
+    const { client, calls } = makeClient(() =>
+      Promise.resolve({ status: 201, body: { uploaded: 2, data: [{ rid: 'r1' }, { rid: 'r2' }] }, headers: {} }),
+    );
+    fakeAuthed(client);
+    const res = await client.notes.upload(
+      [
+        { name: 'a.md', data: Buffer.from('# 标题A'), contentType: 'text/markdown' },
+        { name: 'b.txt', data: Buffer.from('hello') },
+      ],
+      { title: '导入测试', tags: ['t1', 't2'] },
+    );
+    expect(res.uploaded).toBe(2);
+    expect(calls[0].method).toBe('POST');
+    expect(calls[0].url).toBe('http://127.0.0.1:8765/api/notes/upload');
+    const { requestOpts } = calls[0];
+    expect(Buffer.isBuffer(requestOpts.body)).toBe(true);
+    const boundary = requestOpts.headers['Content-Type'].match(/boundary=(.+)/)[1];
+    expect(requestOpts.headers['Content-Type']).toContain('multipart/form-data');
+    const parsed = parseMultipart(requestOpts.body, boundary);
+    expect(parsed.fields.title).toBe('导入测试');
+    expect(parsed.fields.tags).toBe('t1,t2');
+    expect(parsed.files.length).toBe(2);
+    expect(parsed.files[0].name).toBe('file');
+    expect(parsed.files[0].filename).toBe('a.md');
+    expect(parsed.files[0].contentType).toBe('text/markdown');
+    expect(parsed.files[0].data.toString()).toBe('# 标题A');
+    expect(parsed.files[1].filename).toBe('b.txt');
+    expect(parsed.files[1].contentType).toBe('application/octet-stream');
+    expect(parsed.files[1].data.toString()).toBe('hello');
+  });
+
+  it('文件名为空/含引号时安全转义', async () => {
+    const { client, calls } = makeClient(() =>
+      Promise.resolve({ status: 201, body: { uploaded: 1, data: [] }, headers: {} }),
+    );
+    fakeAuthed(client);
+    await client.notes.upload([{ name: 'a"b.md', data: Buffer.from('x') }]);
+    const { requestOpts } = calls[0];
+    const boundary = requestOpts.headers['Content-Type'].match(/boundary=(.+)/)[1];
+    const parsed = parseMultipart(requestOpts.body, boundary);
+    expect(parsed.files[0].filename).toBe('a"b.md');
+  });
+
+  it('无文件时 body 仍为合法 multipart', async () => {
+    const { client, calls } = makeClient(() =>
+      Promise.resolve({ status: 201, body: { uploaded: 0, data: [] }, headers: {} }),
+    );
+    fakeAuthed(client);
+    await client.notes.upload([], { title: 'x' });
+    const { requestOpts } = calls[0];
+    expect(requestOpts.body.toString()).toContain('--');
+  });
+
+  it('服务端错误转换为 LoApiError', async () => {
+    const { client } = makeClient(() =>
+      Promise.resolve({ status: 400, body: { error: '未找到上传的文件（field name 需为 "file"）' }, headers: {} }),
+    );
+    fakeAuthed(client);
+    await expect(client.notes.upload([{ name: 'a.md', data: Buffer.from('x') }])).rejects.toThrow(
+      LoApiError,
+    );
+  });
+});

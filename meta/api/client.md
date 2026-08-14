@@ -21,7 +21,7 @@ await client.login({ privateKeyPath: '~/.ssh/id_ed25519' });
 | 命名空间 | 方法 |
 |---|---|
 | `health` | `ping / stats / tags` |
-| `notes` | `list / get / create / update / remove` |
+| `notes` | `list / get / create / update / remove / upload` |
 | `search` | `search` |
 | `schemas` | `list / get / create / update / remove / attach / detach` |
 | `views` | `list / get / create / update / remove / run / export / importDef` |
@@ -36,6 +36,13 @@ await client.login({ privateKeyPath: '~/.ssh/id_ed25519' });
 
 > 命名空间由 `src/client.cjs` 的 `create*Api(this)` 构造；完整签名见
 > `packages/client/types/index.d.ts`。
+
+## notes.upload（导入文件）
+
+- `notes.upload(files, { title?, tags? })`：multipart/form-data 请求 `POST /api/notes/upload`；
+  multipart 构造（boundary/part 头）完全封装在 SDK 内部。
+- `files`：`[{ name, data: Buffer|Uint8Array|ArrayBuffer, contentType? }]`；`title/tags`
+  应用到全部文件；返回 `{ uploaded, data }`（data 为各文件创建的资源结果）。
 
 ## 错误
 
