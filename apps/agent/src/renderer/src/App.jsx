@@ -20,6 +20,7 @@ function formatTime(value) {
 const SUB_NAV = [
   { id: 'workspace', label: '工作台' },
   { id: 'history', label: '历史' },
+  { id: 'settings', label: '文件设置' },
 ];
 
 const MIN_SIDEBAR_WIDTH = 200;
@@ -46,13 +47,16 @@ export default function App() {
   const [message, setMessage] = useState('');
   const [tabs, setTabs] = useState([]);
   const [activeKey, setActiveKey] = useState(null);
-  const [savingKey, setSavingKey] = useState(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [ctxMenu, setCtxMenu] = useState(null);
+  const [readOnlyOverrides, setReadOnlyOverrides] = useState(() => new Set());
+  const [autoSave, setAutoSave] = useState(false);
   const discardKeyRef = useRef(null);
   const deleteRidRef = useRef(null);
   const toastTimerRef = useRef(null);
+  const autoSaveTimerRef = useRef(null);
 
   const notify = useCallback((text) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -172,7 +176,7 @@ export default function App() {
       if (res.ok && res.data) {
         setRelationsOpen(true);
         const data = res.data;
-        const readOnly = n.type !== 'note';
+        const readOnly = n.type !== 'note' || readOnlyOverrides.has(n.rid);
         const meta = data.metadata || {};
         const tabTitle = meta.title || n.name || n.rid;
         const tabTags = Array.isArray(data.tags) ? data.tags.join(', ') : '';
@@ -262,43 +266,61 @@ export default function App() {
     [activeKey],
   );
 
-  const saveActiveTab = useCallback(async () => {
-    if (!api || !activeTab || activeTab.readOnly) return;
-    setSavingKey(activeTab.key);
-    notify('');
-    const body = { content: activeTab.text };
-    if (activeTab.title !== activeTab.savedTitle) body.title = activeTab.title;
-    if (activeTab.tagsText !== activeTab.savedTagsText) {
-      body.tags = activeTab.tagsText
-        .split(/[,，]/)
-        .map((t) => t.trim())
-        .filter(Boolean);
-    }
-    if (activeTab.category !== activeTab.savedCategory) {
-      body.category = activeTab.category.trim();
-    }
-    const res = await api.updateNote(activeTab.rid, body);
-    setSavingKey(null);
-    if (res.ok) {
-      setTabs((prev) =>
-        prev.map((t) =>
-          t.key === activeTab.key
-            ? {
-                ...t,
-                savedText: t.text,
-                savedTitle: t.title,
-                savedTagsText: t.tagsText,
-                savedCategory: t.category,
-              }
-            : t,
-        ),
-      );
-      notify('已保存');
-      handleRefresh();
-    } else {
-      notify(`保存失败: ${res.message}`);
-    }
-  }, [api, activeTab, handleRefresh]);
+  const saveActiveTab = useCallback(
+    async (silent = false) => {
+      if (!api || !activeTab || activeTab.readOnly) return;
+      if (!silent) notify('');
+      const body = { content: activeTab.text };
+      if (activeTab.title !== activeTab.savedTitle) body.title = activeTab.title;
+      if (activeTab.tagsText !== activeTab.savedTagsText) {
+        body.tags = activeTab.tagsText
+          .split(/[,，]/)
+          .map((t) => t.trim())
+          .filter(Boolean);
+      }
+      if (activeTab.category !== activeTab.savedCategory) {
+        body.category = activeTab.category.trim();
+      }
+      const res = await api.updateNote(activeTab.rid, body);
+      if (res.ok) {
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.key === activeTab.key
+              ? {
+                  ...t,
+                  savedText: t.text,
+                  savedTitle: t.title,
+                  savedTagsText: t.tagsText,
+                  savedCategory: t.category,
+                }
+              : t,
+          ),
+        );
+        if (!silent) notify('已保存');
+        handleRefresh();
+      } else {
+        notify(`保存失败: ${res.message}`);
+      }
+    },
+    [api, activeTab, handleRefresh],
+  );
+
+  useEffect(() => {
+    if (!autoSave) return undefined;
+    const tab = tabs.find((t) => t.key === activeKey);
+    if (!tab || tab.readOnly || !isDirty(tab)) return undefined;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveTimerRef.current = null;
+      saveActiveTab(true);
+    }, 1000);
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+    };
+  }, [tabs, activeKey, autoSave, saveActiveTab, isDirty]);
 
   const createNote = useCallback(async () => {
     if (!api) return;
@@ -339,11 +361,27 @@ export default function App() {
     [api, handleRefresh],
   );
 
-  const requestDeleteNote = useCallback(() => {
-    if (!activeTab) return;
-    deleteRidRef.current = activeTab.rid;
+  const requestDeleteNote = useCallback((rid) => {
+    const target = rid || (activeTab && activeTab.rid);
+    if (!target) return;
+    deleteRidRef.current = target;
     setConfirmDelete(true);
   }, [activeTab]);
+
+  const toggleReadOnly = useCallback((rid) => {
+    setReadOnlyOverrides((prev) => {
+      const next = new Set(prev);
+      if (next.has(rid)) {
+        next.delete(rid);
+      } else {
+        next.add(rid);
+      }
+      return next;
+    });
+    setTabs((prev) =>
+      prev.map((t) => (t.rid === rid ? { ...t, readOnly: !t.readOnly } : t)),
+    );
+  }, []);
 
   const confirmDeleteNote = useCallback(async () => {
     const rid = deleteRidRef.current;
@@ -468,6 +506,15 @@ useEffect(() => {
     },
     [sidebarWidth, collapsed],
   );
+
+  const openCtxMenu = useCallback((n, x, y) => {
+    setCtxMenu({
+      x: Math.max(4, Math.min(x, window.innerWidth - 190)),
+      y: Math.max(4, Math.min(y, window.innerHeight - 140)),
+      rid: n.rid,
+      readOnly: n.type !== 'note' || readOnlyOverrides.has(n.rid),
+    });
+  }, [readOnlyOverrides]);
 
   const toggleSidebar = useCallback(() => {
     if (collapsed) {
@@ -651,6 +698,7 @@ useEffect(() => {
                 onOpen={openResource}
                 onNewNote={createNote}
                 onImport={importFiles}
+                onContextMenu={openCtxMenu}
               />
             </div>
           </Bar>
@@ -725,33 +773,6 @@ useEffect(() => {
                       aria-label="分类"
                     />
                     {isDirty(activeTab) && <span className="chip chip-dirty">未保存</span>}
-                    {activeTab.readOnly && <span className="chip">只读</span>}
-                  </div>
-                  <div className="editor-toolbar-actions">
-                    <button
-                      className="btn ghost"
-                      type="button"
-                      onClick={undoLast}
-                      disabled={busy}
-                    >
-                      撤销
-                    </button>
-                    <button
-                      className="btn danger"
-                      type="button"
-                      onClick={requestDeleteNote}
-                      disabled={savingKey}
-                    >
-                      删除
-                    </button>
-                    <button
-                      className="btn primary"
-                      type="button"
-                      onClick={saveActiveTab}
-                      disabled={savingKey || activeTab.readOnly}
-                    >
-                      {savingKey ? '保存中…' : activeTab.readOnly ? '只读' : '保存'}
-                    </button>
                   </div>
                 </div>
 
@@ -826,6 +847,13 @@ useEffect(() => {
                       onRefresh={handleRefresh}
                     />
                   )}
+
+                  {view === 'settings' && (
+                    <FileSettingsPanel
+                      autoSave={autoSave}
+                      onToggleAutoSave={setAutoSave}
+                    />
+                  )}
                 </div>
               </div>
             </Bar>
@@ -837,6 +865,14 @@ useEffect(() => {
             {message}
           </div>
         )}
+
+        <NoteContextMenu
+          menu={ctxMenu}
+          onClose={() => setCtxMenu(null)}
+          onUndo={undoLast}
+          onDelete={requestDeleteNote}
+          onToggleReadOnly={toggleReadOnly}
+        />
 
         {loginOpen && (
           <Modal title="登录" onClose={closeLogin}>
@@ -1834,6 +1870,29 @@ function RelationPanel(props) {
   );
 }
 
+function FileSettingsPanel(props) {
+  const { autoSave, onToggleAutoSave } = props;
+  return (
+    <div className="panel-card">
+      <h2>文件设置</h2>
+      <div className="field-row">
+        <label>
+          <span>自动保存</span>
+          <input
+            type="checkbox"
+            checked={autoSave}
+            onChange={(e) => onToggleAutoSave(e.target.checked)}
+            style={{ width: 18, height: 18, marginTop: 4 }}
+          />
+        </label>
+      </div>
+      <p className="empty">
+        开启后，停止输入 1 秒自动保存当前笔记（仅可编辑笔记，只读笔记不受影响）。
+      </p>
+    </div>
+  );
+}
+
 function OperationHistory(props) {
   const { authenticated, onLogin, onNotify, onRefresh } = props;
   const [ops, setOps] = useState([]);
@@ -2020,7 +2079,7 @@ function WorkspacePanel(props) {
 }
 
 function ResourceExplorer(props) {
-  const { notes, busy, authenticated, onRefresh, onOpen, onNewNote, onImport } = props;
+  const { notes, busy, authenticated, onRefresh, onOpen, onNewNote, onImport, onContextMenu } = props;
   const [active, setActive] = useState(null);
   const [collapsedSet, setCollapsedSet] = useState(() => new Set());
   const fileRef = useRef(null);
@@ -2157,6 +2216,10 @@ function ResourceExplorer(props) {
                       setActive(n.rid);
                       if (onOpen) onOpen(n);
                     }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      if (onContextMenu) onContextMenu(n, e.clientX, e.clientY);
+                    }}
                     title={n.rid}
                   >
                     <span className="explore-name">
@@ -2172,6 +2235,34 @@ function ResourceExplorer(props) {
         )}
       </nav>
     </div>
+  );
+}
+
+function NoteContextMenu(props) {
+  const { menu, onClose, onUndo, onDelete, onToggleReadOnly } = props;
+  if (!menu) return null;
+  return (
+    <>
+      <div
+        className="ctx-overlay"
+        onClick={onClose}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          onClose();
+        }}
+      />
+      <div className="ctx-menu" style={{ left: menu.x, top: menu.y }}>
+        <button type="button" onClick={() => { onUndo(); onClose(); }}>
+          撤销最近操作
+        </button>
+        <button type="button" onClick={() => { onDelete(menu.rid); onClose(); }}>
+          删除笔记
+        </button>
+        <button type="button" onClick={() => { onToggleReadOnly(menu.rid); onClose(); }}>
+          {menu.readOnly ? '改为可编辑' : '设为只读'}
+        </button>
+      </div>
+    </>
   );
 }
 
