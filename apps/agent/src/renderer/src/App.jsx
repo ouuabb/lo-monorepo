@@ -21,12 +21,17 @@ const SUB_NAV = [
   { id: 'history', label: '历史' },
 ];
 
+const MIN_SIDEBAR_WIDTH = 200;
+const MAX_SIDEBAR_WIDTH = 480;
+
 export default function App() {
   const [view, setView] = useState('workspace');
   const [subOpen, setSubOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(220);
   const [resizing, setResizing] = useState(false);
+  const [dragFromCollapsed, setDragFromCollapsed] = useState(false);
+  const lastWidthRef = useRef(220);
   const [loginOpen, setLoginOpen] = useState(false);
   const [pluginView, setPluginView] = useState(false);
   const [pluginTab, setPluginTab] = useState('commands');
@@ -424,23 +429,45 @@ useEffect(() => {
       e.preventDefault();
       setResizing(true);
       const startX = e.clientX;
-      const startWidth = sidebarWidth;
+      const wasCollapsed = collapsed;
+      setDragFromCollapsed(wasCollapsed);
+      // 折叠状态起锚为 0：边线从隐藏处跟手滑出
+      const startWidth = wasCollapsed ? 0 : sidebarWidth;
+      let lastW = startWidth;
       const onMove = (ev) => {
-        const next = Math.min(480, Math.max(140, startWidth + (ev.clientX - startX)));
-        setSidebarWidth(next);
+        const next = startWidth + (ev.clientX - startX);
+        lastW = Math.max(0, Math.min(MAX_SIDEBAR_WIDTH, next));
+        if (lastW < MIN_SIDEBAR_WIDTH) {
+          // 未到最小边：边线先停在最小边（折叠态可见），保持隐藏
+          setSidebarWidth(MIN_SIDEBAR_WIDTH);
+          return;
+        }
+        setCollapsed(false);
+        setSidebarWidth(lastW);
       };
       const stop = () => {
         setResizing(false);
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', stop);
         document.body.classList.remove('no-select');
+        if (lastW < MIN_SIDEBAR_WIDTH) setCollapsed(true);
       };
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', stop);
       document.body.classList.add('no-select');
     },
-    [sidebarWidth],
+    [sidebarWidth, collapsed],
   );
+
+  const toggleSidebar = useCallback(() => {
+    if (collapsed) {
+      setSidebarWidth(Math.max(MIN_SIDEBAR_WIDTH, lastWidthRef.current || sidebarWidth));
+      setCollapsed(false);
+    } else {
+      lastWidthRef.current = sidebarWidth;
+      setCollapsed(true);
+    }
+  }, [collapsed, sidebarWidth]);
 
   const openLogin = () => setLoginOpen(true);
   const closeLogin = () => setLoginOpen(false);
@@ -542,7 +569,7 @@ useEffect(() => {
         <button
           className="hamburger"
           aria-label="切换侧边栏"
-          onClick={() => setCollapsed((v) => !v)}
+          onClick={toggleSidebar}
         >
           <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
             <path
@@ -564,7 +591,7 @@ useEffect(() => {
         />
         {renderCtlButtons()}
       </header>
-      <div className={`app-shell ${resizing ? 'resizing' : ''}`}>
+      <div className={`app-shell ${resizing ? 'resizing' : ''} ${collapsed ? 'sidebar-hidden' : ''}`}>
         <aside className="app-rail">
           <div className="rail-spacer" />
           <button
@@ -604,23 +631,28 @@ useEffect(() => {
         </aside>
         <aside
           className={collapsed ? 'app-sidebar collapsed' : 'app-sidebar'}
-          style={{ width: collapsed ? 0 : sidebarWidth }}
+          style={{
+            width:
+              (resizing && dragFromCollapsed) || !collapsed ? sidebarWidth : 0,
+          }}
         >
-          <ResourceExplorer
-            notes={notes}
-            busy={busy}
-            authenticated={authenticated}
-            onRefresh={handleRefresh}
-            onOpen={openResource}
-            onNewNote={createNote}
-            onImport={importFiles}
-          />
+          <div className="app-sidebar-inner" style={{ width: sidebarWidth }}>
+            <ResourceExplorer
+              notes={notes}
+              busy={busy}
+              authenticated={authenticated}
+              onRefresh={handleRefresh}
+              onOpen={openResource}
+              onNewNote={createNote}
+              onImport={importFiles}
+            />
+          </div>
         </aside>
 
         <div
           className="app-sidebar-resizer"
           onPointerDown={startResize}
-          title="拖拽调整侧边栏宽度"
+          title={collapsed ? '拖拽展开侧边栏' : '拖拽调整侧边栏宽度'}
         />
 
       <main className="app-content">
@@ -1987,7 +2019,20 @@ function WorkspacePanel(props) {
 function ResourceExplorer(props) {
   const { notes, busy, authenticated, onRefresh, onOpen, onNewNote, onImport } = props;
   const [active, setActive] = useState(null);
+  const [collapsedSet, setCollapsedSet] = useState(() => new Set());
   const fileRef = useRef(null);
+
+  const toggleGroup = (type) => {
+    setCollapsedSet((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        next.delete(type);
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
+  };
 
   const groups = useMemo(() => {
     const m = {};
@@ -2084,27 +2129,41 @@ function ResourceExplorer(props) {
         </button>
       </div>
       <nav className="explore-list">
-        {groups.map(([type, items]) => (
-          <div className="explore-group" key={type}>
-            <div className="explore-group-title">{type}</div>
-            {items.map((n) => (
+        {groups.map(([type, items]) => {
+          const collapsed = collapsedSet.has(type);
+          return (
+            <div className="explore-group" key={type}>
               <button
-                key={n.rid}
                 type="button"
-                className={`explore-item ${active === n.rid ? 'active' : ''}`}
-                onClick={() => {
-                  setActive(n.rid);
-                  if (onOpen) onOpen(n);
-                }}
-                title={n.rid}
+                className={`explore-group-title ${collapsed ? 'collapsed' : ''}`}
+                onClick={() => toggleGroup(type)}
+                aria-expanded={!collapsed}
+                title={collapsed ? `展开 ${type}` : `折叠 ${type}`}
               >
-                <span className="explore-name">
-                  {(n.metadata && n.metadata.title) || n.name || n.rid}
-                </span>
+                <span className="explore-group-toggle">{collapsed ? '+' : '−'}</span>
+                <span className="explore-group-label">{type}</span>
+                <span className="explore-group-count">{items.length}</span>
               </button>
-            ))}
-          </div>
-        ))}
+              {!collapsed &&
+                items.map((n) => (
+                  <button
+                    key={n.rid}
+                    type="button"
+                    className={`explore-item ${active === n.rid ? 'active' : ''}`}
+                    onClick={() => {
+                      setActive(n.rid);
+                      if (onOpen) onOpen(n);
+                    }}
+                    title={n.rid}
+                  >
+                    <span className="explore-name">
+                      {(n.metadata && n.metadata.title) || n.name || n.rid}
+                    </span>
+                  </button>
+                ))}
+            </div>
+          );
+        })}
         {!busy && groups.length === 0 && (
           <p className="empty">{authenticated ? '暂无资源' : '未登录，点击顶栏指示灯登录'}</p>
         )}
