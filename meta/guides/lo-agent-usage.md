@@ -44,6 +44,21 @@ renderer ─login({ privateKeyPath })→ main ──@lo/client──► serve
 
 - 挑战环节由 SDK 自动完成，UI 不暴露 nonce/signature。
 
+## 笔记操作（侧边栏「资源」+ 编辑器）
+
+| 操作 | 入口 | 链路 |
+|---|---|---|
+| 新建笔记 | 侧边栏「资源」`+` | `loCore.createNote({ content:'', title:'未命名笔记' })` → IPC `lo-core:create-note` → `client.notes.create` → `POST /api/notes` |
+| 导入文件 | 侧边栏「资源」导入按钮（多选） | `loCore.uploadNotes(files, {})` → IPC `lo-core:upload-notes` → `client.notes.upload`（multipart 构造在 SDK 内部）→ `POST /api/notes/upload` |
+| 编辑与保存 | 编辑器；`Ctrl+S` | 内容/标题/标签/分类变化后 `loCore.updateNote(rid, { content?, title?, tags?, category? })` → IPC `lo-core:update-note` → `client.operations.execute('resource.update', …)` |
+| 重命名 | 编辑器标题输入框 | 同上（`title` 字段） |
+| 标签/分类 | 编辑器标签与分类输入框（标签逗号分隔） | 同上（`tags` 数组落 `resource_tags` 表、`category` 字符串存 `metadata`） |
+| 删除笔记 | 编辑器「删除」→ 确认弹窗 | `loCore.removeNote(rid)` → IPC `lo-core:remove-note` → `client.operations.execute('resource.delete', { rid })`（默认软删） |
+| 撤销最近操作 | 编辑器「撤销」 | `loCore.operations.list({ limit:1 })` 取最近操作 → `loCore.operations.undo(opId)` → IPC `lo-core:operation-undo` |
+
+- 新建/删除后侧边栏列表自动刷新；删除可在「功能面板 → 历史」中撤销恢复。
+- 导入文件为独立链路：renderer 读取 `ArrayBuffer`（结构化克隆传主进程），不接触 Node Buffer。
+
 ## 安全基线
 
 - Electron 最严格配置：`contextIsolation:true`、`nodeIntegration:false`、`sandbox:true`

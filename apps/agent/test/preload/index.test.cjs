@@ -40,7 +40,10 @@ describe('src/preload/index.cjs', () => {
     expect(api.loCore.getStatus).toBeDefined();
     expect(api.loCore.listNotes).toBeDefined();
     expect(api.loCore.getNote).toBeDefined();
+    expect(api.loCore.createNote).toBeDefined();
     expect(api.loCore.updateNote).toBeDefined();
+    expect(api.loCore.removeNote).toBeDefined();
+    expect(api.loCore.uploadNotes).toBeDefined();
     expect(api.loCore.logout).toBeDefined();
     expect(api.loCore.operations).toBeDefined();
     expect(api.loCore.operations.list).toBeDefined();
@@ -144,7 +147,10 @@ describe('src/preload/index.cjs', () => {
     api.loCore.getStatus();
     api.loCore.listNotes({ limit: 5 });
     api.loCore.getNote('res_1');
+    api.loCore.createNote({ title: '新笔记' });
     api.loCore.updateNote('res_1', { content: 'x' });
+    api.loCore.removeNote('res_1');
+    api.loCore.uploadNotes([{ name: 'a.md', data: new Uint8Array([1, 2]) }], { title: 't' });
     api.loCore.logout();
     api.loCore.events.subscribe(['resource.created']);
     api.loCore.events.unsubscribe();
@@ -163,31 +169,36 @@ describe('src/preload/index.cjs', () => {
     api.plugins.manage.getConfig('demo');
     api.plugins.manage.setConfig('demo', 'greeting', '你好');
 
-    expect(mockInvoke).toHaveBeenCalledTimes(24);
+    expect(mockInvoke).toHaveBeenCalledTimes(27);
     expect(mockInvoke).toHaveBeenNthCalledWith(1, 'lo-core:config');
     expect(mockInvoke).toHaveBeenNthCalledWith(2, 'lo-core:configure', { host: 'h' });
     expect(mockInvoke).toHaveBeenNthCalledWith(3, 'lo-core:login', 'x-invalid-arg');
     expect(mockInvoke).toHaveBeenNthCalledWith(4, 'lo-core:status');
     expect(mockInvoke).toHaveBeenNthCalledWith(5, 'lo-core:list-notes', { limit: 5 });
     expect(mockInvoke).toHaveBeenNthCalledWith(6, 'lo-core:get-note', 'res_1');
-    expect(mockInvoke).toHaveBeenNthCalledWith(7, 'lo-core:update-note', 'res_1', { content: 'x' });
-    expect(mockInvoke).toHaveBeenNthCalledWith(8, 'lo-core:logout');
-    expect(mockInvoke).toHaveBeenNthCalledWith(9, 'lo-core:events-subscribe', ['resource.created']);
-    expect(mockInvoke).toHaveBeenNthCalledWith(10, 'lo-core:events-unsubscribe');
-    expect(mockInvoke).toHaveBeenNthCalledWith(11, 'lo-core:operations', { limit: 5 });
-    expect(mockInvoke).toHaveBeenNthCalledWith(12, 'lo-core:operation-undo', 'op_1');
-    expect(mockInvoke).toHaveBeenNthCalledWith(13, 'lo-core:relations', 'res_1');
-    expect(mockInvoke).toHaveBeenNthCalledWith(14, 'agent-plugins:list-commands');
-    expect(mockInvoke).toHaveBeenNthCalledWith(15, 'agent-plugins:execute-command', 'demo.hello', ['world']);
-    expect(mockInvoke).toHaveBeenNthCalledWith(16, 'agent-plugins:list-views');
-    expect(mockInvoke).toHaveBeenNthCalledWith(17, 'agent-plugins:render-view', 'demo.status', { rid: 'r1' });
-    expect(mockInvoke).toHaveBeenNthCalledWith(18, 'agent-plugins:install', 'demo', 'https://example.com', { force: true });
-    expect(mockInvoke).toHaveBeenNthCalledWith(19, 'agent-plugins:list-plugins');
-    expect(mockInvoke).toHaveBeenNthCalledWith(20, 'agent-plugins:enable', 'demo');
-    expect(mockInvoke).toHaveBeenNthCalledWith(21, 'agent-plugins:disable', 'demo');
-    expect(mockInvoke).toHaveBeenNthCalledWith(22, 'agent-plugins:uninstall', 'demo');
-    expect(mockInvoke).toHaveBeenNthCalledWith(23, 'agent-plugins:get-plugin-config', 'demo');
-    expect(mockInvoke).toHaveBeenNthCalledWith(24, 'agent-plugins:set-plugin-config', 'demo', 'greeting', '你好');
+    expect(mockInvoke).toHaveBeenNthCalledWith(7, 'lo-core:create-note', { title: '新笔记' });
+    expect(mockInvoke).toHaveBeenNthCalledWith(8, 'lo-core:update-note', 'res_1', { content: 'x' });
+    expect(mockInvoke).toHaveBeenNthCalledWith(9, 'lo-core:remove-note', 'res_1');
+    expect(mockInvoke).toHaveBeenNthCalledWith(10, 'lo-core:upload-notes', [
+      { name: 'a.md', data: new Uint8Array([1, 2]) },
+    ], { title: 't' });
+    expect(mockInvoke).toHaveBeenNthCalledWith(11, 'lo-core:logout');
+    expect(mockInvoke).toHaveBeenNthCalledWith(12, 'lo-core:events-subscribe', ['resource.created']);
+    expect(mockInvoke).toHaveBeenNthCalledWith(13, 'lo-core:events-unsubscribe');
+    expect(mockInvoke).toHaveBeenNthCalledWith(14, 'lo-core:operations', { limit: 5 });
+    expect(mockInvoke).toHaveBeenNthCalledWith(15, 'lo-core:operation-undo', 'op_1');
+    expect(mockInvoke).toHaveBeenNthCalledWith(16, 'lo-core:relations', 'res_1');
+    expect(mockInvoke).toHaveBeenNthCalledWith(17, 'agent-plugins:list-commands');
+    expect(mockInvoke).toHaveBeenNthCalledWith(18, 'agent-plugins:execute-command', 'demo.hello', ['world']);
+    expect(mockInvoke).toHaveBeenNthCalledWith(19, 'agent-plugins:list-views');
+    expect(mockInvoke).toHaveBeenNthCalledWith(20, 'agent-plugins:render-view', 'demo.status', { rid: 'r1' });
+    expect(mockInvoke).toHaveBeenNthCalledWith(21, 'agent-plugins:install', 'demo', 'https://example.com', { force: true });
+    expect(mockInvoke).toHaveBeenNthCalledWith(22, 'agent-plugins:list-plugins');
+    expect(mockInvoke).toHaveBeenNthCalledWith(23, 'agent-plugins:enable', 'demo');
+    expect(mockInvoke).toHaveBeenNthCalledWith(24, 'agent-plugins:disable', 'demo');
+    expect(mockInvoke).toHaveBeenNthCalledWith(25, 'agent-plugins:uninstall', 'demo');
+    expect(mockInvoke).toHaveBeenNthCalledWith(26, 'agent-plugins:get-plugin-config', 'demo');
+    expect(mockInvoke).toHaveBeenNthCalledWith(27, 'agent-plugins:set-plugin-config', 'demo', 'greeting', '你好');
   });
 
   it('events.onEvent 注册 EVENTS_PUSH 监听并返回退订函数', () => {

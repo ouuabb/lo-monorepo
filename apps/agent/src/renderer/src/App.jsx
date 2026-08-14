@@ -41,13 +41,22 @@ export default function App() {
   const [activeKey, setActiveKey] = useState(null);
   const [savingKey, setSavingKey] = useState(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [zoom, setZoom] = useState(1);
   const discardKeyRef = useRef(null);
+  const deleteRidRef = useRef(null);
 
   const notify = (text) => setMessage(text);
 
   const activeTab = tabs.find((t) => t.key === activeKey) || null;
-  const isDirty = (tab) => !!tab && (tab.readOnly ? false : tab.text !== tab.savedText);
+  const isDirty = (tab) =>
+    !!tab &&
+    (tab.readOnly
+      ? false
+      : tab.text !== tab.savedText ||
+        tab.title !== tab.savedTitle ||
+        tab.tagsText !== tab.savedTagsText ||
+        tab.category !== tab.savedCategory);
 
   useEffect(() => {
     if (!api) {
@@ -149,13 +158,21 @@ export default function App() {
       if (res.ok && res.data) {
         const data = res.data;
         const readOnly = n.type !== 'note';
+        const meta = data.metadata || {};
+        const tabTitle = meta.title || n.name || n.rid;
+        const tabTags = Array.isArray(data.tags) ? data.tags.join(', ') : '';
         const tab = {
           key: n.rid,
           rid: n.rid,
           type: n.type || data.type || 'resource',
-          title: (data.metadata && data.metadata.title) || n.name || n.rid,
+          title: tabTitle,
+          tagsText: tabTags,
+          category: meta.category || '',
           text: data.content || '',
           savedText: data.content || '',
+          savedTitle: tabTitle,
+          savedTagsText: tabTags,
+          savedCategory: meta.category || '',
           readOnly,
           meta: {
             rid: n.rid,
@@ -209,15 +226,57 @@ export default function App() {
     [tabs, isDirty, closeTab],
   );
 
+  const setActiveTitle = useCallback(
+    (title) => {
+      setTabs((prev) => prev.map((t) => (t.key === activeKey ? { ...t, title } : t)));
+    },
+    [activeKey],
+  );
+
+  const setActiveTagsText = useCallback(
+    (tagsText) => {
+      setTabs((prev) => prev.map((t) => (t.key === activeKey ? { ...t, tagsText } : t)));
+    },
+    [activeKey],
+  );
+
+  const setActiveCategory = useCallback(
+    (category) => {
+      setTabs((prev) => prev.map((t) => (t.key === activeKey ? { ...t, category } : t)));
+    },
+    [activeKey],
+  );
+
   const saveActiveTab = useCallback(async () => {
     if (!api || !activeTab || activeTab.readOnly) return;
     setSavingKey(activeTab.key);
     notify('');
-    const res = await api.updateNote(activeTab.rid, { content: activeTab.text });
+    const body = { content: activeTab.text };
+    if (activeTab.title !== activeTab.savedTitle) body.title = activeTab.title;
+    if (activeTab.tagsText !== activeTab.savedTagsText) {
+      body.tags = activeTab.tagsText
+        .split(/[,，]/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+    }
+    if (activeTab.category !== activeTab.savedCategory) {
+      body.category = activeTab.category.trim();
+    }
+    const res = await api.updateNote(activeTab.rid, body);
     setSavingKey(null);
     if (res.ok) {
       setTabs((prev) =>
-        prev.map((t) => (t.key === activeTab.key ? { ...t, savedText: t.text } : t)),
+        prev.map((t) =>
+          t.key === activeTab.key
+            ? {
+                ...t,
+                savedText: t.text,
+                savedTitle: t.title,
+                savedTagsText: t.tagsText,
+                savedCategory: t.category,
+              }
+            : t,
+        ),
       );
       notify('已保存');
       handleRefresh();
@@ -225,6 +284,91 @@ export default function App() {
       notify(`保存失败: ${res.message}`);
     }
   }, [api, activeTab, handleRefresh]);
+
+  const createNote = useCallback(async () => {
+    if (!api) return;
+    setBusy(true);
+    notify('');
+    const res = await api.createNote({ content: '', title: '未命名笔记' });
+    setBusy(false);
+    if (res.ok && res.data && res.data.rid) {
+      notify('已创建');
+      handleRefresh();
+      await openResource({ rid: res.data.rid, type: 'note', name: '未命名笔记' });
+    } else {
+      notify(`创建失败: ${res.message}`);
+    }
+  }, [api, openResource, handleRefresh]);
+
+  const importFiles = useCallback(
+    async (fileList) => {
+      if (!api || !fileList || fileList.length === 0) return;
+      setBusy(true);
+      notify('');
+      const files = await Promise.all(
+        Array.from(fileList).map(async (f) => ({
+          name: f.name,
+          data: await f.arrayBuffer(),
+          contentType: f.type || undefined,
+        })),
+      );
+      const res = await api.uploadNotes(files, {});
+      setBusy(false);
+      if (res.ok) {
+        notify(`已导入 ${res.data.uploaded} 个文件`);
+        handleRefresh();
+      } else {
+        notify(`导入失败: ${res.message}`);
+      }
+    },
+    [api, handleRefresh],
+  );
+
+  const requestDeleteNote = useCallback(() => {
+    if (!activeTab) return;
+    deleteRidRef.current = activeTab.rid;
+    setConfirmDelete(true);
+  }, [activeTab]);
+
+  const confirmDeleteNote = useCallback(async () => {
+    const rid = deleteRidRef.current;
+    deleteRidRef.current = null;
+    setConfirmDelete(false);
+    if (!api || !rid) return;
+    setBusy(true);
+    notify('');
+    const res = await api.removeNote(rid);
+    setBusy(false);
+    if (res.ok) {
+      notify('已删除');
+      closeTab(rid);
+      handleRefresh();
+    } else {
+      notify(`删除失败: ${res.message}`);
+    }
+  }, [api, closeTab, handleRefresh]);
+
+  const undoLast = useCallback(async () => {
+    if (!api || !api.operations) return;
+    setBusy(true);
+    notify('');
+    const list = await api.operations.list({ limit: 1 });
+    if (!list.ok || !list.data || list.data.length === 0) {
+      setBusy(false);
+      notify(list.ok ? '没有可撤销的操作' : `获取操作失败: ${list.message}`);
+      return;
+    }
+    const op = list.data[0];
+    const opId = op.operation_id || op.operationId;
+    const res = await api.operations.undo(opId);
+    setBusy(false);
+    if (res.ok) {
+      notify('已撤销最近操作');
+      handleRefresh();
+    } else {
+      notify(`撤销失败: ${res.message}`);
+    }
+  }, [api, handleRefresh]);
 
   const confirmDiscardAction = useCallback(() => {
     const key = discardKeyRef.current;
@@ -468,6 +612,8 @@ useEffect(() => {
             authenticated={authenticated}
             onRefresh={handleRefresh}
             onOpen={openResource}
+            onNewNote={createNote}
+            onImport={importFiles}
           />
         </aside>
 
@@ -524,12 +670,50 @@ useEffect(() => {
           <div className="editor-panel">
             <div className="editor-toolbar">
               <div className="editor-toolbar-title">
+                <input
+                  className="editor-doc-name-input"
+                  value={activeTab.title}
+                  disabled={activeTab.readOnly}
+                  onChange={(e) => setActiveTitle(e.target.value)}
+                  aria-label="笔记标题"
+                />
                 <span className="editor-doc-rid">{activeTab.rid}</span>
-                <span className="editor-doc-name">{activeTab.title}</span>
+                <input
+                  className="editor-meta-input"
+                  placeholder="标签（逗号分隔）"
+                  value={activeTab.tagsText}
+                  disabled={activeTab.readOnly}
+                  onChange={(e) => setActiveTagsText(e.target.value)}
+                  aria-label="标签"
+                />
+                <input
+                  className="editor-meta-input editor-meta-input-sm"
+                  placeholder="分类"
+                  value={activeTab.category}
+                  disabled={activeTab.readOnly}
+                  onChange={(e) => setActiveCategory(e.target.value)}
+                  aria-label="分类"
+                />
                 {isDirty(activeTab) && <span className="chip chip-dirty">未保存</span>}
                 {activeTab.readOnly && <span className="chip">只读</span>}
               </div>
               <div className="editor-toolbar-actions">
+                <button
+                  className="btn ghost"
+                  type="button"
+                  onClick={undoLast}
+                  disabled={busy}
+                >
+                  撤销
+                </button>
+                <button
+                  className="btn danger"
+                  type="button"
+                  onClick={requestDeleteNote}
+                  disabled={savingKey}
+                >
+                  删除
+                </button>
                 <button
                   className="btn primary"
                   type="button"
@@ -644,6 +828,22 @@ useEffect(() => {
                 </button>
                 <button className="btn ghost" type="button" onClick={() => setConfirmDiscard(false)}>
                   继续编辑
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {confirmDelete && (
+          <Modal title="删除笔记" onClose={() => setConfirmDelete(false)}>
+            <div className="confirm-body">
+              <p>确定删除该笔记吗？删除后可在「功能面板 → 历史」中撤销恢复。</p>
+              <div className="confirm-actions">
+                <button className="btn danger" type="button" onClick={confirmDeleteNote}>
+                  删除
+                </button>
+                <button className="btn ghost" type="button" onClick={() => setConfirmDelete(false)}>
+                  取消
                 </button>
               </div>
             </div>
@@ -1785,8 +1985,9 @@ function WorkspacePanel(props) {
 }
 
 function ResourceExplorer(props) {
-  const { notes, busy, authenticated, onRefresh, onOpen } = props;
+  const { notes, busy, authenticated, onRefresh, onOpen, onNewNote, onImport } = props;
   const [active, setActive] = useState(null);
+  const fileRef = useRef(null);
 
   const groups = useMemo(() => {
     const m = {};
@@ -1801,6 +2002,63 @@ function ResourceExplorer(props) {
     <div className="sidebar-explore">
       <div className="explore-head">
         <span className="explore-title">资源</span>
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          hidden
+          aria-hidden="true"
+          onChange={(e) => {
+            if (onImport) onImport(e.target.files);
+            e.target.value = '';
+          }}
+        />
+        <button
+          className="explore-refresh"
+          type="button"
+          title="导入文件"
+          aria-label="导入文件"
+          onClick={() => fileRef.current && fileRef.current.click()}
+          disabled={!authenticated || busy}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <path d="M17 8l-5-5-5 5" />
+            <path d="M12 3v12" />
+          </svg>
+        </button>
+        <button
+          className="explore-refresh"
+          type="button"
+          title="新建笔记"
+          aria-label="新建笔记"
+          onClick={onNewNote}
+          disabled={!authenticated || busy}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
         <button
           className="explore-refresh"
           type="button"

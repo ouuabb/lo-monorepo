@@ -14,7 +14,10 @@ const CHANNELS = {
   STATUS: 'lo-core:status',
   LIST_NOTES: 'lo-core:list-notes',
   GET_NOTE: 'lo-core:get-note',
+  CREATE_NOTE: 'lo-core:create-note',
   UPDATE_NOTE: 'lo-core:update-note',
+  REMOVE_NOTE: 'lo-core:remove-note',
+  UPLOAD_NOTES: 'lo-core:upload-notes',
   LOGOUT: 'lo-core:logout',
   RELATIONS: 'lo-core:relations',
   OPERATIONS: 'lo-core:operations',
@@ -35,7 +38,12 @@ function registerLoCoreIpc(ipcMain, service) {
   ipcMain.handle(CHANNELS.STATUS, () => service.getStatus());
   ipcMain.handle(CHANNELS.LIST_NOTES, (_event, query) => service.listNotes(query || {}));
   ipcMain.handle(CHANNELS.GET_NOTE, (_event, rid) => service.getNote(rid));
+  ipcMain.handle(CHANNELS.CREATE_NOTE, (_event, body) => service.createNote(body || {}));
   ipcMain.handle(CHANNELS.UPDATE_NOTE, (_event, rid, body) => service.updateNote(rid, body || {}));
+  ipcMain.handle(CHANNELS.REMOVE_NOTE, (_event, rid) => service.removeNote(rid));
+  ipcMain.handle(CHANNELS.UPLOAD_NOTES, (_event, files, options) =>
+    service.uploadNotes(files || [], options || {}),
+  );
   ipcMain.handle(CHANNELS.LOGOUT, () => service.logout());
   ipcMain.handle(CHANNELS.RELATIONS, (_event, rid) => service.getRelations(rid));
   ipcMain.handle(CHANNELS.OPERATIONS, (_event, query) => service.listOperations(query || {}));

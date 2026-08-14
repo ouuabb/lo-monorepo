@@ -8,7 +8,10 @@ function makeService() {
     getStatus: jest.fn(async () => ({ ok: true, stats: {} })),
     listNotes: jest.fn(async (q) => ({ ok: true, data: [] })),
     getNote: jest.fn(async (rid) => ({ ok: true, data: { rid } })),
+    createNote: jest.fn(async (body) => ({ ok: true, data: { rid: 'r_new' } })),
     updateNote: jest.fn(async (rid, body) => ({ ok: true, data: { rid, updated: body } })),
+    removeNote: jest.fn(async (rid) => ({ ok: true, data: { rid, deleted: true } })),
+    uploadNotes: jest.fn(async (files, opts) => ({ ok: true, data: { uploaded: 1 } })),
     logout: jest.fn(() => ({ ok: true })),
     subscribeEvents: jest.fn(() => ({ ok: true })),
     unsubscribeEvents: jest.fn(() => ({ ok: true })),
@@ -30,14 +33,17 @@ describe('registerLoCoreIpc', () => {
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.STATUS, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.LIST_NOTES, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.GET_NOTE, expect.any(Function));
+    expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.CREATE_NOTE, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.UPDATE_NOTE, expect.any(Function));
+    expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.REMOVE_NOTE, expect.any(Function));
+    expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.UPLOAD_NOTES, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.LOGOUT, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.EVENTS_SUBSCRIBE, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.EVENTS_UNSUBSCRIBE, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.OPERATIONS, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.OPERATION_UNDO, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.RELATIONS, expect.any(Function));
-    expect(ipcMain.handle.mock.calls.length).toBe(13);
+    expect(ipcMain.handle.mock.calls.length).toBe(16);
   });
 
   it('handler 委托并传参', async () => {
@@ -75,11 +81,31 @@ describe('registerLoCoreIpc', () => {
     await byChannel(CHANNELS.GET_NOTE)({}, 'res_1');
     expect(service.getNote).toHaveBeenCalledWith('res_1');
 
+    await byChannel(CHANNELS.CREATE_NOTE)({}, { title: '新笔记' });
+    expect(service.createNote).toHaveBeenCalledWith({ title: '新笔记' });
+
+    await byChannel(CHANNELS.CREATE_NOTE)({}, undefined);
+    expect(service.createNote).toHaveBeenCalledWith({});
+
     await byChannel(CHANNELS.UPDATE_NOTE)({}, 'res_1', { content: 'x' });
     expect(service.updateNote).toHaveBeenCalledWith('res_1', { content: 'x' });
 
     await byChannel(CHANNELS.UPDATE_NOTE)({}, 'res_1', undefined);
     expect(service.updateNote).toHaveBeenCalledWith('res_1', {});
+
+    await byChannel(CHANNELS.REMOVE_NOTE)({}, 'res_1');
+    expect(service.removeNote).toHaveBeenCalledWith('res_1');
+
+    await byChannel(CHANNELS.UPLOAD_NOTES)({}, [{ name: 'a.md', data: new Uint8Array([1]) }], {
+      title: 't',
+    });
+    expect(service.uploadNotes).toHaveBeenCalledWith(
+      [{ name: 'a.md', data: new Uint8Array([1]) }],
+      { title: 't' },
+    );
+
+    await byChannel(CHANNELS.UPLOAD_NOTES)({}, undefined, undefined);
+    expect(service.uploadNotes).toHaveBeenCalledWith([], {});
 
     await byChannel(CHANNELS.LOGOUT)();
     expect(service.logout).toHaveBeenCalled();

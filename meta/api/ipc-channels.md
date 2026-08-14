@@ -12,7 +12,10 @@
 | `STATUS` | `lo-core:status` | `apps/agent/src/main/ipc.cjs` |
 | `LIST_NOTES` | `lo-core:list-notes` | `apps/agent/src/main/ipc.cjs` |
 | `GET_NOTE` | `lo-core:get-note` | `apps/agent/src/main/ipc.cjs` |
+| `CREATE_NOTE` | `lo-core:create-note` | `apps/agent/src/main/ipc.cjs` |
 | `UPDATE_NOTE` | `lo-core:update-note` | `apps/agent/src/main/ipc.cjs` |
+| `REMOVE_NOTE` | `lo-core:remove-note` | `apps/agent/src/main/ipc.cjs` |
+| `UPLOAD_NOTES` | `lo-core:upload-notes` | `apps/agent/src/main/ipc.cjs` |
 | `LOGOUT` | `lo-core:logout` | `apps/agent/src/main/ipc.cjs` |
 | `RELATIONS` | `lo-core:relations` | `apps/agent/src/main/ipc.cjs` |
 | `OPERATIONS` | `lo-core:operations` | `apps/agent/src/main/ipc.cjs` |

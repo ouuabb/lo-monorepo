@@ -6,7 +6,7 @@ function makeMockClient(overrides = {}) {
     login: jest.fn(),
     logout: jest.fn(),
     health: { stats: jest.fn() },
-    notes: { list: jest.fn(), get: jest.fn(), update: jest.fn() },
+    notes: { list: jest.fn(), get: jest.fn(), create: jest.fn(), update: jest.fn(), upload: jest.fn() },
     operations: { execute: jest.fn(), list: jest.fn(), undo: jest.fn() },
     relations: { list: jest.fn() },
     events: { subscribe: jest.fn(), history: jest.fn() },
@@ -200,6 +200,62 @@ describe('LoCoreService', () => {
     expect(updateRes.ok).toBe(false);
     expect(updateRes.error).toBe('api');
     expect(updateRes.status).toBe(400);
+  });
+
+  it('createNote 走 client.notes.create 并返回新建资源', async () => {
+    const client = makeMockClient();
+    client.notes.create.mockResolvedValue({ rid: 'r_new', type: 'note' });
+    const service = new LoCoreService({ LoClient: class {} });
+    service.client = client;
+    const res = await service.createNote({ content: '', title: '未命名笔记' });
+    expect(res.ok).toBe(true);
+    expect(res.data.rid).toBe('r_new');
+    expect(client.notes.create).toHaveBeenCalledWith({ content: '', title: '未命名笔记' });
+  });
+
+  it('removeNote 经 resource.delete operation 执行', async () => {
+    const client = makeMockClient();
+    client.operations.execute.mockResolvedValue({
+      operationId: 'op_del',
+      result: { rid: 'r1', deleted: true },
+    });
+    const service = new LoCoreService({ LoClient: class {} });
+    service.client = client;
+    const res = await service.removeNote('r1');
+    expect(res.ok).toBe(true);
+    expect(res.operationId).toBe('op_del');
+    expect(client.operations.execute).toHaveBeenCalledWith('resource.delete', { rid: 'r1' }, {});
+  });
+
+  it('uploadNotes 走 client.notes.upload 透传文件与参数', async () => {
+    const client = makeMockClient();
+    client.notes.upload.mockResolvedValue({ uploaded: 2, data: [] });
+    const service = new LoCoreService({ LoClient: class {} });
+    service.client = client;
+    const files = [{ name: 'a.md', data: Buffer.from('x') }];
+    const res = await service.uploadNotes(files, { title: 't' });
+    expect(res.ok).toBe(true);
+    expect(res.data.uploaded).toBe(2);
+    expect(client.notes.upload).toHaveBeenCalledWith(files, { title: 't' });
+  });
+
+  it('createNote/removeNote/uploadNotes 业务错误映射为 api', async () => {
+    const { LoApiError } = require('@lo/client');
+    const client = makeMockClient();
+    client.notes.create.mockRejectedValue(new LoApiError('missing title', { status: 400 }));
+    client.operations.execute.mockRejectedValue(new LoApiError('not found', { status: 404 }));
+    client.notes.upload.mockRejectedValue(new LoApiError('bad multipart', { status: 400 }));
+    const service = new LoCoreService({ LoClient: class {} });
+    service.client = client;
+    const createRes = await service.createNote({});
+    expect(createRes.ok).toBe(false);
+    expect(createRes.status).toBe(400);
+    const removeRes = await service.removeNote('r1');
+    expect(removeRes.ok).toBe(false);
+    expect(removeRes.status).toBe(404);
+    const uploadRes = await service.uploadNotes([{ name: 'x', data: Buffer.from('') }]);
+    expect(uploadRes.ok).toBe(false);
+    expect(uploadRes.status).toBe(400);
   });
 
   it('configure 通过 saveConfig 持久化配置', () => {

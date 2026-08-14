@@ -138,6 +138,54 @@ class LoCoreService {
   }
 
   /**
+   * 创建笔记（统一走 client.notes.create → POST /api/notes → repo.createResource；
+   * Core 内部自动登记 resource.create operation，可经 undo 撤销）
+   * @param {object} body — { type?, content?, title?, metadata?, tags?, category?, filename? }
+   */
+  async createNote(body = {}) {
+    try {
+      this._ensureClient();
+      const data = await this.client.notes.create(body);
+      return { ok: true, data };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
+  /**
+   * 删除笔记（统一走 resource.delete operation，默认软删，可撤销）
+   * @param {string} rid
+   */
+  async removeNote(rid) {
+    try {
+      this._ensureClient();
+      const { operationId, result } = await this.client.operations.execute(
+        'resource.delete',
+        { rid },
+        {},
+      );
+      return { ok: true, operationId, data: result };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
+  /**
+   * 导入文件（multipart 构造已封装在 @lo/client 内部）
+   * @param {Array<{ name: string, data: Buffer, contentType?: string }>} files
+   * @param {object} [options] — { title?, tags? }
+   */
+  async uploadNotes(files, options = {}) {
+    try {
+      this._ensureClient();
+      const data = await this.client.notes.upload(files, options);
+      return { ok: true, data };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
+  /**
    * 更新资源(content/metadata/title/tags/category)
    *
    * 写路径已收敛到 Operation 语义(010 Phase1/Phase2):
