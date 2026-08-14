@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NoteEditor from './editor/NoteEditor.jsx';
 import PluginUiMount from './plugin/PluginUiMount.jsx';
 import { hasUi } from './plugin/pluginUi.js';
+import { BarArea, Bar } from './layout/BarArea.jsx';
 import './App.css';
 
 const api = window.loAgent && window.loAgent.loCore;
@@ -35,6 +36,7 @@ export default function App() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [pluginView, setPluginView] = useState(false);
   const [pluginTab, setPluginTab] = useState('commands');
+  const [relationsOpen, setRelationsOpen] = useState(true);
   const [config, setConfig] = useState({ host: '127.0.0.1', port: 8765, protocol: 'http' });
   const [privateKeyPath, setPrivateKeyPath] = useState('');
   const [busy, setBusy] = useState(false);
@@ -50,8 +52,16 @@ export default function App() {
   const [zoom, setZoom] = useState(1);
   const discardKeyRef = useRef(null);
   const deleteRidRef = useRef(null);
+  const toastTimerRef = useRef(null);
 
-  const notify = (text) => setMessage(text);
+  const notify = useCallback((text) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = null;
+    setMessage(text);
+    if (text) {
+      toastTimerRef.current = setTimeout(() => setMessage(''), 4000);
+    }
+  }, []);
 
   const activeTab = tabs.find((t) => t.key === activeKey) || null;
   const isDirty = (tab) =>
@@ -150,7 +160,6 @@ export default function App() {
   const openResource = useCallback(
     async (n) => {
       if (!api || !n) return;
-      setPluginView(false);
       const existing = tabs.find((t) => t.rid === n.rid);
       if (existing) {
         setActiveKey(existing.key);
@@ -161,6 +170,7 @@ export default function App() {
       const res = await api.getNote(n.rid);
       setBusy(false);
       if (res.ok && res.data) {
+        setRelationsOpen(true);
         const data = res.data;
         const readOnly = n.type !== 'note';
         const meta = data.metadata || {};
@@ -598,10 +608,7 @@ useEffect(() => {
             className={`rail-btn ${pluginView ? 'active' : ''}`}
             aria-label="插件"
             title="插件"
-            onClick={() => {
-              setSubOpen(false);
-              setPluginView((v) => !v);
-            }}
+            onClick={() => setPluginView((v) => !v)}
           >
             <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
               <path d="M15 4.95703C15 4.58711 14.8563 4.24054 14.5949 3.97992L12.0096 1.39234C11.4879 0.86922 10.5788 0.86922 10.0571 1.39234L8 3.45119V3.32321C8 2.55068 7.37187 1.922 6.6 1.922H2.4C1.62813 1.922 1 2.55068 1 3.32321V13.5988C1 14.3713 1.62813 15 2.4 15H12.6667C13.4385 15 14.0667 14.3713 14.0667 13.5988V9.39514C14.0667 8.62261 13.4385 7.99393 12.6667 7.99393H12.5379L14.5949 5.93508C14.8553 5.67445 15 5.32602 15 4.95703ZM2.4 2.85521H6.6C6.85667 2.85521 7.06667 3.06446 7.06667 3.32228V7.99299H1.93333V3.32228C1.93333 3.06446 2.14333 2.85521 2.4 2.85521ZM1.93333 13.5979V8.92714H7.06667V14.0649H2.4C2.14333 14.0649 1.93333 13.8547 1.93333 13.5979ZM13.1333 9.39421V13.5979C13.1333 13.8547 12.9233 14.0649 12.6667 14.0649H8V8.92714H12.6667C12.9233 8.92714 13.1333 9.13638 13.1333 9.39421ZM8 7.99299V6.46287L9.5288 7.99299H8ZM13.9351 5.2737L11.3488 7.86221C11.1789 8.03223 10.8859 8.03223 10.716 7.86221L8.12973 5.2737C8.0448 5.18963 7.99813 5.07753 7.99813 4.95796C7.99813 4.83839 8.0448 4.7263 8.12973 4.64129L10.716 2.05278C10.8009 1.96777 10.9129 1.92106 11.0324 1.92106C11.1519 1.92106 11.2639 1.96777 11.3488 2.05278L13.9351 4.64129C14.02 4.72536 14.0667 4.83746 14.0667 4.95703C14.0667 5.0766 14.02 5.1887 13.9351 5.2737Z" />
@@ -611,10 +618,7 @@ useEffect(() => {
             className={`rail-btn ${subOpen ? 'active' : ''}`}
             aria-label="展开功能面板"
             title="功能面板"
-            onClick={() => {
-              setPluginView(false);
-              setSubOpen((v) => !v);
-            }}
+            onClick={() => setSubOpen((v) => !v)}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -629,211 +633,210 @@ useEffect(() => {
             </svg>
           </button>
         </aside>
-        <aside
-          className={collapsed ? 'app-sidebar collapsed' : 'app-sidebar'}
-          style={{
-            width:
-              (resizing && dragFromCollapsed) || !collapsed ? sidebarWidth : 0,
-          }}
-        >
-          <div className="app-sidebar-inner" style={{ width: sidebarWidth }}>
-            <ResourceExplorer
-              notes={notes}
-              busy={busy}
-              authenticated={authenticated}
-              onRefresh={handleRefresh}
-              onOpen={openResource}
-              onNewNote={createNote}
-              onImport={importFiles}
-            />
-          </div>
-        </aside>
+        <BarArea>
+          <Bar
+            id="sidebar"
+            className={collapsed ? 'collapsed' : ''}
+            style={{
+              width:
+                (resizing && dragFromCollapsed) || !collapsed ? sidebarWidth : 0,
+            }}
+          >
+            <div className="bar-sidebar-inner" style={{ width: sidebarWidth }}>
+              <ResourceExplorer
+                notes={notes}
+                busy={busy}
+                authenticated={authenticated}
+                onRefresh={handleRefresh}
+                onOpen={openResource}
+                onNewNote={createNote}
+                onImport={importFiles}
+              />
+            </div>
+          </Bar>
 
-        <div
-          className="app-sidebar-resizer"
-          onPointerDown={startResize}
-          title={collapsed ? '拖拽展开侧边栏' : '拖拽调整侧边栏宽度'}
-        />
+          <div
+            className="app-sidebar-resizer"
+            onPointerDown={startResize}
+            title={collapsed ? '拖拽展开侧边栏' : '拖拽调整侧边栏宽度'}
+          />
 
-      <main className="app-content">
+          {pluginView && (
+            <Bar id="plugin" title="插件" onClose={() => setPluginView(false)}>
+              <PluginCenter tab={pluginTab} onTab={setPluginTab} onNotify={notify} />
+            </Bar>
+          )}
+
+          {activeTab && (
+            <Bar id="editor">
+              <div className="editor-tabs" role="tablist">
+                {tabs.map((t) => (
+                  <div
+                    key={t.key}
+                    role="tab"
+                    aria-selected={t.key === activeKey}
+                    className={`editor-tab ${t.key === activeKey ? 'active' : ''} ${
+                      isDirty(t) ? 'dirty' : ''
+                    }`}
+                    onClick={() => setActiveKey(t.key)}
+                  >
+                    <span className="editor-tab-name">{t.title}</span>
+                    {isDirty(t) && <span className="editor-tab-dirty-dot" title="未保存" />}
+                    <button
+                      type="button"
+                      className="editor-tab-close"
+                      aria-label={`关闭 ${t.title}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        requestCloseTab(t.key);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="editor-panel">
+                <div className="editor-toolbar">
+                  <div className="editor-toolbar-title">
+                    <input
+                      className="editor-doc-name-input"
+                      value={activeTab.title}
+                      disabled={activeTab.readOnly}
+                      onChange={(e) => setActiveTitle(e.target.value)}
+                      aria-label="笔记标题"
+                    />
+                    <span className="editor-doc-rid">{activeTab.rid}</span>
+                    <input
+                      className="editor-meta-input"
+                      placeholder="标签（逗号分隔）"
+                      value={activeTab.tagsText}
+                      disabled={activeTab.readOnly}
+                      onChange={(e) => setActiveTagsText(e.target.value)}
+                      aria-label="标签"
+                    />
+                    <input
+                      className="editor-meta-input editor-meta-input-sm"
+                      placeholder="分类"
+                      value={activeTab.category}
+                      disabled={activeTab.readOnly}
+                      onChange={(e) => setActiveCategory(e.target.value)}
+                      aria-label="分类"
+                    />
+                    {isDirty(activeTab) && <span className="chip chip-dirty">未保存</span>}
+                    {activeTab.readOnly && <span className="chip">只读</span>}
+                  </div>
+                  <div className="editor-toolbar-actions">
+                    <button
+                      className="btn ghost"
+                      type="button"
+                      onClick={undoLast}
+                      disabled={busy}
+                    >
+                      撤销
+                    </button>
+                    <button
+                      className="btn danger"
+                      type="button"
+                      onClick={requestDeleteNote}
+                      disabled={savingKey}
+                    >
+                      删除
+                    </button>
+                    <button
+                      className="btn primary"
+                      type="button"
+                      onClick={saveActiveTab}
+                      disabled={savingKey || activeTab.readOnly}
+                    >
+                      {savingKey ? '保存中…' : activeTab.readOnly ? '只读' : '保存'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="editor-body">
+                  <NoteEditor
+                    key={activeTab.key}
+                    value={activeTab.text}
+                    onChange={setActiveText}
+                    readOnly={activeTab.readOnly}
+                  />
+                </div>
+
+                <div className="editor-statusbar">
+                  <span className="status-meta">{activeTab.rid}</span>
+                  <span className="status-meta">类型 {activeTab.meta.type}</span>
+                  {activeTab.meta.schema && (
+                    <span className="status-meta">schema {activeTab.meta.schema}</span>
+                  )}
+                  {activeTab.meta.updatedAt && (
+                    <span className="status-meta">
+                      更新 {formatTime(activeTab.meta.updatedAt)}
+                    </span>
+                  )}
+                  <span className="status-meta">
+                    {activeTab.text.length} 字符
+                    {activeTab.readOnly ? ' · 只读' : ''}
+                  </span>
+                  <span className="status-hint">Ctrl/Cmd+S 保存</span>
+                </div>
+              </div>
+            </Bar>
+          )}
+
+          {activeTab && relationsOpen && (
+            <Bar id="relations" title="关联关系" onClose={() => setRelationsOpen(false)}>
+              <RelationPanel rid={activeTab.rid} notes={notes} />
+            </Bar>
+          )}
+
+          {subOpen && (
+            <Bar id="settings" title="设置" onClose={() => setSubOpen(false)}>
+              <div className="sub-panel">
+                <div className="sub-nav" role="tablist">
+                  {SUB_NAV.map((item) => (
+                    <button
+                      key={item.id}
+                      role="tab"
+                      aria-selected={view === item.id}
+                      className={view === item.id ? 'active' : ''}
+                      onClick={() => setView(item.id)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="sub-body">
+                  {view === 'workspace' && (
+                    <WorkspacePanel
+                      status={status}
+                      notes={notes}
+                      busy={busy}
+                      onRefresh={handleRefresh}
+                      onLogin={openLogin}
+                    />
+                  )}
+
+                  {view === 'history' && (
+                    <OperationHistory
+                      authenticated={authenticated}
+                      onLogin={openLogin}
+                      onNotify={notify}
+                      onRefresh={handleRefresh}
+                    />
+                  )}
+                </div>
+              </div>
+            </Bar>
+          )}
+        </BarArea>
+
         {message && (
           <div className="app-toast" aria-live="polite">
             {message}
           </div>
         )}
-
-        {tabs.length > 0 && (
-          <div className="editor-tabs" role="tablist">
-            {tabs.map((t) => (
-              <div
-                key={t.key}
-                role="tab"
-                aria-selected={t.key === activeKey}
-                className={`editor-tab ${t.key === activeKey ? 'active' : ''} ${
-                  isDirty(t) ? 'dirty' : ''
-                }`}
-                onClick={() => setActiveKey(t.key)}
-              >
-                <span className="editor-tab-name">{t.title}</span>
-                {isDirty(t) && <span className="editor-tab-dirty-dot" title="未保存" />}
-                <button
-                  type="button"
-                  className="editor-tab-close"
-                  aria-label={`关闭 ${t.title}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    requestCloseTab(t.key);
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {pluginView ? (
-          <PluginCenter
-            tab={pluginTab}
-            onTab={setPluginTab}
-            onNotify={notify}
-          />
-        ) : activeTab ? (
-          <div className="editor-panel">
-            <div className="editor-toolbar">
-              <div className="editor-toolbar-title">
-                <input
-                  className="editor-doc-name-input"
-                  value={activeTab.title}
-                  disabled={activeTab.readOnly}
-                  onChange={(e) => setActiveTitle(e.target.value)}
-                  aria-label="笔记标题"
-                />
-                <span className="editor-doc-rid">{activeTab.rid}</span>
-                <input
-                  className="editor-meta-input"
-                  placeholder="标签（逗号分隔）"
-                  value={activeTab.tagsText}
-                  disabled={activeTab.readOnly}
-                  onChange={(e) => setActiveTagsText(e.target.value)}
-                  aria-label="标签"
-                />
-                <input
-                  className="editor-meta-input editor-meta-input-sm"
-                  placeholder="分类"
-                  value={activeTab.category}
-                  disabled={activeTab.readOnly}
-                  onChange={(e) => setActiveCategory(e.target.value)}
-                  aria-label="分类"
-                />
-                {isDirty(activeTab) && <span className="chip chip-dirty">未保存</span>}
-                {activeTab.readOnly && <span className="chip">只读</span>}
-              </div>
-              <div className="editor-toolbar-actions">
-                <button
-                  className="btn ghost"
-                  type="button"
-                  onClick={undoLast}
-                  disabled={busy}
-                >
-                  撤销
-                </button>
-                <button
-                  className="btn danger"
-                  type="button"
-                  onClick={requestDeleteNote}
-                  disabled={savingKey}
-                >
-                  删除
-                </button>
-                <button
-                  className="btn primary"
-                  type="button"
-                  onClick={saveActiveTab}
-                  disabled={savingKey || activeTab.readOnly}
-                >
-                  {savingKey ? '保存中…' : activeTab.readOnly ? '只读' : '保存'}
-                </button>
-                <button
-                  className="btn ghost"
-                  type="button"
-                  onClick={() => requestCloseTab(activeTab.key)}
-                >
-                  关闭
-                </button>
-              </div>
-            </div>
-
-            <div className="editor-body">
-              <NoteEditor
-                key={activeTab.key}
-                value={activeTab.text}
-                onChange={setActiveText}
-                readOnly={activeTab.readOnly}
-              />
-            </div>
-
-            <RelationPanel rid={activeTab.rid} notes={notes} />
-
-            <div className="editor-statusbar">
-              <span className="status-meta">{activeTab.rid}</span>
-              <span className="status-meta">类型 {activeTab.meta.type}</span>
-              {activeTab.meta.schema && (
-                <span className="status-meta">schema {activeTab.meta.schema}</span>
-              )}
-              {activeTab.meta.updatedAt && (
-                <span className="status-meta">
-                  更新 {formatTime(activeTab.meta.updatedAt)}
-                </span>
-              )}
-              <span className="status-meta">
-                {activeTab.text.length} 字符
-                {activeTab.readOnly ? ' · 只读' : ''}
-              </span>
-              <span className="status-hint">Ctrl/Cmd+S 保存</span>
-            </div>
-          </div>
-        ) : (
-          tabs.length === 0 &&
-          subOpen && (
-          <div className="sub-panel">
-            <div className="sub-nav" role="tablist">
-              {SUB_NAV.map((item) => (
-                <button
-                  key={item.id}
-                  role="tab"
-                  aria-selected={view === item.id}
-                  className={view === item.id ? 'active' : ''}
-                  onClick={() => setView(item.id)}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-            <div className="sub-body">
-              {view === 'workspace' && (
-                <WorkspacePanel
-                  status={status}
-                  notes={notes}
-                  busy={busy}
-                  onRefresh={handleRefresh}
-                  onLogin={openLogin}
-                />
-              )}
-
-              {view === 'history' && (
-                <OperationHistory
-                  authenticated={authenticated}
-                  onLogin={openLogin}
-                  onNotify={notify}
-                  onRefresh={handleRefresh}
-                />
-              )}
-            </div>
-          </div>
-          )
-        )}
-        </main>
 
         {loginOpen && (
           <Modal title="登录" onClose={closeLogin}>

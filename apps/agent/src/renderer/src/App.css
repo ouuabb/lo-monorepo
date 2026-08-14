@@ -147,6 +147,7 @@ body {
   flex: 1;
   display: flex;
   overflow: hidden;
+  position: relative;
 }
 
 .app-rail {
@@ -206,25 +207,113 @@ body {
   background: var(--bg);
 }
 
-.app-sidebar {
-  flex: none;
-  width: 220px;
-  background: var(--panel);
-  color: var(--text);
+/* ---- 栏管理器（BarArea / Bar） ---- */
+.bar-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.bar {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.bar-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.bar-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-close {
+  appearance: none;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.bar-close:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.bar-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 第一栏：侧边栏（紧挨 rail 列） */
+.bar-sidebar {
+  flex: none;
+  background: var(--panel);
+  color: var(--text);
   border-right: 1px solid var(--border);
   overflow: hidden;
 }
 
-.app-sidebar-inner {
+.bar-sidebar.collapsed {
+  border-right: none;
+}
+
+.bar-sidebar-inner {
   height: 100%;
   overflow: hidden;
 }
 
-.app-sidebar.collapsed {
-  width: 0;
-  border-right: none;
+/* 其余栏：均分侧边栏外的剩余空间 */
+.bar-plugin,
+.bar-settings,
+.bar-editor,
+.bar-relations {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.bar-plugin,
+.bar-settings,
+.bar-relations {
+  border-left: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.bar-relations .rel-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  padding: 16px 20px;
 }
 
 body.no-select {
@@ -403,13 +492,7 @@ body.no-select {
   text-overflow: ellipsis;
 }
 
-/* ---- 主内容区 ---- */
-.app-content {
-  flex: 1;
-  overflow: auto;
-  padding: 0;
-}
-
+/* ---- 主内容区（BarArea） ---- */
 .sub-panel {
   display: flex;
   flex-direction: column;
@@ -454,12 +537,18 @@ body.no-select {
 }
 
 .app-toast {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  max-width: 70%;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 14px;
-  margin-bottom: 20px;
   font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 
 .panel-card {
@@ -920,7 +1009,7 @@ select {
 }
 
 .editor-panel {
-  height: 100%;
+  flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
