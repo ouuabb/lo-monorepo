@@ -186,6 +186,49 @@ class LoCoreService {
   }
 
   /**
+   * 获取 Core View 列表
+   * @param {object} [query] — { status? }
+   */
+  async listViews(query = {}) {
+    try {
+      this._ensureClient();
+      const result = await this.client.views.list(query);
+      return { ok: true, total: result.total, data: result.data };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
+  /**
+   * 获取单个 Core View 定义
+   * @param {string} id — view id 或 name
+   */
+  async getView(id) {
+    try {
+      this._ensureClient();
+      const data = await this.client.views.get(id);
+      return { ok: true, data };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
+  /**
+   * 运行 Core View（结构化结果原样透传，语义由 Core 决定）
+   * @param {string} id
+   * @param {object} [body] — { limit?, offset? }
+   */
+  async runView(id, body = {}) {
+    try {
+      this._ensureClient();
+      const data = await this.client.views.run(id, body);
+      return { ok: true, data };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
+  /**
    * 更新资源(content/metadata/title/tags/category)
    *
    * 写路径已收敛到 Operation 语义(010 Phase1/Phase2):

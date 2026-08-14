@@ -22,6 +22,9 @@ const CHANNELS = {
   RELATIONS: 'lo-core:relations',
   OPERATIONS: 'lo-core:operations',
   OPERATION_UNDO: 'lo-core:operation-undo',
+  VIEWS_LIST: 'lo-core:views-list',
+  VIEWS_GET: 'lo-core:views-get',
+  VIEWS_RUN: 'lo-core:views-run',
   EVENTS_SUBSCRIBE: 'lo-core:events-subscribe',
   EVENTS_UNSUBSCRIBE: 'lo-core:events-unsubscribe',
   EVENTS_PUSH: 'lo-core:event',
@@ -48,6 +51,9 @@ function registerLoCoreIpc(ipcMain, service) {
   ipcMain.handle(CHANNELS.RELATIONS, (_event, rid) => service.getRelations(rid));
   ipcMain.handle(CHANNELS.OPERATIONS, (_event, query) => service.listOperations(query || {}));
   ipcMain.handle(CHANNELS.OPERATION_UNDO, (_event, id) => service.undoOperation(id));
+  ipcMain.handle(CHANNELS.VIEWS_LIST, (_event, query) => service.listViews(query || {}));
+  ipcMain.handle(CHANNELS.VIEWS_GET, (_event, id) => service.getView(id));
+  ipcMain.handle(CHANNELS.VIEWS_RUN, (_event, id, body) => service.runView(id, body || {}));
 
   // 事件订阅(SSE)：主进程持有订阅，事件经 EVENTS_PUSH 推送到发起窗口
   ipcMain.handle(CHANNELS.EVENTS_SUBSCRIBE, (event, types) => {

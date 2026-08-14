@@ -21,6 +21,9 @@ const CHANNEL = {
   RELATIONS: 'lo-core:relations',
   OPERATIONS: 'lo-core:operations',
   OPERATION_UNDO: 'lo-core:operation-undo',
+  VIEWS_LIST: 'lo-core:views-list',
+  VIEWS_GET: 'lo-core:views-get',
+  VIEWS_RUN: 'lo-core:views-run',
   EVENTS_SUBSCRIBE: 'lo-core:events-subscribe',
   EVENTS_UNSUBSCRIBE: 'lo-core:events-unsubscribe',
   EVENTS_PUSH: 'lo-core:event',
@@ -69,6 +72,11 @@ contextBridge.exposeInMainWorld('loAgent', {
     operations: {
       list: (query) => ipcRenderer.invoke(CHANNEL.OPERATIONS, query),
       undo: (id) => ipcRenderer.invoke(CHANNEL.OPERATION_UNDO, id),
+    },
+    views: {
+      list: (query) => ipcRenderer.invoke(CHANNEL.VIEWS_LIST, query),
+      get: (id) => ipcRenderer.invoke(CHANNEL.VIEWS_GET, id),
+      run: (id, body) => ipcRenderer.invoke(CHANNEL.VIEWS_RUN, id, body),
     },
     events: {
       subscribe: (types) => ipcRenderer.invoke(CHANNEL.EVENTS_SUBSCRIBE, types),

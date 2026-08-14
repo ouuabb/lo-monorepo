@@ -17,6 +17,9 @@ function makeService() {
     unsubscribeEvents: jest.fn(() => ({ ok: true })),
     listOperations: jest.fn(async (q) => ({ ok: true, data: [] })),
     undoOperation: jest.fn(async (id) => ({ ok: true, data: { operationId: id } })),
+    listViews: jest.fn(async (q) => ({ ok: true, data: [] })),
+    getView: jest.fn(async (id) => ({ ok: true, data: { id } })),
+    runView: jest.fn(async (id, body) => ({ ok: true, data: { presentation: { type: 'list' } } })),
     getRelations: jest.fn(async (rid) => ({ ok: true, data: { outgoing: [], incoming: [] } })),
   };
 }
@@ -43,7 +46,10 @@ describe('registerLoCoreIpc', () => {
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.OPERATIONS, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.OPERATION_UNDO, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.RELATIONS, expect.any(Function));
-    expect(ipcMain.handle.mock.calls.length).toBe(16);
+    expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.VIEWS_LIST, expect.any(Function));
+    expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.VIEWS_GET, expect.any(Function));
+    expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.VIEWS_RUN, expect.any(Function));
+    expect(ipcMain.handle.mock.calls.length).toBe(19);
   });
 
   it('handler 委托并传参', async () => {
@@ -121,6 +127,21 @@ describe('registerLoCoreIpc', () => {
 
     await byChannel(CHANNELS.RELATIONS)({}, 'res_1');
     expect(service.getRelations).toHaveBeenCalledWith('res_1');
+
+    await byChannel(CHANNELS.VIEWS_LIST)({}, { status: 'active' });
+    expect(service.listViews).toHaveBeenCalledWith({ status: 'active' });
+
+    await byChannel(CHANNELS.VIEWS_LIST)({}, undefined);
+    expect(service.listViews).toHaveBeenCalledWith({});
+
+    await byChannel(CHANNELS.VIEWS_GET)({}, 'v1');
+    expect(service.getView).toHaveBeenCalledWith('v1');
+
+    await byChannel(CHANNELS.VIEWS_RUN)({}, 'v1', { limit: 50 });
+    expect(service.runView).toHaveBeenCalledWith('v1', { limit: 50 });
+
+    await byChannel(CHANNELS.VIEWS_RUN)({}, 'v1', undefined);
+    expect(service.runView).toHaveBeenCalledWith('v1', {});
   });
 
   it('事件订阅通道委托 service 并在事件到达时推送 EVENTS_PUSH', async () => {

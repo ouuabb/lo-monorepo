@@ -20,6 +20,9 @@
 | `RELATIONS` | `lo-core:relations` | `apps/agent/src/main/ipc.cjs` |
 | `OPERATIONS` | `lo-core:operations` | `apps/agent/src/main/ipc.cjs` |
 | `OPERATION_UNDO` | `lo-core:operation-undo` | `apps/agent/src/main/ipc.cjs` |
+| `VIEWS_LIST` | `lo-core:views-list` | `apps/agent/src/main/ipc.cjs` |
+| `VIEWS_GET` | `lo-core:views-get` | `apps/agent/src/main/ipc.cjs` |
+| `VIEWS_RUN` | `lo-core:views-run` | `apps/agent/src/main/ipc.cjs` |
 | `EVENTS_SUBSCRIBE` | `lo-core:events-subscribe` | `apps/agent/src/main/ipc.cjs` |
 | `EVENTS_UNSUBSCRIBE` | `lo-core:events-unsubscribe` | `apps/agent/src/main/ipc.cjs` |
 | `EVENTS_PUSH` | `lo-core:event` | `apps/agent/src/main/ipc.cjs` |

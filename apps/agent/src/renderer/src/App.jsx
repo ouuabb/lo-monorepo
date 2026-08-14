@@ -3,6 +3,7 @@ import NoteEditor from './editor/NoteEditor.jsx';
 import PluginUiMount from './plugin/PluginUiMount.jsx';
 import { hasUi } from './plugin/pluginUi.js';
 import { BarArea, Bar } from './layout/BarArea.jsx';
+import CoreViewPanel from './views/ViewPanel.jsx';
 import './App.css';
 
 const api = window.loAgent && window.loAgent.loCore;
@@ -21,6 +22,7 @@ const SUB_NAV = [
   { id: 'workspace', label: '工作台' },
   { id: 'history', label: '历史' },
   { id: 'settings', label: '文件设置' },
+  { id: 'views', label: '视图' },
 ];
 
 const MIN_SIDEBAR_WIDTH = 200;
@@ -885,6 +887,8 @@ useEffect(() => {
                       onToggleAutoSave={setAutoSave}
                     />
                   )}
+
+                  {view === 'views' && <CoreViewPanel onOpen={openResource} onNotify={notify} />}
                 </div>
               </div>
             </Bar>

@@ -8,6 +8,7 @@ function makeMockClient(overrides = {}) {
     health: { stats: jest.fn() },
     notes: { list: jest.fn(), get: jest.fn(), create: jest.fn(), update: jest.fn(), upload: jest.fn() },
     operations: { execute: jest.fn(), list: jest.fn(), undo: jest.fn() },
+    views: { list: jest.fn(), get: jest.fn(), run: jest.fn() },
     relations: { list: jest.fn() },
     events: { subscribe: jest.fn(), history: jest.fn() },
     ...overrides,
@@ -256,6 +257,61 @@ describe('LoCoreService', () => {
     const uploadRes = await service.uploadNotes([{ name: 'x', data: Buffer.from('') }]);
     expect(uploadRes.ok).toBe(false);
     expect(uploadRes.status).toBe(400);
+  });
+
+  it('listViews 返回视图列表', async () => {
+    const client = makeMockClient();
+    client.views.list.mockResolvedValue({ total: 1, data: [{ id: 'v1', name: 'V1' }] });
+    const service = new LoCoreService({ LoClient: class {} });
+    service.client = client;
+    const res = await service.listViews({ status: 'active' });
+    expect(res.ok).toBe(true);
+    expect(res.total).toBe(1);
+    expect(res.data[0].id).toBe('v1');
+    expect(client.views.list).toHaveBeenCalledWith({ status: 'active' });
+  });
+
+  it('getView 返回视图定义', async () => {
+    const client = makeMockClient();
+    client.views.get.mockResolvedValue({ id: 'v1', query: { conditions: [] } });
+    const service = new LoCoreService({ LoClient: class {} });
+    service.client = client;
+    const res = await service.getView('v1');
+    expect(res.ok).toBe(true);
+    expect(res.data.id).toBe('v1');
+    expect(client.views.get).toHaveBeenCalledWith('v1');
+  });
+
+  it('runView 原样透传结构化结果', async () => {
+    const client = makeMockClient();
+    client.views.run.mockResolvedValue({
+      presentation: { type: 'table' },
+      columns: [{ name: 'title' }],
+      rows: [{ rid: 'r1', title: 'T' }],
+      total: 1,
+    });
+    const service = new LoCoreService({ LoClient: class {} });
+    service.client = client;
+    const res = await service.runView('v1', { limit: 50 });
+    expect(res.ok).toBe(true);
+    expect(res.data.presentation.type).toBe('table');
+    expect(res.data.rows[0].rid).toBe('r1');
+    expect(client.views.run).toHaveBeenCalledWith('v1', { limit: 50 });
+  });
+
+  it('views 业务错误映射为 api', async () => {
+    const { LoApiError } = require('@lo/client');
+    const client = makeMockClient();
+    client.views.list.mockRejectedValue(new LoApiError('bad', { status: 500 }));
+    client.views.run.mockRejectedValue(new LoApiError('not found', { status: 404 }));
+    const service = new LoCoreService({ LoClient: class {} });
+    service.client = client;
+    const listRes = await service.listViews();
+    expect(listRes.ok).toBe(false);
+    expect(listRes.status).toBe(500);
+    const runRes = await service.runView('missing');
+    expect(runRes.ok).toBe(false);
+    expect(runRes.status).toBe(404);
   });
 
   it('configure 通过 saveConfig 持久化配置', () => {

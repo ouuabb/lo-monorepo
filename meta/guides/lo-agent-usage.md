@@ -59,6 +59,16 @@ renderer ─login({ privateKeyPath })→ main ──@lo/client──► serve
 - 新建/删除后侧边栏列表自动刷新；删除可在「功能面板 → 历史」中撤销恢复。
 - 导入文件为独立链路：renderer 读取 `ArrayBuffer`（结构化克隆传主进程），不接触 Node Buffer。
 
+## Core 视图（设置栏「视图」）
+
+- 设置栏「视图」页签列出 lo Core 的 active views（`views.list`，经 IPC `lo-core:views-list`）。
+- 点击视图 → `views.run(id, { limit, offset })`（IPC `lo-core:views-run`）→ 按 Core 返回的
+  `presentation.type` 渲染结果：`table` / `list` / `card` 完整展示，
+  `kanban` / `calendar` / `timeline` 按 Core 返回的 `groups` 基础分组渲染。
+- 结果行含 `rid` 时点击复用现有资源打开机制（多栏并存）。
+- View 的 query / fields / presentation 语义完全由 lo Core 决定，Agent 只消费结构化结果；
+  renderer 统一经 `ViewService` 访问（`src/renderer/src/services/ViewService.js`），不直接调用 preload 接口。
+
 ## 安全基线
 
 - Electron 最严格配置：`contextIsolation:true`、`nodeIntegration:false`、`sandbox:true`

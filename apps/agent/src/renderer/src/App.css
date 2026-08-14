@@ -316,6 +316,193 @@ body {
   padding: 16px 20px;
 }
 
+/* ---- Core View 消费（设置栏「视图」） ---- */
+.view-panel {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+}
+
+.view-list-select {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 12px 0;
+}
+
+.view-item {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.view-item:hover {
+  border-color: var(--border-strong);
+}
+
+.view-item.active {
+  border-color: var(--border-strong);
+  background: var(--bg);
+  font-weight: 600;
+}
+
+.view-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.view-item-meta {
+  flex: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.view-result {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.view-result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.view-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.view-table th,
+.view-table td {
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-all;
+}
+
+.view-table th {
+  background: var(--bg);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.view-table tr.clickable {
+  cursor: pointer;
+}
+
+.view-table tr.clickable:hover {
+  background: var(--bg);
+}
+
+.view-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.view-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.view-row.clickable {
+  cursor: pointer;
+}
+
+.view-row.clickable:hover {
+  background: var(--bg);
+}
+
+.view-row-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.view-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.view-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.view-card.clickable {
+  cursor: pointer;
+}
+
+.view-card.clickable:hover {
+  border-color: var(--border-strong);
+}
+
+.view-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.view-card-field {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.view-card-label {
+  color: var(--muted);
+  flex: none;
+}
+
+.view-card-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70%;
+}
+
+.view-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.view-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
 body.no-select {
   user-select: none;
 }
