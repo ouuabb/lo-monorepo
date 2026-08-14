@@ -1,0 +1,40 @@
+{
+  "name": "@lo/client",
+  "version": "0.1.0",
+  "description": "lo 知识库 API 客户端 SDK —— lo serve HTTP 协议的类型化客户端",
+  "main": "src/index.cjs",
+  "types": "types/index.d.ts",
+  "files": [
+    "src/",
+    "types/",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "jest --passWithNoTests",
+    "lint": "eslint \"src/**/*.cjs\" \"test/**/*.cjs\"",
+    "format": "prettier --write \"src/**/*.cjs\" \"test/**/*.cjs\""
+  },
+  "keywords": [
+    "lo",
+    "client",
+    "knowledge-base",
+    "http",
+    "api"
+  ],
+  "author": "lo Project",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {},
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.4.2"
+  },
+  "defaultConfig": {
+    "host": "127.0.0.1",
+    "port": 8765,
+    "timeout": 15000
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "name": "@lo/agent-plugins-sdk",
+  "version": "0.1.0",
+  "description": "lo-agent 插件开发工具包 —— 跑在 lo-agent 内、通过 @lo/client 访问 lo Core 的插件契约层",
+  "main": "src/index.cjs",
+  "types": "types/index.d.ts",
+  "files": [
+    "src/",
+    "types/",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
+    "lint": "eslint \"src/**/*.cjs\" \"test/**/*.cjs\"",
+    "format": "prettier --write \"src/**/*.cjs\" \"test/**/*.cjs\""
+  },
+  "keywords": [
+    "lo",
+    "agent",
+    "plugin",
+    "sdk",
+    "knowledge-base"
+  ],
+  "author": "lo Project",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "@lo/client": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@lo/client": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@babel/preset-env": "^7.29.7",
+    "babel-jest": "^29.7.0",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.4.2"
+  }
+}

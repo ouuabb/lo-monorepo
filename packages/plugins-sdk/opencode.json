@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "references": {
+    "lo-meta": {
+      "repository": "ouuabb/lo-monorepo",
+      "branch": "main",
+      "description": "lo 生态统一代码工作区与文档源（meta/AGENTS.md 总纲）"
+    }
+  }
+}

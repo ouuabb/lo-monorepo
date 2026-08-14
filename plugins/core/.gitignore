@@ -1,0 +1,11 @@
+node_modules/
+coverage/
+*.log
+.DS_Store
+
+# 构建产物（插件包与分发清单）
+dist/
+
+# VitePress
+docs/.vitepress/dist/
+docs/.vitepress/cache/

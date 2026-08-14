@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EPUB 书库</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  min-height: 100vh;
+  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #fff;
+  color: #1a1a1a;
+}
+
+.header {
+  text-align: center;
+  padding: 48px 20px 16px;
+}
+.header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: #1a1a1a;
+}
+.header .subtitle {
+  font-size: 0.8rem;
+  color: #aaa;
+  letter-spacing: 0.1em;
+  margin-top: 4px;
+}
+
+.stats {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  padding: 0 20px 40px;
+}
+.stat-item { text-align: center; }
+.stat-num { font-size: 1.4rem; font-weight: 700; color: #1a1a1a; }
+.stat-label { font-size: 0.7rem; color: #bbb; margin-top: 2px; }
+
+/* ── 书架 ── */
+.bookshelf {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px 80px;
+}
+.shelf {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  justify-content: flex-start;
+  align-items: flex-end;
+  padding-bottom: 12px;
+  margin-bottom: 24px;
+  min-height: 180px;
+}
+.shelf-board {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: #e8e8e8;
+  border-radius: 1px 1px 0 0;
+  z-index: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.shelf::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #d0d0d0;
+}
+
+/* ═══════════════════════════════════════════════
+   3D 书本 — 6 面立方体（与参考一致）
+   ═══════════════════════════════════════════════ */
+.book {
+  width: 20px;
+  height: 160px;
+  position: relative;
+  transform-style: preserve-3d;
+  transform: rotateY(90deg);
+  transition: transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+  flex-shrink: 0;
+  z-index: 1;
+}
+.book:hover {
+  transform: rotateY(0deg) translateY(-50px) scale(1.15);
+  z-index: 999;
+}
+.book div {
+  position: absolute;
+  border: 1px solid rgba(255,255,255,0.10);
+  box-sizing: border-box;
+}
+
+/* 封面 */
+.book .cover {
+  width: 100px;
+  height: 160px;
+  transform: translateZ(10px);
+  left: -40px;
+  top: 0;
+  border-radius: 2px 4px 4px 2px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  z-index: 2;
+}
+.cover-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.95);
+  text-align: center;
+  line-height: 1.4;
+  word-break: break-word;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.cover-author {
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.6);
+  text-align: center;
+  margin-top: 6px;
+}
+
+/* 背面 */
+.book .back {
+  width: 100px;
+  height: 160px;
+  transform: rotateY(180deg) translateZ(10px);
+  left: -40px;
+  top: 0;
+  border-radius: 2px 4px 4px 2px;
+  z-index: 2;
+}
+
+/* 书脊 */
+.book .spine {
+  width: 20px;
+  height: 160px;
+  transform: rotateY(-90deg) translateZ(25px);
+  left: 0;
+  top: 0;
+  border-radius: 2px 0 0 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.spine span {
+  font-size: 8px;
+  color: rgba(255,255,255,0.9);
+  writing-mode: vertical-rl;
+  letter-spacing: 1px;
+  font-family: Georgia, serif;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 书页 */
+.book .pages {
+  width: 18px;
+  height: 160px;
+  transform: rotateY(90deg) translateZ(25px);
+  left: 1px;
+  top: 0;
+  background: repeating-linear-gradient(180deg,
+    #f5f0e8 0px, #f5f0e8 1px,
+    #e8ddd0 1px, #e8ddd0 2px);
+  z-index: 2;
+}
+
+/* 顶面 */
+.book .top {
+  width: 100px;
+  height: 20px;
+  transform: rotateX(90deg) translateZ(80px);
+  left: -40px;
+  top: 0;
+  border-radius: 2px 2px 0 0;
+  z-index: 2;
+}
+
+/* 底面 */
+.book .bottom {
+  width: 100px;
+  height: 20px;
+  transform: rotateX(-90deg) translateZ(80px);
+  left: -40px;
+  top: 140px;
+  border-radius: 0 0 2px 2px;
+  z-index: 2;
+}
+
+/* ── 空状态 ── */
+.empty-state {
+  text-align: center;
+  padding: 100px 20px;
+  color: #ccc;
+}
+.empty-state .empty-text {
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+  color: #999;
+}
+.empty-state .empty-hint {
+  font-size: 0.8rem;
+  color: #ccc;
+}
+
+.loading {
+  text-align: center;
+  padding: 100px 20px;
+  color: #ccc;
+  font-size: 0.85rem;
+}
+.loading::after {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #eee;
+  border-top-color: #999;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 700px) {
+  .book { height: 120px; }
+  .book .cover, .book .back { height: 120px; }
+  .book .spine { height: 120px; }
+  .book .pages { height: 120px; }
+  .book .top { height: 16px; transform: rotateX(90deg) translateZ(60px); top: 0; }
+  .book .bottom { height: 16px; transform: rotateX(-90deg) translateZ(60px); top: 104px; }
+  .spine span { font-size: 7px; }
+}
+@media (max-width: 500px) {
+  .book { height: 90px; }
+  .book .cover, .book .back { height: 90px; }
+  .book .spine { height: 90px; }
+  .book .pages { height: 90px; }
+  .book .top { height: 12px; transform: rotateX(90deg) translateZ(45px); top: 0; }
+  .book .bottom { height: 12px; transform: rotateX(-90deg) translateZ(45px); top: 78px; }
+  .spine span { font-size: 6px; letter-spacing: 1px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>EPUB 书库</h1>
+  <div class="subtitle">My Library</div>
+</div>
+
+<div class="stats" id="stats">
+  <div class="stat-item">
+    <div class="stat-num" id="stat-total">—</div>
+    <div class="stat-label">藏书</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num" id="stat-chapters">—</div>
+    <div class="stat-label">章节</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num" id="stat-authors">—</div>
+    <div class="stat-label">作者</div>
+  </div>
+</div>
+
+<div class="bookshelf" id="bookshelf">
+  <div class="loading">正在加载</div>
+</div>
+
+<script>
+// ── 色板 ──
+const PALETTES = [
+  ['#e8d5b0', '#c9a87c', '#b0885a', '#9a7a5a'],
+  ['#d4b0a8', '#c0988a', '#a87a6a', '#8a6a5a'],
+  ['#b8d4b0', '#98c08a', '#7aaa6a', '#5a8a4a'],
+  ['#c0d4e0', '#a0b8c8', '#809ab0', '#607a98'],
+  ['#d4c09a', '#c0a87a', '#a88a5a', '#8a704a'],
+  ['#b0c8d8', '#90b0c0', '#7098a8', '#507a90'],
+  ['#d4c8a8', '#c0b088', '#a89868', '#887850'],
+  ['#d4a8a0', '#c08878', '#a86a5a', '#8a4a3a'],
+  ['#b0b8b0', '#98a098', '#788878', '#586858'],
+  ['#d4b8c8', '#c098a8', '#a87a8a', '#8a5a6a'],
+];
+
+// ── 纹理生成器 ──
+const Patterns = {
+  horizontal(c1, c2, c3) {
+    return `repeating-linear-gradient(0deg, ${c1} 0px, ${c1} 12px, ${c2} 12px, ${c2} 25px, ${c3} 25px, ${c3} 38px, ${c1} 38px, ${c1} 50px)`;
+  },
+  vertical(c1, c2, c3) {
+    return `repeating-linear-gradient(90deg, ${c1} 0px, ${c1} 14px, ${c2} 14px, ${c2} 30px, ${c3} 30px, ${c3} 44px, ${c1} 44px, ${c1} 56px)`;
+  },
+  checker(c1, c2) {
+    return `repeating-conic-gradient(${c1} 0% 25%, ${c2} 0% 50%, ${c1} 0% 75%, ${c2} 0% 100%) 0 0 / 20px 20px`;
+  },
+  diamond(c1, c2) {
+    return `repeating-linear-gradient(45deg, ${c1} 0px, ${c1} 10px, ${c2} 10px, ${c2} 20px), repeating-linear-gradient(-45deg, ${c1} 0px, ${c1} 10px, ${c2} 10px, ${c2} 20px)`;
+  },
+  diagonal(c1, c2, c3) {
+    return `linear-gradient(135deg, ${c1} 0% 45%, ${c3} 45% 50%, ${c2} 50% 100%)`;
+  },
+  radial(c1, c2, c3) {
+    return `radial-gradient(circle at 30% 30%, ${c1} 0%, ${c2} 40%, ${c3} 80%, ${c1} 100%)`;
+  },
+  waves(c1, c2, c3) {
+    return `radial-gradient(circle at 20% 20%, ${c1} 0%, ${c2} 40%, ${c3} 80%, ${c1} 100%), radial-gradient(circle at 80% 80%, ${c3} 0%, ${c1} 30%, ${c2} 70%, ${c3} 100%)`;
+  },
+  bands(c1, c2, c3, c4) {
+    return `conic-gradient(${c1} 0deg 90deg, ${c2} 90deg 180deg, ${c3} 180deg 270deg, ${c4} 270deg 360deg)`;
+  },
+};
+const PATTERN_KEYS = Object.keys(Patterns);
+
+function adjustColor(hex, amount) {
+  let r = parseInt(hex.slice(1,3), 16);
+  let g = parseInt(hex.slice(3,5), 16);
+  let b = parseInt(hex.slice(5,7), 16);
+  r = Math.max(0, Math.min(255, r + amount));
+  g = Math.max(0, Math.min(255, g + amount));
+  b = Math.max(0, Math.min(255, b + amount));
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
+
+function buildBg(genName, colors, offset = 0) {
+  const gen = Patterns[genName];
+  if (!gen) return 'linear-gradient(145deg, #ccc, #aaa)';
+  const cols = colors.map(c => adjustColor(c, offset));
+  return gen(cols[0], cols[1], cols[2], cols[3]);
+}
+
+function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function truncate(s, max) {
+  if (!s) return '';
+  return s.length <= max ? s : s.slice(0, max - 1) + '…';
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+const BOOKS_PER_ROW = 20;
+
+function renderBookshelf(books) {
+  const container = document.getElementById('bookshelf');
+  container.innerHTML = '';
+
+  if (!books || books.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-text">书库空空如也</div><div class="empty-hint">使用 lo import *.epub 导入 EPUB 文件</div></div>';
+    return;
+  }
+
+  const sorted = [...books].sort((a, b) =>
+    (a.title || a.name || '').localeCompare(b.title || b.name || '', 'zh-CN')
+  );
+
+  for (let i = 0; i < sorted.length; i += BOOKS_PER_ROW) {
+    const shelf = document.createElement('div');
+    shelf.className = 'shelf';
+    const batch = sorted.slice(i, i + BOOKS_PER_ROW);
+
+    let html = '<div class="shelf-board"></div>';
+    for (const book of batch) {
+      const title = book.title || book.name || '';
+      const author = book.author || '';
+      const palette = rand(PALETTES);
+
+      const coverBg = buildBg(rand(PATTERN_KEYS), palette, 0);
+      const spineBg = buildBg(rand(PATTERN_KEYS), palette, 20);
+      const backBg = buildBg(rand(PATTERN_KEYS), palette, -5);
+      const topBg = buildBg(rand(PATTERN_KEYS), palette, 15);
+      const bottomBg = buildBg(rand(PATTERN_KEYS), palette, -10);
+
+      html += `
+        <div class="book">
+          <div class="cover" style="background-image: ${coverBg};">
+            <div class="cover-title">${escapeHtml(truncate(title, 12))}</div>
+            <div class="cover-author">${escapeHtml(author)}</div>
+          </div>
+          <div class="spine" style="background-image: ${spineBg};"><span>${escapeHtml(truncate(title, 10))}</span></div>
+          <div class="back" style="background-image: ${backBg};"></div>
+          <div class="top" style="background-image: ${topBg};"></div>
+          <div class="bottom" style="background-image: ${bottomBg};"></div>
+          <div class="pages"></div>
+        </div>`;
+    }
+    shelf.innerHTML = html;
+    container.appendChild(shelf);
+  }
+}
+
+function renderStats(books) {
+  document.getElementById('stat-total').textContent = books.length;
+  document.getElementById('stat-chapters').textContent = books.reduce((s, b) => s + (b.spineCount || 0), 0);
+  document.getElementById('stat-authors').textContent = new Set(books.map(b => b.author).filter(Boolean)).size;
+}
+
+async function init() {
+  try {
+    const resp = await fetch('/api/plugins/epub-library/books');
+    const data = await resp.json();
+    renderStats(data.books || []);
+    renderBookshelf(data.books || []);
+  } catch {
+    document.getElementById('bookshelf').innerHTML = '<div class="empty-state"><div class="empty-text">加载失败</div><div class="empty-hint">请确保 lo serve 正在运行</div></div>';
+  }
+}
+
+init();
+</script>
+</body>
+</html>

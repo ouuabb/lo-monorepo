@@ -1,0 +1,8 @@
+{
+  "id": "epub-reader",
+  "name": "EPUB 阅读",
+  "version": "0.1.0",
+  "description": "为 EPUB 文件提供阅读、标注和笔记能力",
+  "author": "lo Project",
+  "main": "src/index.cjs"
+}

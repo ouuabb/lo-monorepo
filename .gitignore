@@ -1,0 +1,10 @@
+node_modules/
+dist/
+out/
+coverage/
+.repo/
+*.log
+.DS_Store
+.turbo/
+.vitepress/cache/
+.vitepress/dist/

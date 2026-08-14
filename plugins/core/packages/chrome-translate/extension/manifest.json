@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "lo 划词翻译",
+  "version": "0.1.0",
+  "description": "划词翻译并同步到 lo 仓库（双通道：HTTP 实时 + 本地兜底）",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "contextMenus",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://lingva.ml/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "lo 划词翻译"
+  },
+  "options_page": "options.html"
+}

@@ -1,0 +1,21 @@
+# 文本文件统一使用 LF（与 .editorconfig 一致），消除 CRLF 警告
+* text=auto
+
+*.cjs    text eol=lf
+*.js     text eol=lf
+*.jsx    text eol=lf
+*.mjs    text eol=lf
+*.json   text eol=lf
+*.md     text eol=lf
+*.html   text eol=lf
+*.css    text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+
+# 二进制文件不参与换行符转换
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.icns   binary

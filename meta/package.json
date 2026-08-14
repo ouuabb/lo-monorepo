@@ -1,0 +1,17 @@
+{
+  "name": "lo-meta",
+  "version": "0.1.0",
+  "private": true,
+  "description": "lo 生态唯一正式文档 Source of Truth（知识组织层；docs/ 为 VitePress 展示壳）",
+  "scripts": {
+    "docs": "vitepress build ../docs",
+    "docs:gen": "node scripts/docs-gen.cjs",
+    "docs:dev": "vitepress dev ../docs",
+    "docs:build": "vitepress build ../docs",
+    "docs:preview": "vitepress preview ../docs",
+    "check": "node scripts/docs-check.cjs"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  }
+}

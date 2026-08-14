@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>lo 划词翻译 - 设置</title>
+  <style>
+    body {
+      font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+      max-width: 520px;
+      margin: 40px auto;
+      padding: 0 20px;
+      color: #1a1a2e;
+    }
+    h1 { font-size: 20px; }
+    h2 { font-size: 16px; margin-top: 28px; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+    label { display: block; margin: 12px 0 4px; font-weight: 600; font-size: 14px; }
+    input[type="text"], select {
+      width: 100%; padding: 8px 10px; font-size: 14px;
+      border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+    }
+    .hint { color: #888; font-size: 12px; margin-top: 4px; }
+    .row { margin: 16px 0; }
+    .row label { display: inline; }
+    button {
+      padding: 8px 20px; font-size: 14px; cursor: pointer;
+      background: #16213e; color: #fff; border: none; border-radius: 4px;
+    }
+    button:hover { background: #0f3460; }
+    .saved { color: #4ecca3; font-size: 13px; margin-left: 12px; display: none; }
+    .danger { background: #c0392b; }
+    .danger:hover { background: #a93226; }
+  </style>
+</head>
+<body>
+  <h1>lo 划词翻译设置</h1>
+
+  <h2>翻译</h2>
+  <label>源语言</label>
+  <select id="sourceLang">
+    <option value="auto">自动检测</option>
+    <option value="en">English</option>
+    <option value="zh">中文</option>
+    <option value="ja">日本語</option>
+    <option value="ko">한국어</option>
+    <option value="fr">Français</option>
+    <option value="de">Deutsch</option>
+    <option value="es">Español</option>
+  </select>
+
+  <label>目标语言</label>
+  <select id="targetLang">
+    <option value="zh">中文</option>
+    <option value="en">English</option>
+    <option value="ja">日本語</option>
+    <option value="ko">한국어</option>
+    <option value="fr">Français</option>
+    <option value="de">Deutsch</option>
+  </select>
+
+  <h2>同步</h2>
+  <label>lo 仓库连接地址</label>
+  <input type="text" id="endpoint" placeholder="http://127.0.0.1:8765">
+  <div class="hint">
+    lo 仓库 HTTP 服务地址（<code>lo serve</code> 启动后监听的地址，默认端口 8765）。<br>
+    翻译记录会实时 POST 到此地址写入 lo 仓库。未配置时仅本地保存。
+  </div>
+
+  <div class="row">
+    <label><input type="checkbox" id="httpEnabled" checked> 启用 HTTP 实时推送（通道①）</label>
+  </div>
+  <div class="row">
+    <label><input type="checkbox" id="localEnabled" checked> 启用本地兜底存储（通道②）</label>
+    <div class="hint">本地存储始终开启以确保数据不丢失，导出功能依赖此</div>
+  </div>
+
+  <div style="margin-top: 24px;">
+    <button id="save">保存设置</button>
+    <span class="saved" id="savedHint">已保存</span>
+  </div>
+
+  <h2>数据管理</h2>
+  <div class="row">
+    <button id="export">导出 records.json</button>
+    <div class="hint">导出本地所有记录，供 lo 插件 discover 全量校验补录</div>
+  </div>
+  <div class="row">
+    <button id="retry">重试 HTTP 推送</button>
+    <div class="hint">HTTP 恢复后，重新推送所有本地记录</div>
+  </div>
+  <div class="row">
+    <button id="clear" class="danger">清空本地记录</button>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

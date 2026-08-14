@@ -1,0 +1,25 @@
+{
+  "name": "lo-monorepo",
+  "private": true,
+  "packageManager": "pnpm@10.18.0",
+  "description": "lo 生态统一代码工作区（Turborepo + pnpm）——代码统一到 monorepo，文档统一到 meta",
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "docs": "turbo run docs",
+    "dev": "turbo run dev --parallel",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.3",
+    "@commitlint/config-conventional": "^20.5.3",
+    "husky": "^9.1.7",
+    "turbo": "^2.5.0",
+    "vitepress": "^1.6.4",
+    "vue": "^3.5.13"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["sqlite3", "esbuild", "adm-zip", "electron"]
+  }
+}

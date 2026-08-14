@@ -1,0 +1,16 @@
+{
+  "name": "@lo-plugin/chrome-translate",
+  "version": "0.1.0",
+  "description": "Chrome 划词翻译插件 — 同步翻译记录到 lo 仓库",
+  "main": "src/index.cjs",
+  "scripts": {
+    "test": "jest --config ../../jest.config.js"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "@lo/plugins-sdk": ">=0.1.0"
+  },
+  "keywords": ["lo", "plugin", "chrome", "translate", "vocabulary"],
+  "author": "lo Project",
+  "license": "MIT"
+}

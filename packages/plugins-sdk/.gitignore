@@ -1,0 +1,7 @@
+node_modules/
+coverage/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+.DS_Store
+npm-debug.log*
+.nyc_output/

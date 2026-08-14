@@ -1,0 +1,18 @@
+{
+  "name": "@lo-plugin/epub-reader",
+  "version": "0.1.0",
+  "description": "EPUB 阅读插件 — 解析 EPUB、阅读状态管理、标注与笔记",
+  "main": "src/index.cjs",
+  "scripts": {
+    "test": "jest --config ../../jest.config.js"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "@lo/plugins-sdk": ">=0.1.0",
+    "sqlite3": "^6.0.1",
+    "adm-zip": "^0.5.10"
+  },
+  "keywords": ["lo", "plugin", "epub", "reader", "annotation"],
+  "author": "lo Project",
+  "license": "MIT"
+}

@@ -1,0 +1,24 @@
+{
+  "name": "lo-agent-plugins",
+  "version": "0.1.0",
+  "private": true,
+  "description": "lo-agent 官方插件源码仓库（客户端插件分发）",
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "build:packages": "node scripts/build.cjs",
+    "test": "node scripts/build.cjs --plugin demo-hello && echo build ok"
+  },
+  "keywords": [
+    "lo",
+    "agent",
+    "plugins",
+    "monorepo"
+  ],
+  "author": "lo Project",
+  "license": "MIT",
+  "devDependencies": {
+    "@lo/agent-plugins-sdk": "workspace:*",
+    "fs-extra": "^11.2.0",
+    "tar": "^7.5.22"
+  }
+}

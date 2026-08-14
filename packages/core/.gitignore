@@ -1,0 +1,10 @@
+.repo/
+node_modules/
+backups/
+.DS_Store
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+admin/dist/
+coverage/
+.nyc_output/
+npm-debug.log*
