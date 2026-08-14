@@ -324,38 +324,56 @@ export default function App() {
 
   const createNote = useCallback(async () => {
     if (!api) return;
+    if (typeof api.createNote !== 'function') {
+      notify('新建功能需重启应用后生效');
+      return;
+    }
     setBusy(true);
     notify('');
-    const res = await api.createNote({ content: '', title: '未命名笔记' });
-    setBusy(false);
-    if (res.ok && res.data && res.data.rid) {
-      notify('已创建');
-      handleRefresh();
-      await openResource({ rid: res.data.rid, type: 'note', name: '未命名笔记' });
-    } else {
-      notify(`创建失败: ${res.message}`);
+    try {
+      const res = await api.createNote({ content: '', title: '未命名笔记' });
+      if (res.ok && res.data && res.data.rid) {
+        notify('已创建');
+        handleRefresh();
+        await openResource({ rid: res.data.rid, type: 'note', name: '未命名笔记' });
+      } else {
+        notify(`创建失败: ${res.message}`);
+      }
+    } catch (e) {
+      notify(`创建失败: ${e.message}`);
+    } finally {
+      setBusy(false);
     }
   }, [api, openResource, handleRefresh]);
 
   const importFiles = useCallback(
     async (fileList) => {
       if (!api || !fileList || fileList.length === 0) return;
+      if (typeof api.uploadNotes !== 'function') {
+        notify('导入功能需重启应用后生效');
+        return;
+      }
       setBusy(true);
       notify('');
-      const files = await Promise.all(
-        Array.from(fileList).map(async (f) => ({
-          name: f.name,
-          data: await f.arrayBuffer(),
-          contentType: f.type || undefined,
-        })),
-      );
-      const res = await api.uploadNotes(files, {});
-      setBusy(false);
-      if (res.ok) {
-        notify(`已导入 ${res.data.uploaded} 个文件`);
-        handleRefresh();
-      } else {
-        notify(`导入失败: ${res.message}`);
+      try {
+        const files = await Promise.all(
+          Array.from(fileList).map(async (f) => ({
+            name: f.name,
+            data: await f.arrayBuffer(),
+            contentType: f.type || undefined,
+          })),
+        );
+        const res = await api.uploadNotes(files, {});
+        if (res.ok) {
+          notify(`已导入 ${res.data.uploaded} 个文件`);
+          handleRefresh();
+        } else {
+          notify(`导入失败: ${res.message}`);
+        }
+      } catch (e) {
+        notify(`导入失败: ${e.message}`);
+      } finally {
+        setBusy(false);
       }
     },
     [api, handleRefresh],
@@ -388,16 +406,25 @@ export default function App() {
     deleteRidRef.current = null;
     setConfirmDelete(false);
     if (!api || !rid) return;
+    if (typeof api.removeNote !== 'function') {
+      notify('删除功能需重启应用后生效');
+      return;
+    }
     setBusy(true);
     notify('');
-    const res = await api.removeNote(rid);
-    setBusy(false);
-    if (res.ok) {
-      notify('已删除');
-      closeTab(rid);
-      handleRefresh();
-    } else {
-      notify(`删除失败: ${res.message}`);
+    try {
+      const res = await api.removeNote(rid);
+      if (res.ok) {
+        notify('已删除');
+        closeTab(rid);
+        handleRefresh();
+      } else {
+        notify(`删除失败: ${res.message}`);
+      }
+    } catch (e) {
+      notify(`删除失败: ${e.message}`);
+    } finally {
+      setBusy(false);
     }
   }, [api, closeTab, handleRefresh]);
 
@@ -405,21 +432,25 @@ export default function App() {
     if (!api || !api.operations) return;
     setBusy(true);
     notify('');
-    const list = await api.operations.list({ limit: 1 });
-    if (!list.ok || !list.data || list.data.length === 0) {
+    try {
+      const list = await api.operations.list({ limit: 1 });
+      if (!list.ok || !list.data || list.data.length === 0) {
+        notify(list.ok ? '没有可撤销的操作' : `获取操作失败: ${list.message}`);
+        return;
+      }
+      const op = list.data[0];
+      const opId = op.operation_id || op.operationId;
+      const res = await api.operations.undo(opId);
+      if (res.ok) {
+        notify('已撤销最近操作');
+        handleRefresh();
+      } else {
+        notify(`撤销失败: ${res.message}`);
+      }
+    } catch (e) {
+      notify(`撤销失败: ${e.message}`);
+    } finally {
       setBusy(false);
-      notify(list.ok ? '没有可撤销的操作' : `获取操作失败: ${list.message}`);
-      return;
-    }
-    const op = list.data[0];
-    const opId = op.operation_id || op.operationId;
-    const res = await api.operations.undo(opId);
-    setBusy(false);
-    if (res.ok) {
-      notify('已撤销最近操作');
-      handleRefresh();
-    } else {
-      notify(`撤销失败: ${res.message}`);
     }
   }, [api, handleRefresh]);
 
@@ -2256,7 +2287,7 @@ function NoteContextMenu(props) {
           撤销最近操作
         </button>
         <button type="button" onClick={() => { onDelete(menu.rid); onClose(); }}>
-          删除笔记
+          删除
         </button>
         <button type="button" onClick={() => { onToggleReadOnly(menu.rid); onClose(); }}>
           {menu.readOnly ? '改为可编辑' : '设为只读'}
