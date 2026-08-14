@@ -836,6 +836,12 @@ class ResourceService {
   }
 
   async delete(rid, soft = true) {
+    // 系统资源不可删除（覆盖 operation 层拦截不到的硬删路径）
+    const systemCheck = await this.getByRid(rid);
+    if (systemCheck && systemCheck.type === 'system') {
+      throw new Error(`系统资源不可删除: ${rid}`);
+    }
+
     // ── Hook: beforeResourceDelete ──
     const beforePayload = await this._runBefore("beforeResourceDelete", {
       rid,

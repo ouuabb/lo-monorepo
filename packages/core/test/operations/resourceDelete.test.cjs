@@ -33,6 +33,23 @@ describe('resource.delete handler', () => {
       ).rejects.toThrow('资源不存在或已删除');
     });
 
+    test('rejects deleting system resources', async () => {
+      const beforeRow = {
+        name: '__system__',
+        path: '',
+        type: 'system',
+        layer: 0,
+        container_schema: '{}',
+      };
+      const db = { get: jest.fn().mockResolvedValue(beforeRow) };
+      const del = jest.fn();
+
+      await expect(
+        handler.execute({ db, resourceService: { delete: del } }, { rid: '__system__' }),
+      ).rejects.toThrow('系统资源不可删除');
+      expect(del).not.toHaveBeenCalled();
+    });
+
     test('falls back to deleted=true when service omits deleted flag', async () => {
       const beforeRow = { name: 'a.md', path: '/a.md' };
       const db = { get: jest.fn().mockResolvedValue(beforeRow) };

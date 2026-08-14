@@ -27,6 +27,9 @@ module.exports = {
       [rid],
     );
     if (!before) throw new Error(`资源不存在或已删除: ${rid}`);
+    if (before.type === 'system') {
+      throw new Error(`系统资源不可删除: ${rid}`);
+    }
 
     const result = await ctx.resourceService.delete(rid, true);
 

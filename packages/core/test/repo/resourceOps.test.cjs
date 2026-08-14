@@ -84,6 +84,18 @@ describe('System Operations (resource & definition)', () => {
       expect(restored.deleted).toBe(0);
       expect(restored.name).toBe(r.name);
     });
+
+    test('拒绝删除系统资源（软删与硬删）', async () => {
+      await expect(repo.deleteResource('__system__', true)).rejects.toThrow(
+        '系统资源不可删除',
+      );
+      await expect(repo.deleteResource('__system__', false)).rejects.toThrow(
+        '系统资源不可删除',
+      );
+      const sys = await repo.resourceService.getByRid('__system__');
+      expect(sys).toBeTruthy();
+      expect(sys.deleted).toBe(0);
+    });
   });
 
   // ─── schema operations ───
