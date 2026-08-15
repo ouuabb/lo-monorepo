@@ -59,6 +59,10 @@ contextBridge.exposeInMainWorld('loAgent', {
     configure: (config) => ipcRenderer.invoke(CHANNEL.CONFIGURE, config),
     login: (params) => ipcRenderer.invoke(CHANNEL.LOGIN, params),
     getStatus: () => ipcRenderer.invoke(CHANNEL.STATUS),
+    repository: {
+      info: () => ipcRenderer.invoke(CHANNEL.REPOSITORY_INFO),
+      resolveLocation: (rid) => ipcRenderer.invoke(CHANNEL.RESOURCE_LOCATION, rid),
+    },
     listNotes: (query) => ipcRenderer.invoke(CHANNEL.LIST_NOTES, query),
     getNote: (rid) => ipcRenderer.invoke(CHANNEL.GET_NOTE, rid),
     createNote: (body) => ipcRenderer.invoke(CHANNEL.CREATE_NOTE, body),

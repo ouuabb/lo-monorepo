@@ -227,6 +227,33 @@ describe("Protocol HTTP API (relations/operations/events)", () => {
     expect(committed.data.committed).toBe(true);
   });
 
+  // ─── Repository API（D6：Identity + Resolver 三态）────────────
+
+  test("Repository: GET /api/repository 返回 Identity + path", async () => {
+    const res = await request(port, "GET", "/api/repository");
+    expect(res.status).toBe(200);
+    expect(res.data.repositoryId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(res.data.path).toBe(ctx.tempDir);
+  });
+
+  test("Repository: GET /api/resources/:rid/location 返回 Resolver 三态", async () => {
+    const r = await request(port, "POST", "/api/notes", { title: "LocNote", content: "x" });
+    expect(r.status).toBe(201);
+    const rid = r.data.rid;
+
+    // local 存在 → resolved
+    const ok = await request(port, "GET", `/api/resources/${rid}/location`);
+    expect(ok.status).toBe(200);
+    expect(ok.data.kind).toBe("local");
+    expect(ok.data.resolved).toBe(true);
+    expect(ok.data.absolutePath.startsWith(path.join(ctx.tempDir, "resources"))).toBe(true);
+    expect(ok.data.absolutePath.endsWith(".md")).toBe(true);
+
+    // 未知 rid → 404
+    const missing = await request(port, "GET", "/api/resources/res_none/location");
+    expect(missing.status).toBe(404);
+  });
+
   // ─── Event API ─────────────────────────────────────────────
 
   test("Event history: 资源创建后产生 resource.created 事件", async () => {

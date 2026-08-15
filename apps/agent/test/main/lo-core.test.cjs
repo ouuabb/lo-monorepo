@@ -11,6 +11,7 @@ function makeMockClient(overrides = {}) {
     views: { list: jest.fn(), get: jest.fn(), run: jest.fn() },
     relations: { list: jest.fn() },
     events: { subscribe: jest.fn(), history: jest.fn() },
+    repository: { info: jest.fn(), resolveLocation: jest.fn() },
     ...overrides,
   };
   return client;
@@ -145,6 +146,48 @@ describe('LoCoreService', () => {
     const res = service.logout();
     expect(client.logout).toHaveBeenCalled();
     expect(res.ok).toBe(true);
+  });
+
+  it('getRepositoryInfo 透传 Core Repository Identity（不自行拼接路径）', async () => {
+    const client = makeMockClient();
+    client.repository.info.mockResolvedValue({
+      repositoryId: 'repo_uuid',
+      path: '/tmp/lo-demo',
+    });
+    const service = new LoCoreService({ LoClient: class {} });
+    service.client = client;
+    const res = await service.getRepositoryInfo();
+    expect(res).toEqual({
+      ok: true,
+      info: { repositoryId: 'repo_uuid', path: '/tmp/lo-demo' },
+    });
+  });
+
+  it('resolveResourceLocation 透传 Core Resolver 三态', async () => {
+    const client = makeMockClient();
+    client.repository.resolveLocation.mockResolvedValue({
+      kind: 'local',
+      resolved: true,
+      absolutePath: '/tmp/lo-demo/resources/a.md',
+    });
+    const service = new LoCoreService({ LoClient: class {} });
+    service.client = client;
+    const res = await service.resolveResourceLocation('res_1');
+    expect(res).toEqual({
+      ok: true,
+      resolved: { kind: 'local', resolved: true, absolutePath: '/tmp/lo-demo/resources/a.md' },
+    });
+    expect(client.repository.resolveLocation).toHaveBeenCalledWith('res_1');
+  });
+
+  it('未配置时 getRepositoryInfo/resolveResourceLocation 报错提示先 configure', async () => {
+    const service = new LoCoreService({});
+    const infoRes = await service.getRepositoryInfo();
+    expect(infoRes.ok).toBe(false);
+    expect(infoRes.message).toContain('configure');
+    const locRes = await service.resolveResourceLocation('res_1');
+    expect(locRes.ok).toBe(false);
+    expect(locRes.message).toContain('configure');
   });
 
   it('未配置时 getNote/updateNote 报错提示先 configure', async () => {

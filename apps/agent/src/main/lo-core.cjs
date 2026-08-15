@@ -110,6 +110,34 @@ class LoCoreService {
   }
 
   /**
+   * 获取仓库信息（Repository Identity + 仓库路径；来自 Core，不自行拼接）
+   * @returns {Promise<{ ok: true, info: { repositoryId, path } }|{ error, message }>}
+   */
+  async getRepositoryInfo() {
+    try {
+      this._ensureClient();
+      const info = await this.client.repository.info();
+      return { ok: true, info };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
+  /**
+   * 解析 Resource Location（Resolver 三态；来自 Core，不自行拼接路径）
+   * @param {string} rid
+   */
+  async resolveResourceLocation(rid) {
+    try {
+      this._ensureClient();
+      const resolved = await this.client.repository.resolveLocation(rid);
+      return { ok: true, resolved };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
+  /**
    * 获取资源列表
    * @param {object} [query] — { type, schema, limit, offset }
    */

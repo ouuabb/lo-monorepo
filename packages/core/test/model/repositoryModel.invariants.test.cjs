@@ -224,5 +224,17 @@ describe('Repository Model Invariants (016 §12)', () => {
     await repo.close();
   });
 
-  it.todo('I10 · Agent/SDK 不自行解析路径（唯一解析在 Core）（Phase 5）');
+  it('I10 · Agent/SDK 不自行解析路径（唯一解析在 Core）', async () => {
+    // 运行时验证跨包完成（本文件为 Core 仓库内测试，无法实例化 Agent/SDK）：
+    //   - SDK：client.test.cjs repository.info/resolveLocation（URL 透传 Core，断言无本地拼接）
+    //   - Agent：lo-core.test/ipc.test/preload.test（RepositoryContext 通道 + 三入口消费 info()）
+    //   - HTTP 协议：protocolHttp.test.cjs（真实 serve：GET /api/repository + /api/resources/:rid/location）
+    const repo = await Repository.create(dir);
+    const res = await repo.createResource('note', '# A', { filename: 'i10.md' });
+    // Core 仍为唯一解析持有者
+    const loc = await repo.resourceService.resolveResourceLocation(res.rid);
+    expect(loc.resolved).toBe(true);
+    expect(loc.absolutePath).toBe(path.join(dir, 'resources', 'i10.md'));
+    await repo.close();
+  });
 });

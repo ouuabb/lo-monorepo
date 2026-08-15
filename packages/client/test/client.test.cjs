@@ -67,6 +67,39 @@ describe('LoClient 基础', () => {
     expect(calls[0].requestOpts.headers.Authorization).toBe('Bearer tok_123');
   });
 
+  it('repository.info() 返回 Core 仓库信息(不自行拼接路径)', async () => {
+    const { client, calls } = makeClient(() =>
+      Promise.resolve({
+        status: 200,
+        body: { repositoryId: 'rid_abc', path: '/tmp/lo-demo' },
+        headers: {},
+      }),
+    );
+    fakeAuthed(client);
+    const info = await client.repository.info();
+    expect(info).toEqual({ repositoryId: 'rid_abc', path: '/tmp/lo-demo' });
+    expect(calls[0].method).toBe('GET');
+    expect(calls[0].url).toBe('http://127.0.0.1:8765/api/repository');
+  });
+
+  it('repository.resolveLocation(rid) 透传 Core Resolver 三态', async () => {
+    const { client, calls } = makeClient(() =>
+      Promise.resolve({
+        status: 200,
+        body: { kind: 'local', resolved: true, absolutePath: '/tmp/lo-demo/resources/a.md' },
+        headers: {},
+      }),
+    );
+    fakeAuthed(client);
+    const loc = await client.repository.resolveLocation('res_1');
+    expect(loc).toEqual({
+      kind: 'local',
+      resolved: true,
+      absolutePath: '/tmp/lo-demo/resources/a.md',
+    });
+    expect(calls[0].url).toBe('http://127.0.0.1:8765/api/resources/res_1/location');
+  });
+
   it('GET 带 query 并 encode', async () => {
     const { client, calls } = makeClient(() =>
       Promise.resolve({ status: 200, body: {}, headers: {} }),

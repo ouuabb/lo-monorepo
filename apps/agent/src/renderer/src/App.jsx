@@ -44,6 +44,7 @@ export default function App() {
   const [privateKeyPath, setPrivateKeyPath] = useState('');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(null);
+const [repoCtx, setRepoCtx] = useState(null);
   const [notes, setNotes] = useState([]);
   const [authenticated, setAuthenticated] = useState(false);
   const [message, setMessage] = useState('');
@@ -141,15 +142,27 @@ export default function App() {
     if (!api) return;
     setBusy(true);
     notify('');
-    const [statusRes, notesRes] = await Promise.all([
+    const [statusRes, notesRes, repoRes] = await Promise.all([
       api.getStatus(),
       api.listNotes({ limit: 50 }),
+      api.repository.info(),
     ]);
     setBusy(false);
     if (statusRes.ok) setStatus(statusRes.stats);
     else notify(`获取状态失败: ${statusRes.message}`);
     if (notesRes.ok) setNotes(notesRes.data);
     else notify(`获取资源列表失败: ${notesRes.message}`);
+    if (repoRes && repoRes.ok) {
+      setRepoCtx({
+        repositoryId: repoRes.info.repositoryId,
+        currentPath: repoRes.info.path,
+        connectionState: 'connected',
+      });
+    } else {
+      setRepoCtx((prev) =>
+        prev ? { ...prev, connectionState: 'disconnected' } : null,
+      );
+    }
   }, []);
 
   const handleLogout = useCallback(async () => {
@@ -157,6 +170,7 @@ export default function App() {
     await api.logout();
     setAuthenticated(false);
     setStatus(null);
+    setRepoCtx(null);
     setNotes([]);
     setTabs([]);
     setActiveKey(null);
@@ -675,7 +689,13 @@ useEffect(() => {
         <button
           className={`conn-dot ${authenticated ? 'on' : ''}`}
           type="button"
-          title={authenticated ? '已登录，点击重新登录/登出' : '未连接，点击登录'}
+          title={
+            authenticated
+              ? repoCtx
+                ? `已登录（${repoCtx.repositoryId} · ${repoCtx.currentPath}），点击重新登录/登出`
+                : '已登录，点击重新登录/登出'
+              : '未连接，点击登录'
+          }
           aria-label={authenticated ? '已登录' : '未连接'}
           onClick={openLogin}
         />

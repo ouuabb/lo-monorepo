@@ -59,6 +59,7 @@ class LoClient {
     this.relations = createRelationsApi(this);
     this.operations = createOperationsApi(this);
     this.events = createEventsApi(this);
+    this.repository = createRepositoryApi(this);
   }
 
   get baseUrl() {
@@ -184,6 +185,28 @@ function createHealthApi(client) {
     /** GET /api/tags */
     tags() {
       return client.get('/api/tags').then((r) => r.body);
+    },
+  };
+}
+
+function createRepositoryApi(client) {
+  return {
+    /**
+     * 获取仓库信息（Repository Identity + 仓库路径；来自 Core，不自行拼接）
+     * @returns {Promise<{ repositoryId: string, path: string }>}
+     */
+    info() {
+      return client.get('/api/repository').then((r) => r.body);
+    },
+    /**
+     * 解析 Resource Location（Resolver 三态，来自 Core）
+     * @param {string} rid
+     * @returns {Promise<{ kind: string, resolved: boolean,
+     *   absolutePath: string|null, reason?: string }>}
+     */
+    resolveLocation(rid) {
+      const encoded = encodeURIComponent(rid);
+      return client.get(`/api/resources/${encoded}/location`).then((r) => r.body);
     },
   };
 }

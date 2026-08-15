@@ -58,6 +58,9 @@ describe('src/preload/index.cjs', () => {
     expect(api.loCore.events.subscribe).toBeDefined();
     expect(api.loCore.events.unsubscribe).toBeDefined();
     expect(api.loCore.events.onEvent).toBeDefined();
+    expect(api.loCore.repository).toBeDefined();
+    expect(api.loCore.repository.info).toBeDefined();
+    expect(api.loCore.repository.resolveLocation).toBeDefined();
     expect(api.plugins).toBeDefined();
     expect(api.plugins.list).toBeDefined();
     expect(api.plugins.execute).toBeDefined();

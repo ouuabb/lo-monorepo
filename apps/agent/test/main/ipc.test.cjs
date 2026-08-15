@@ -21,6 +21,8 @@ function makeService() {
     getView: jest.fn(async (id) => ({ ok: true, data: { id } })),
     runView: jest.fn(async (id, body) => ({ ok: true, data: { presentation: { type: 'list' } } })),
     getRelations: jest.fn(async (rid) => ({ ok: true, data: { outgoing: [], incoming: [] } })),
+    getRepositoryInfo: jest.fn(async () => ({ ok: true, info: { repositoryId: 'repo_uuid', path: '/tmp/lo-demo' } })),
+    resolveResourceLocation: jest.fn(async (rid) => ({ ok: true, resolved: { kind: 'local', resolved: true, absolutePath: '/tmp/lo-demo/resources/a.md' } })),
   };
 }
 
@@ -49,7 +51,24 @@ describe('registerLoCoreIpc', () => {
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.VIEWS_LIST, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.VIEWS_GET, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.VIEWS_RUN, expect.any(Function));
-    expect(ipcMain.handle.mock.calls.length).toBe(19);
+    expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.REPOSITORY_INFO, expect.any(Function));
+    expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.RESOURCE_LOCATION, expect.any(Function));
+    expect(ipcMain.handle.mock.calls.length).toBe(21);
+  });
+
+  it('Repository 通道委托 service（info / resolveLocation）', async () => {
+    const ipcMain = { handle: jest.fn() };
+    const service = makeService();
+    registerLoCoreIpc(ipcMain, service);
+    const byChannel = (ch) => ipcMain.handle.mock.calls.find(([c]) => c === ch)[1];
+
+    const info = await byChannel(CHANNELS.REPOSITORY_INFO)();
+    expect(service.getRepositoryInfo).toHaveBeenCalled();
+    expect(info.info.repositoryId).toBe('repo_uuid');
+
+    const loc = await byChannel(CHANNELS.RESOURCE_LOCATION)({}, 'res_1');
+    expect(service.resolveResourceLocation).toHaveBeenCalledWith('res_1');
+    expect(loc.resolved.absolutePath).toBe('/tmp/lo-demo/resources/a.md');
   });
 
   it('handler 委托并传参', async () => {

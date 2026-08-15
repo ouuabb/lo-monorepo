@@ -606,6 +606,32 @@ route("DELETE", "/api/notes/:rid", async (req, res, { repo, url }) => {
   }
 });
 
+// ---- Repository 端点 --------------------------------------------------
+// 仓库身份 + Resource Location 解析（D5/D6：Agent/SDK 唯一信息入口，不返回旧 path）
+
+route("GET", "/api/repository", async (req, res, { repo }) => {
+  try {
+    const ctx = repo.getRepositoryContext();
+    jsonOk(res, { repositoryId: ctx.repositoryId, path: ctx.currentPath });
+  } catch (e) {
+    serverError(res, e.message);
+  }
+});
+
+route("GET", "/api/resources/:rid/location", async (req, res, { repo, url }) => {
+  const rid = extractResourceRid(url.pathname);
+  if (!rid) return notFound(res, "Invalid rid");
+  try {
+    const resolved = await repo.resourceService.resolveResourceLocation(rid);
+    if (!resolved || resolved.kind === 'unknown') {
+      return notFound(res, "Resource not found");
+    }
+    jsonOk(res, resolved);
+  } catch (e) {
+    serverError(res, e.message);
+  }
+});
+
 // ---- Schema 端点 ----------------------------------------------------
 // 供 Schema 语义系统的管理/消费入口：CRUD + attach/detach + 按 schema 过滤资源
 
@@ -2848,6 +2874,11 @@ function extractAdminRid(urlPath) {
   return match ? match[1] : null;
 }
 
+function extractResourceRid(urlPath) {
+  const match = urlPath.match(/^\/api\/resources\/(res_[a-zA-Z0-9_]+)\/location/);
+  return match ? match[1] : null;
+}
+
 // ---------------------------------------------------------------------------
 // 静态文件服务（Admin SPA）
 // ---------------------------------------------------------------------------
@@ -2960,6 +2991,11 @@ function matchRoute(method, pathname) {
   // 参数化路由匹配
   if (pathname.startsWith("/api/notes/") && pathname.split("/").length === 4) {
     const exactKey = "/api/notes/:rid";
+    if (map.has(exactKey)) return map.get(exactKey);
+  }
+
+  if (/^\/api\/resources\/[^/]+\/location$/.test(pathname)) {
+    const exactKey = "/api/resources/:rid/location";
     if (map.has(exactKey)) return map.get(exactKey);
   }
 

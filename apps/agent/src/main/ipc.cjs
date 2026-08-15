@@ -28,6 +28,8 @@ const CHANNELS = {
   EVENTS_SUBSCRIBE: 'lo-core:events-subscribe',
   EVENTS_UNSUBSCRIBE: 'lo-core:events-unsubscribe',
   EVENTS_PUSH: 'lo-core:event',
+  REPOSITORY_INFO: 'lo-core:repository-info',
+  RESOURCE_LOCATION: 'lo-core:resource-location',
 };
 
 /**
@@ -39,6 +41,10 @@ function registerLoCoreIpc(ipcMain, service) {
   ipcMain.handle(CHANNELS.CONFIGURE, (_event, cfg) => service.configure(cfg || {}));
   ipcMain.handle(CHANNELS.LOGIN, (_event, params) => service.login(params || {}));
   ipcMain.handle(CHANNELS.STATUS, () => service.getStatus());
+  ipcMain.handle(CHANNELS.REPOSITORY_INFO, () => service.getRepositoryInfo());
+  ipcMain.handle(CHANNELS.RESOURCE_LOCATION, (_event, rid) =>
+    service.resolveResourceLocation(rid),
+  );
   ipcMain.handle(CHANNELS.LIST_NOTES, (_event, query) => service.listNotes(query || {}));
   ipcMain.handle(CHANNELS.GET_NOTE, (_event, rid) => service.getNote(rid));
   ipcMain.handle(CHANNELS.CREATE_NOTE, (_event, body) => service.createNote(body || {}));

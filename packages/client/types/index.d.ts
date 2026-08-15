@@ -86,6 +86,7 @@ export class LoClient {
   relations: RelationsApi;
   operations: OperationsApi;
   events: EventsApi;
+  repository: RepositoryApi;
   setAdminToken(token: string): void;
   request(method: string, path: string, query?: object, options?: object): Promise<ApiResponse>;
   get(path: string, query?: object, options?: object): Promise<ApiResponse>;
@@ -297,6 +298,19 @@ export interface HealthApi {
   ping(): Promise<LoBody>;
   stats(): Promise<LoBody>;
   tags(): Promise<LoBody>;
+}
+
+/** Resolver 三态（D5）：resolved / unresolved(file-missing|source-missing|
+ * external-unavailable) / virtual */
+export type ResolvedLocation =
+  | { kind: string; resolved: true; absolutePath: string | null }
+  | { kind: string; resolved: false; reason: string; absolutePath: null };
+
+export interface RepositoryApi {
+  /** 仓库信息（Repository Identity + 路径，来自 Core） */
+  info(): Promise<{ repositoryId: string; path: string }>;
+  /** Resource Location 解析（来自 Core，不自行拼接路径） */
+  resolveLocation(rid: string): Promise<ResolvedLocation>;
 }
 
 type LoBody = any;
