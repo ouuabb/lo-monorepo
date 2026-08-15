@@ -62,16 +62,142 @@ describe('Repository Model Invariants (016 §12)', () => {
     await reopened.close();
   });
 
-  it.todo('I4 · Resource Location 三分类（local/external/virtual）+ Container 能力层；'
-    + 'kind 决定解析，禁止形式推断（Phase 2/3）');
+  it('I4 · Resource Location 三分类（local/external/virtual）+ Container 能力层；'
+    + 'kind 决定解析，禁止形式推断', async () => {
+    const repo = await Repository.create(dir);
+    const local = await repo.createResource('note', '# L', { filename: 'i4.md' });
+    expect(local.location_kind).toBe('local');
+    expect(local.location).toBe(path.join('resources', 'i4.md'));
 
-  it.todo('I5 · 仓库内资源 location 相对 Repository.currentPath（Phase 2）');
+    const extPath = path.join(dir, 'ext.md');
+    await fs.writeFile(extPath, '# E');
+    const ext = await repo.resourceService.create({
+      type: 'note',
+      location_kind: 'external',
+      location: extPath,
+      name: 'i4-ext',
+    });
+    expect(ext.location_kind).toBe('external');
 
-  it.todo('I6 · Resource Source 与 Location 解耦（source 不承载定位）（Phase 4）');
+    const virt = await repo.resourceService.create({
+      type: 'vocabulary',
+      location_kind: 'virtual',
+      location: '',
+      name: 'i4-v',
+    });
+    expect(virt.location_kind).toBe('virtual');
 
-  it.todo('I7 · 复制后 Identity 不变；副本独立化必须经 reinitialize（Phase 1/4）');
+    const conDir = path.join(dir, 'con');
+    await fs.ensureDir(conDir);
+    const con = await repo.createResourceWithContainer('album', conDir, { name: 'i4-con' });
+    expect(con.capabilities).toContain('container'); // 能力层，非位置 kind
+    await repo.close();
+  });
 
-  it.todo('I8 · Backup/Restore 后 Identity 不变（Phase 4）');
+  it('I5 · 仓库内资源 location 相对 Repository.currentPath', async () => {
+    const repo = await Repository.create(dir);
+    const res = await repo.createResource('note', '# R', { filename: 'i5.md' });
+    expect(res.location_kind).toBe('local');
+    expect(res.location).toBe(path.join('resources', 'i5.md')); // 相对路径
+    expect(path.isAbsolute(res.location)).toBe(false);
+    await repo.close();
+  });
+
+  it('I6 · Resource Source 与 Location 解耦（source 不承载定位）（Phase 4）', async () => {
+    const repo = await Repository.create(dir);
+    const res = await repo.createResource('note', '# S', { filename: 'src.md' });
+    const originalLoc = res.location;
+
+    // 绑定多个内容来源（source 层：目录 / URL）
+    await repo.sourceService.addSource(res.rid, 'directory', path.join(dir, 'some-source'));
+    await repo.sourceService.addSource(res.rid, 'url', 'https://example.com/x');
+
+    // 存在不同 Source 不改变 Resource Location 语义（local 相对保持）
+    const again = await repo.resourceService.getByRid(res.rid);
+    expect(again.location_kind).toBe('local');
+    expect(again.location).toBe(originalLoc);
+
+    // Container source + memberPath 独立于 Resource Location（两层模型）
+    const srcDir = path.join(dir, 'container-src');
+    await fs.ensureDir(srcDir);
+    await fs.writeFile(path.join(srcDir, 'photo.png'), 'x');
+    const container = await repo.createResourceWithContainer('album', srcDir, {
+      name: 'album1',
+    });
+    const c = await repo.resourceService.getByRid(container.rid);
+    expect(c.capabilities).toContain('container');
+    await repo.containerService.addMember(container.rid, {
+      path: 'photo.png',
+      absolutePath: path.join(srcDir, 'photo.png'),
+      name: 'photo.png',
+    });
+    const memberRow = await repo.containerService.getMember(container.rid, 'photo.png');
+    expect(memberRow.path).toBe('photo.png'); // memberPath 相对内容源目录
+    await repo.close();
+  });
+
+  it('I7 · 复制后 Identity 不变；副本独立化必须经 reinitialize（Phase 4）', async () => {
+    const repoA = await Repository.create(dir);
+    const idA = repoA.repositoryId;
+    const res = await repoA.createResource('note', '# A', { filename: 'copy.md' });
+    const rid = res.rid;
+    const loc = res.location;
+    const conDir = path.join(dir, 'con-src');
+    await fs.ensureDir(conDir);
+    await fs.writeFile(path.join(conDir, 'm.md'), 'm');
+    const con = await repoA.createResourceWithContainer('album', conDir, { name: 'albumC' });
+    await repoA.close();
+
+    // OS copy → Repository B：Identity 保持与 A 相同（同源副本）
+    const dirB = path.join(dir, '..', `${path.basename(dir)}-copy`);
+    await fs.copy(dir, dirB);
+    const repoB = new Repository(dirB);
+    await repoB.open({ skipAuth: true });
+    expect(repoB.repositoryId).toBe(idA);
+
+    // reinitialize：B 获得新 Identity，lineage.origin = A 原 Identity
+    const { oldId, newId } = await repoB.reinitialize();
+    expect(newId).not.toBe(idA);
+    expect(oldId).toBe(idA);
+
+    // Resource rid / Location / Container / DB 数据保持不变
+    const resB = await repoB.resourceService.getByRid(rid);
+    expect(resB.rid).toBe(rid);
+    expect(resB.location_kind).toBe('local');
+    expect(resB.location).toBe(loc);
+    const conB = await repoB.resourceService.getByRid(con.rid);
+    expect(conB.capabilities).toContain('container');
+    await repoB.close();
+  });
+
+  it('I8 · Backup/Restore 后 Identity 不变（Phase 4）', async () => {
+    const repo = await Repository.create(dir);
+    const id = repo.repositoryId;
+    const res = await repo.createResource('note', '# B', { filename: 'bk.md' });
+    const rid = res.rid;
+    const loc = res.location;
+    await repo.close();
+
+    // backup：复制整仓（backup.cjs 语义：排除 .repo/keys）
+    const backupDir = path.join(dir, '..', `${path.basename(dir)}-backup`);
+    await fs.copy(dir, backupDir, {
+      filter: (src) => !src.includes(`${path.sep}.repo${path.sep}keys`),
+    });
+
+    // restore 到新位置
+    const restored = path.join(dir, '..', `${path.basename(dir)}-restored`);
+    await fs.copy(backupDir, restored);
+    const repoR = new Repository(restored);
+    await repoR.open({ skipAuth: true });
+
+    // Identity 不变；Resource rid 不变；local location 仍相对
+    expect(repoR.repositoryId).toBe(id);
+    const resR = await repoR.resourceService.getByRid(rid);
+    expect(resR.rid).toBe(rid);
+    expect(resR.location_kind).toBe('local');
+    expect(resR.location).toBe(loc);
+    await repoR.close();
+  });
 
   it('I9 · Core 唯一解析规则；Resolver 明确返回 resolved/unresolved/virtual 三态'
     + '（不保证任何时刻存在有效路径）（Phase 3）', async () => {

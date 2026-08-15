@@ -64,7 +64,12 @@ class StagingArea {
     // 检测已删除的文件
     const allResources = await repository.resourceService.getAll();
     for (const resource of allResources) {
-      const absPath = resource.location_kind === 'local' ? path.join(this.repoPath, resource.location) : '';
+      // 复用 Core 既有 Location 解析能力（Resource Location 唯一解析规则）
+      const absPath =
+        repository.resourceService.resolveLocation({
+          kind: resource.location_kind,
+          value: resource.location,
+        }) || '';
       if (!absPath.startsWith(this.repoPath + path.sep) && absPath !== this.repoPath) continue;
       if (!await fs.pathExists(absPath)) {
         const relPath = this._relative(absPath);
