@@ -481,7 +481,7 @@ route("POST", "/api/notes/upload", async (req, res, { repo }) => {
       });
       results.push(result);
     } catch (e) {
-      if (e.code === "RESOURCE_EXISTS") return conflict(res, e.message);
+      if (e.code === "RESOURCE_EXISTS" || e.code === "LOCATION_CONFLICT") return conflict(res, e.message);
       return serverError(res, `保存文件失败: ${e.message}`);
     }
   }

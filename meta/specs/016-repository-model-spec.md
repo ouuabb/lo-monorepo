@@ -69,6 +69,22 @@
 - kind 决定解析方式，**禁止从字符串形式推断 kind**（绝对路径 ≠ 必然 external）。
 - Repository-local Resource 的 location **相对 Repository.currentPath**，而非历史绝对路径。
 
+### 6.1 Resource Location 唯一性（正式语义，2026-08 定稿）
+
+只有 **local** Resource Location 具有仓库内物理路径唯一性约束；external 不具有全局唯一约束。
+
+| kind | 唯一性 | 说明 |
+|---|---|---|
+| local | **唯一** | 同一仓库内、同一 active（`deleted=0`）+ `layer=0` 的 location → 至多一个 Resource |
+| external | **不唯一** | 同一个绝对路径可被多个 Resource 引用 |
+| virtual | **不参与** | `location=''`，不参与 location 唯一性 |
+
+- `deleted`（软删）与 `layer>0`（name-stack 历史版本）**不参与**当前唯一性约束。
+- 实现约定：DB 唯一索引（`idx_resources_location_active`，谓词含 `location_kind='local'`）
+  负责**最终一致性**；应用层只负责把约束冲突转换为可读的 `LOCATION_CONFLICT` 错误，
+  不引入第二套独立唯一性规则。`createResource` 的占用检查与索引语义完全一致（仅 local）。
+- 各入口（create / import / move / syncOps apply）统一遵守该语义；不实现 swap。
+
 ## 7. Resource Source
 
 - 内容来源绑定（`resource_sources.location`，可多源 / URL，container 扫描/同步用）。

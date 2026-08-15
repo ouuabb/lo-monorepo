@@ -2,6 +2,10 @@ const RidUtils = require("../utils/rid.cjs");
 const HashUtils = require("../utils/hash.cjs");
 const ResourceType = require("../plugin/typeRegistry.cjs");
 const { assertMetadata } = require("../utils/validateMetadata.cjs");
+const {
+  isLocationConstraintError,
+  locationConflictError,
+} = require("./locationConstraint.cjs");
 const fs = require("fs-extra");
 const path = require("path");
 
@@ -422,6 +426,13 @@ class ResourceService {
       await this.db.run("RELEASE tx_create");
     } catch (e) {
       await this.db.run("ROLLBACK TO tx_create");
+      // 数据库唯一索引负责最终一致性；此处把 location 冲突转成可读错误
+      if (isLocationConstraintError(e)) {
+        throw locationConflictError({
+          location: finalLocation.value,
+          operation: "create",
+        });
+      }
       throw e;
     }
 
@@ -909,6 +920,14 @@ class ResourceService {
       await this.db.run("RELEASE tx_update");
     } catch (e) {
       await this.db.run("ROLLBACK TO tx_update");
+      // move/updatePath 目标 location 被占用 → 可读冲突（最终一致性仍由唯一索引保证）
+      if (isLocationConstraintError(e)) {
+        throw locationConflictError({
+          rid: finalRid,
+          location: fPath ? this.locationFromPath(fPath).value : undefined,
+          operation: "update",
+        });
+      }
       throw e;
     }
 
@@ -986,10 +1005,14 @@ class ResourceService {
   }
 
   async importFile(filePath, type = null, options = {}) {
-    // 先按路径检查
-    const existing = await this.getByPath(filePath);
-    if (existing) {
-      return existing;
+    // 去重语义与 location 唯一性一致（016 §6）：仅 local 路径去重；
+    // external 同一绝对路径可被多个 Resource 引用，不做查重。
+    const importedLoc = this.locationFromPath(filePath);
+    if (importedLoc.kind === 'local') {
+      const existing = await this.getByPath(filePath);
+      if (existing) {
+        return existing;
+      }
     }
 
     const resourceType = type || ResourceType.fromPath(filePath);

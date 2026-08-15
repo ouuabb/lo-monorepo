@@ -3,6 +3,10 @@ const path = require("path");
 const fs = require("fs-extra");
 const Logger = require("../utils/logger.cjs");
 const { assertMetadata } = require("../utils/validateMetadata.cjs");
+const {
+  isLocationConstraintError,
+  locationConflictError,
+} = require("./locationConstraint.cjs");
 
 /**
  * 同步操作日志引擎
@@ -408,10 +412,22 @@ class SyncOpsEngine {
 
       case OP_TYPES.RESOURCE_MOVED: {
         // data.new_path 为仓库内相对路径（recordOp 时相对化）
-        await this.db.run(
-          `UPDATE resources SET location_kind = 'local', location = ?, updated = ? WHERE rid = ? AND deleted = 0`,
-          [data.new_path, opTimestamp, rid],
-        );
+        try {
+          await this.db.run(
+            `UPDATE resources SET location_kind = 'local', location = ?, updated = ? WHERE rid = ? AND deleted = 0`,
+            [data.new_path, opTimestamp, rid],
+          );
+        } catch (e) {
+          // 目标 local location 已被占用 → 可读冲突（唯一索引保证最终一致性）
+          if (isLocationConstraintError(e)) {
+            throw locationConflictError({
+              rid,
+              location: data.new_path,
+              operation: "sync RESOURCE_MOVED",
+            });
+          }
+          throw e;
+        }
         break;
       }
 

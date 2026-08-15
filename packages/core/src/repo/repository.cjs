@@ -596,10 +596,12 @@ class Repository {
 
     // 防覆盖：目标文件已存在，或该 location 已有活跃 layer-0 记录时，默认拒绝
     // （覆盖是显式操作，需显式传 overwrite: true；name-stack 的 layer>0 版本共享 location，不受此约束）
+    // 语义与数据库唯一索引（idx_resources_location_active）完全一致：
+    // 仅 local 参与唯一性；external/virtual 不拦截（016 §6：external 同一文件可被多个 Resource 引用）。
     const fileExists = await fs.pathExists(filePath);
     const ownerRow = await this.db.get(
-      "SELECT rid FROM resources WHERE location_kind = ? AND location = ? AND deleted = 0 AND layer = 0",
-      [loc.kind, loc.value],
+      "SELECT rid FROM resources WHERE location_kind = 'local' AND location = ? AND deleted = 0 AND layer = 0",
+      [loc.value],
     );
     const existing = ownerRow
       ? await this.resourceService.getByRid(ownerRow.rid)
