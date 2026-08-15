@@ -634,10 +634,10 @@ class Repository {
     const contentBuf = Buffer.isBuffer(content)
       ? content
       : Buffer.from(content, "utf-8");
-    if (options.encrypt && !this._cryptoKey) {
+    if (encrypt && !this._cryptoKey) {
       throw new Error("无法加密：加密密钥未加载，请先完成 SSH 认证");
     }
-    if ((this._cryptoKey && this._encryptByDefault) || options.encrypt) {
+    if ((this._cryptoKey && this._encryptByDefault) || encrypt) {
       await CryptoUtils.writeEncryptedFile(
         filePath,
         contentBuf,
