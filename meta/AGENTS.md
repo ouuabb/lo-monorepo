@@ -116,7 +116,7 @@ Plugin → ctx.extensions（契约）→ Host ExtensionRegistry（实现）→ �
 - 包管理器 **pnpm**（`pnpm install` 一次装全部）；任务编排 **Turborepo**
   （`pnpm build/test/lint/docs` → `turbo run ...`）。
 - 不修改生成目录（`node_modules/`、`dist/`、`coverage/`、`.repo/`、`out/`）。
-- 提交：Conventional Commits（type 英文小写 + subject 中文，header ≤ 72）；husky 根钩子。
+- 提交：Conventional Commits（type 英文小写 + subject 中文或英文，header ≤ 72；机器约束以 commitlint 为准，subject 语言建议中文，历史以英文为主——两语言均可接受）；husky 根钩子。
 
 ### 2.2 packages/core（@lo/core）
 - 命令：`pnpm --filter @lo/core start/test/lint/format`；`npm test` 等价（3638+ 用例）。
@@ -186,7 +186,7 @@ Plugin → ctx.extensions（契约）→ Host ExtensionRegistry（实现）→ �
 - [ ] 相关包 `pnpm --filter <pkg> test` 全绿；跨包改动跑 `pnpm test`
 - [ ] `pnpm lint` 无 error（warning 尽量清零）
 - [ ] 已审查 `git status` / `git diff`：只暂存目标文件，未混入无关改动
-- [ ] 提交信息 ≤72 字符、Conventional Commits（type 英文小写 + subject 中文）
+- [ ] 提交信息 ≤72 字符、Conventional Commits（type 英文小写 + subject 中文或英文）
 - [ ] 未误提交 `node_modules/`、`dist/`、`coverage/`、锁文件（除非有意）
 - [ ] 未提交 secrets
 - [ ] 未跨包混提（一个包一个 commit；跨包联动各自提交）
