@@ -42,7 +42,7 @@ describe('new command', () => {
   }
 
   test('无模板时创建默认内容', async () => {
-    await newCommand({ _: ['lo'], title: 'My Note' });
+    await newCommand({ _: ['lo'], name: 'My Note' });
 
     const content = await readCreatedContent('My Note');
     expect(content).toContain('# My Note');
@@ -57,14 +57,14 @@ describe('new command', () => {
       templateContent
     );
 
-    await newCommand({ _: ['lo'], title: 'Meeting Notes', template: 'daily' });
+    await newCommand({ _: ['lo'], name: 'Meeting Notes', template: 'daily' });
 
     const content = await readCreatedContent('Meeting Notes');
     expect(content).toBe(`# Meeting Notes\n\n写作于 ${DateUtils.today()}\n`);
   });
 
   test('--template 指向不存在的模板时回退默认内容', async () => {
-    await newCommand({ _: ['lo'], title: 'Plain Note', template: 'does-not-exist' });
+    await newCommand({ _: ['lo'], name: 'Plain Note', template: 'does-not-exist' });
 
     const content = await readCreatedContent('Plain Note');
     expect(content).toContain('# Plain Note');

@@ -41,8 +41,8 @@ describe('AIExecutor', () => {
     test('should create a resource via repository', async () => {
       const repository = { createResource: jest.fn().mockResolvedValue({ rid: 'r1' }) };
       const executor = new AIExecutor({ repository });
-      const result = await executor.executeStep({ action: 'create_resource', payload: { type: 'note', content: 'hi', title: 'T' } }, {});
-      expect(repository.createResource).toHaveBeenCalledWith('note', 'hi', { title: 'T' });
+const result = await executor.executeStep({ action: 'create_resource', payload: { type: 'note', content: 'hi', name: 'T' } }, {});
+expect(repository.createResource).toHaveBeenCalledWith('note', 'hi', { name: 'T' });
       expect(result).toMatchObject({ action: 'create_resource', status: 'completed', resourceId: 'r1' });
     });
 

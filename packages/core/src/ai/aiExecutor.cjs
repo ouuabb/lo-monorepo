@@ -95,7 +95,8 @@ class AIExecutor {
         const resource = await this.repository.createResource(
           payload.type || "note",
           payload.content || "",
-          { title: payload.title || payload.name || "AI Generated" },
+          // 018：candidate = AI 输出（payload.name），统一 normalize
+          { name: payload.name || "AI Generated" },
         );
         return {
           action: "create_resource",

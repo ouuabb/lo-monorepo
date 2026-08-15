@@ -82,7 +82,8 @@ describe('resource.update handler', () => {
         Buffer.from('# 旧内容\n\n正文', 'utf8'),
       );
       expect(after.hash).toBe(recomputed);
-      expect(after.metadata.title).toBe('旧内容');
+      // 018：H1 不再提取为 metadata.title
+      expect(after.metadata.title).toBeUndefined();
       // 快照已删除
       const snap = path.join(dir, '.repo', 'operations', `${operationId}.bak`);
       expect(await fs.pathExists(snap)).toBe(false);

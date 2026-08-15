@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require("uuid");
 const path = require("path");
 const fs = require("fs-extra");
 const Logger = require("../utils/logger.cjs");
+const StringUtils = require("../utils/string.cjs");
 const { assertMetadata } = require("../utils/validateMetadata.cjs");
 const {
   isLocationConstraintError,
@@ -213,12 +214,17 @@ class SyncOpsEngine {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
             [
               rid,
-              data.name ||
-                (hasFile
-                  ? path
-                      .basename(data.path, path.extname(data.path))
-                      .replace(/^\d{4}-\d{2}-\d{2}-/, "")
-                  : data.name || rid),
+              // 018 §3：同步入口候选（data.name 或 filename 剥离，剥日期+随机后缀）
+              // 统一经 normalizeResourceName；与本地创建规则一致
+              StringUtils.normalizeResourceName(
+                data.name ||
+                  (hasFile
+                    ? path
+                        .basename(data.path, path.extname(data.path))
+                        .replace(/^\d{4}-\d{2}-\d{2}-/, "")
+                        .replace(/-[a-f0-9]{8}$/, "")
+                    : rid),
+              ),
               data.layer || 0,
               data.type,
               hasFile ? "local" : "virtual",

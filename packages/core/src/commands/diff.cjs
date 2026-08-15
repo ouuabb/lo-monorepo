@@ -51,17 +51,12 @@ async function diff(argv) {
             .forEach((line) => console.log(chalk.gray(`  ${line}`)));
         }
 
-        // 显示元数据变更
+        // 显示元数据变更（018：title 不再是 Resource 名称语义，不参与 diff）
         const newMeta = await repo.resourceService._extractMetadata(
           absPath,
           existing.type,
         );
         const changes = [];
-        if (newMeta.title && newMeta.title !== existing.metadata.title) {
-          changes.push(
-            `title: "${existing.metadata.title || ""}" -> "${newMeta.title}"`,
-          );
-        }
         if (
           newMeta.wordCount !== undefined &&
           newMeta.wordCount !== existing.metadata.wordCount
@@ -82,9 +77,7 @@ async function diff(argv) {
       const existing = await repo.resourceService.getByPath(absPath);
       console.log(chalk.red(`\n[删除] ${relPath}`));
       if (existing) {
-        console.log(
-          chalk.gray(`  title: ${existing.metadata.title || "(无)"}`),
-        );
+        console.log(chalk.gray(`  name: ${existing.name || "(无)"}`));
         console.log(chalk.gray(`  type: ${existing.type}`));
       }
     }

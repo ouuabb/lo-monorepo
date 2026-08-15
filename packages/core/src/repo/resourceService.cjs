@@ -1,5 +1,6 @@
 const RidUtils = require("../utils/rid.cjs");
 const HashUtils = require("../utils/hash.cjs");
+const StringUtils = require("../utils/string.cjs");
 const ResourceType = require("../plugin/typeRegistry.cjs");
 const { assertMetadata } = require("../utils/validateMetadata.cjs");
 const {
@@ -223,16 +224,18 @@ class ResourceService {
 
     if (!finalName) {
       if (absPath) {
-        // 自动推导 name：从文件路径提取
+        // 自动推导候选 name：从文件路径提取（018 §3：各入口自定候选，统一 normalize）
         const basename = path.basename(absPath, path.extname(absPath));
         finalName = basename
           .replace(/^\d{4}-\d{2}-\d{2}-/, "")
           .replace(/-[a-f0-9]{8}$/, "");
       } else {
-        // 无文件也无 name：用 type + 时间戳生成唯一名（参考 1.md §6：资源可能没有文件）
+        // 无文件也无 name：用 type + 时间戳生成唯一候选（资源可能没有文件）
         finalName = `${finalType || "resource"}-${Date.now()}`;
       }
     }
+    // 所有候选（显式 name / 推导）统一经 normalizeResourceName（018 §2/§3）
+    finalName = StringUtils.normalizeResourceName(finalName);
 
     // 确定 layer：同名时自动入栈（layer 1~19），否则 layer 0（活跃）
     let layer = 0;
@@ -1192,10 +1195,7 @@ class ResourceService {
     if (type === "note") {
       try {
         const content = await this._readFile(filePath, "utf-8");
-        const match = content.match(/^#\s+(.+)$/m);
-        if (match) {
-          metadata.title = match[1].trim();
-        }
+        // 018：H1 属 Content，不提取为 metadata.title（Core 不认识 H1）
         metadata.wordCount = content
           .split(/\s+/)
           .filter((w) => w.length > 0).length;

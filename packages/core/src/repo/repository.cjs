@@ -588,13 +588,12 @@ class Repository {
       overwrite = false,
       schema,
       encrypt = false,
+      name: explicitName,
     } = options;
 
-    // 顶层 title 选项并入 metadata（如 epub:note 传入的笔记标题）
+    // 018：options.title 不再并入 metadata（title 不是 Resource 名称语义）；
+    // 顶层 name 选项作为候选 name（resourceService.create 统一 normalize）
     const finalMeta = { ...metadata };
-    if (options.title && finalMeta.title === undefined) {
-      finalMeta.title = options.title;
-    }
 
     const CryptoUtils = require("../utils/crypto.cjs");
 
@@ -681,6 +680,7 @@ class Repository {
       location: loc.value,
       metadata: finalMeta,
       schema,
+      ...(explicitName !== undefined ? { name: explicitName } : {}),
     });
 
     // 记录操作日志
@@ -749,7 +749,8 @@ class Repository {
         type,
         path: absPath,
         name: resourceName,
-        metadata: { ...metadata, title: resourceName },
+        // 018：不再写入 metadata.title（title 不是 Resource 名称语义）
+        metadata,
         capabilities: finalCapabilities,
         container_schema: finalSchema,
       },
@@ -1384,18 +1385,13 @@ class Repository {
       return this.resourceService.getByRid(input);
     }
 
-    // 2. 按 name 精确匹配（全局唯一）
-    const byName = await this.resourceService.getByName(input);
+    // 2. 按 canonical name 匹配（018 §4：输入统一 normalize 后精确匹配；
+    //    无 slug/旧名 fallback；name 存储值即 canonical name）
+    const normalized = StringUtils.normalizeResourceName(input);
+    const byName = await this.resourceService.getByName(normalized);
     if (byName) return byName;
 
-    // 2b. 按 name 的 slug 化形式匹配（显示标题可带空格/大小写，而 name 存的是 slug）
-    const slug = StringUtils.slugify(input);
-    if (slug !== input) {
-      const bySlug = await this.resourceService.getByName(slug);
-      if (bySlug) return bySlug;
-    }
-
-    // 3. 按路径降级匹配
+    // 3. 按路径降级匹配（Storage 层查找，非名称语义）
     const byPath = await this.resourceService.getByPath(input);
     if (byPath) return byPath;
 
@@ -4079,25 +4075,23 @@ class Repository {
       if (resource) return resource.rid;
     }
 
-    // 3. 退而求其次：按文件名查找
-    //    ./assets/img.png → img → getByName("img")
-    const name = this._extractResourceName(targetPath);
-    if (!name) return null;
+    // 3. 退而求其次：按文件名候选查找（018 §3：入口自定候选 → resolveResource 统一 normalize）
+    //    ./assets/img.png → basename 剥离 → resolveResource
+    const candidate = this._candidateNameFromPath(targetPath);
+    if (!candidate) return null;
 
-    const resource = await this.resolveResource(name);
+    const resource = await this.resolveResource(candidate);
     return resource ? resource.rid : null;
   }
 
   /**
-   * 从文件路径中提取资源名称
-   * 与 resourceService.create() 中的 name 推导逻辑一致：
-   *   - 提取文件名（不含扩展名）
-   *   - 去除日期前缀（YYYY-MM-DD-）
-   *   - 去除随机后缀（-[a-f0-9]{8}）
+   * 从文件路径提取候选 name（embed 图片解析专用候选来源；018 §3）
+   * 提取文件名（不含扩展名）、去除日期前缀、随机后缀——与创建链路的
+   * filename 候选规则一致；最终由 resolveResource 统一 normalize。
    * @param {string} filePath - 文件路径或资源引用
-   * @returns {string|null} 资源名称
+   * @returns {string|null} 候选名称
    */
-  _extractResourceName(filePath) {
+  _candidateNameFromPath(filePath) {
     if (!filePath) return null;
 
     // 提取文件名部分（去除目录）

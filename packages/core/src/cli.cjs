@@ -103,11 +103,11 @@ cli
       });
   }, importCmd)
 
-  .command('new <title>', '创建新资源', (yargs) => {
+  .command('new <name>', '创建新资源', (yargs) => {
     yargs
-      .positional('title', {
+      .positional('name', {
         type: 'string',
-        description: '资源标题'
+        description: '资源名称'
       })
       .option('type', {
         type: 'string',

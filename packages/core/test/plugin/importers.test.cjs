@@ -250,13 +250,13 @@ describe('P4 importer 端到端', () => {
 
     const result = await matched.handler.import(realFile, ctx, {});
     expect(result.resources).toHaveLength(1);
-    expect(result.resources[0].name).toBe('MyBook');
+    expect(result.resources[0].name).toBe('mybook');
     expect(result.resources[0].rid).toBeDefined();
 
     // 验证真实写入 DB
     const found = await repo.resourceService.getByRid(result.resources[0].rid);
     expect(found).not.toBeNull();
-    expect(found.name).toBe('MyBook');
+    expect(found.name).toBe('mybook');
   });
 });
 
@@ -301,7 +301,7 @@ describe('P4 import 命令 — 全链路', () => {
     await repo2.open({ skipAuth: true });
     const all = await repo2.resourceService.getAll();
     expect(all.length).toBeGreaterThanOrEqual(1);
-    expect(all.some((r) => r.name === 'CmdBook')).toBe(true);
+    expect(all.some((r) => r.name === 'cmdbook')).toBe(true);
     await repo2.close();
   });
 
@@ -469,7 +469,7 @@ describe('P4 import 命令 — 全链路', () => {
     const all = await repo2.resourceService.getAll();
     const userRes = all.filter((r) => r.type !== 'system');
     expect(userRes).toHaveLength(1);
-    expect(userRes[0].name).toBe('RealRes');
+    expect(userRes[0].name).toBe('realres');
     await repo2.close();
   });
 

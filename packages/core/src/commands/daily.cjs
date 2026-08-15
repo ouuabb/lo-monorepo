@@ -53,15 +53,16 @@ module.exports = async function daily(argv) {
 `;
 
     const metadata = {
-      title: `${dateStr} 日记`,
       tags: ["daily"],
       category: "日记",
       status: "draft",
     };
 
+    // 018 §3：candidate = 日期（YYYY-MM-DD），createResource 统一 normalize
     const resource = await repo.createResource("note", content, {
       filename,
       metadata,
+      name: today,
     });
 
     Logger.success(`今日日记已创建: ${resource.rid}`);

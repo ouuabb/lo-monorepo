@@ -458,7 +458,8 @@ route("POST", "/api/notes/upload", async (req, res, { repo }) => {
 
   const results = [];
   for (const file of files) {
-    const title = fields.title || file.filename;
+    // 018 §3：上传候选 name = multipart title 字段（外部输入）；无则回退 filename 推导
+    const titleCandidate = fields.title || null;
     let tags = [];
     if (fields.tags) {
       tags = fields.tags
@@ -472,8 +473,8 @@ route("POST", "/api/notes/upload", async (req, res, { repo }) => {
     try {
       const result = await repo.createResource(null, file.data, {
         filename: file.filename,
+        name: titleCandidate,
         metadata: {
-          title,
           tags,
           mimetype: file.contentType,
           size: file.data.length,

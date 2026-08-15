@@ -608,7 +608,8 @@ describe('ResourceService', () => {
 
     await fs.writeFile(filePath, '# New Title');
     const refreshed = await resourceService.refresh(created.rid);
-    expect(refreshed.metadata.title).toBe('New Title');
+    // 018：H1 不提取为 metadata.title；refresh 只合并派生字段（wordCount/hash）
+    expect(refreshed.metadata.title).toBeUndefined();
     expect(refreshed.metadata.category).toBe('manual');
     expect(refreshed.hash).not.toBe(created.hash);
 
@@ -663,7 +664,8 @@ describe('ResourceService', () => {
     await fs.writeFile(filePath, '# Ext');
     const resource = await svc.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'ext' });
     expect(resource.metadata.extraField).toBe('yes');
-    expect(resource.metadata.title).toBe('Ext');
+    // 018：H1 不再内置提取为 title（插件扩展点可写任意 metadata 键）
+    expect(resource.metadata.title).toBeUndefined();
   });
 
   test('_extractMetadata returns empty for directories', async () => {

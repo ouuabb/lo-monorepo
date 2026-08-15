@@ -64,15 +64,23 @@ describe('Repository', () => {
     await repo.close();
   });
 
-  test('createResource 顶层 title 并入 metadata', async () => {
+  test('createResource options.name 作为候选，统一 normalize 为 canonical name', async () => {
     await fs.ensureDir(path.join(tempDir, '.repo'));
     const repo = new Repository(tempDir);
     await repo.open({ skipAuth: true });
 
-    const resource = await repo.createResource('note', 'content', { title: '我的标题' });
-    const retrieved = await repo.getResource(resource.rid);
+    const resource = await repo.createResource('note', 'content', {
+      filename: 'x.md',
+      name: '我的标题',
+    });
 
-    expect(retrieved.metadata.title).toBe('我的标题');
+    expect(resource.name).toBe('我的标题');
+    // options.title 不再并入 metadata（018：title 不是 Resource 名称语义）
+    const noTitle = await repo.createResource('note', 'content', {
+      filename: 'y.md',
+      title: '不应写入',
+    });
+    expect(noTitle.metadata.title).toBeUndefined();
 
     await repo.close();
   });
@@ -315,7 +323,8 @@ describe('Repository', () => {
     const notes = await repo.query({ type: 'note' });
     expect(notes.some(r => r.rid === res.rid)).toBe(true);
 
-    const search = await repo.search('Title');
+    // 搜索覆盖 name/metadata/location（018：内容搜索不属于命名模型）
+    const search = await repo.search('stats-a');
     expect(search.length).toBeGreaterThanOrEqual(1);
 
     const graph = await repo.getResourceGraph(res.rid);
@@ -645,8 +654,8 @@ describe('Repository', () => {
     const json = await repo.createResource('json', '{}', { filename: 'not-note.json' });
     expect(await repo.syncMarkdownRelations(json.rid)).toMatchObject({ wikilinks: 0, embeds: 0 });
 
-    expect(repo._extractResourceName('2026-01-01-abc-a1b2c3d4.md')).toBe('abc');
-    expect(repo._extractResourceName('')).toBeNull();
+    expect(repo._candidateNameFromPath('2026-01-01-abc-a1b2c3d4.md')).toBe('abc');
+    expect(repo._candidateNameFromPath('')).toBeNull();
 
     const all = await repo.syncAllMarkdownRelations();
     expect(all.wikilinks).toBeGreaterThanOrEqual(1);

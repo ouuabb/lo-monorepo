@@ -94,7 +94,7 @@ describe('diff command', () => {
     expect(output).toContain('新 hash:');
     expect(output).toContain('当前文件内容预览');
     expect(output).toContain('元数据变更:');
-    expect(output).toContain('title:');
+    expect(output).toContain('wordCount:');
   });
 
   test('should show staged modified file without preview for non-note types', async () => {
@@ -137,7 +137,7 @@ describe('diff command', () => {
 
     const output = await runDiff({ _: ['lo'] });
     expect(output).toContain('[删除] del.md');
-    expect(output).toContain('title:');
+    expect(output).toContain('name:');
     expect(output).toContain('type:');
   });
 
