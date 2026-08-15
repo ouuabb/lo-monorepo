@@ -508,7 +508,16 @@ class Repository {
   }
 
   async importFile(filePath, type = null) {
-    const resource = await this.resourceService.importFile(filePath, type);
+    // P2：import 正式写入口统一进入 resource.create operation。
+    // 查重语义保持（local 已注册 → 返回 existing，不产生 operation）
+    const prepared = await this.resourceService.prepareImport(filePath, type);
+    if (prepared.existing) {
+      return prepared.existing;
+    }
+    const { result: resource } = await this.operationEngine.execute(
+      "resource.create",
+      prepared.params,
+    );
 
     // 记录操作日志
     if (this.syncOps && resource) {
@@ -1618,18 +1627,30 @@ class Repository {
   }
 
   async linkResources(ridA, ridB, type = "reference") {
+    // P3：link 写入口统一经 relation.create operation（可撤销）
     if (type === "wikilink") {
-      return this.relationService.create(ridA, ridB, type);
+      return this.createRelation(ridA, ridB, type);
     }
-    return this.relationService.createBidirectional(ridA, ridB, type);
+    const a = await this.createRelation(ridA, ridB, type);
+    const b = await this.createRelation(ridB, ridA, type);
+    return { a, b };
   }
 
-  async unlinkResources(ridA, ridB, type) {
+  async unlinkResources(ridA, ridB, type = "reference") {
+    // P3：unlink 写入口统一经 relation.remove operation（软删，可撤销）。
+    // 找不到/已软删的关系按"不存在"处理（保持 CLI 不报错的既有语义）
+    const removeDirection = async (from, to) => {
+      const rel = await this.relationService.getByTriple(from, to, type);
+      if (rel && !rel.deleted) {
+        return this.removeRelation(rel.id);
+      }
+      return { removed: false };
+    };
     if (type === "wikilink") {
-      return this.relationService.removeByTriple(ridA, ridB, type);
+      return removeDirection(ridA, ridB);
     }
-    await this.relationService.removeByTriple(ridA, ridB, type);
-    await this.relationService.removeByTriple(ridB, ridA, type);
+    await removeDirection(ridA, ridB);
+    await removeDirection(ridB, ridA);
     return { removed: true };
   }
 

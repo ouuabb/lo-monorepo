@@ -279,6 +279,37 @@ describe("Protocol HTTP API (relations/operations/events)", () => {
     expect(found.location_kind).toBeUndefined();
   });
 
+  test("PUT content 经 resource.update operation：undo 后内容恢复", async () => {
+    const r = await request(port, "POST", "/api/notes", {
+      title: "UndoMe",
+      content: "旧内容",
+    });
+    expect(r.status).toBe(201);
+    const rid = r.data.rid;
+
+    // 更新内容（serve PUT content 分支 → resource.update operation）
+    const put = await request(port, "PUT", `/api/notes/${rid}`, {
+      content: "新内容",
+    });
+    expect(put.status).toBe(200);
+
+    const after = await request(port, "GET", `/api/notes/${rid}`);
+    expect(after.data.content).toBe("新内容");
+
+    // 找到该 resource.update operation 并 undo（容器操作记录无 rid 列，按 type 取最新）
+    const hist = await request(port, "GET", `/api/operations?type=resource.update`);
+    expect(hist.status).toBe(200);
+    expect(hist.data.data.length).toBeGreaterThanOrEqual(1);
+    const op = hist.data.data[hist.data.data.length - 1];
+    expect(op.operation_id).toBeDefined();
+
+    const undone = await request(port, "POST", `/api/operations/${op.operation_id}/undo`);
+    expect(undone.status).toBe(200);
+
+    const restored = await request(port, "GET", `/api/notes/${rid}`);
+    expect(restored.data.content).toBe("旧内容");
+  });
+
   // ─── Event API ─────────────────────────────────────────────
 
   test("Event history: 资源创建后产生 resource.created 事件", async () => {

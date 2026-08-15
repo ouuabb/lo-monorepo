@@ -1,3 +1,13 @@
+/**
+ * resource.update operation 测试（P1：content 完整 undo）
+ *
+ * 覆盖：正常 execute/undo（文件内容恢复 + hash/metadata 一致）、name 恢复、
+ * 文件写入失败（快照清理、可重试）、undo 写回失败（快照保留重试）。
+ */
+const fs = require('fs-extra');
+const path = require('path');
+const os = require('os');
+const Repository = require('../../src/repo/repository.cjs');
 const handler = require('../../src/operations/resourceUpdate.cjs');
 
 describe('resource.update handler', () => {
@@ -5,158 +15,173 @@ describe('resource.update handler', () => {
     expect(handler.type).toBe('resource.update');
   });
 
-  describe('execute', () => {
-    test('captures before snapshot and delegates to resourceService.update', async () => {
-      const beforeRow = {
-        rid: 'r1',
-        name: 'a.md',
-        path: '/repo/a.md',
-        hash: 'h1',
-        metadata: '{"title":"A"}',
-        type: 'note',
-        layer: 0,
-        container_schema: '{}',
-        capabilities: '[]',
-        tags: null,
-      };
-      const db = { get: jest.fn().mockResolvedValue(beforeRow) };
-      const update = jest.fn().mockResolvedValue({ rid: 'r1', name: 'b.md' });
+  describe('execute：content 更新前创建文件快照', () => {
+    test('旧文件存在 → 快照写入 .repo/operations/<opId>.bak，after 携带 contentSnapshot', async () => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'lo-op-update-'));
+      const repo = await Repository.create(dir);
+      const created = await repo.createResource('note', '# 旧内容', { filename: 'u.md' });
+      const absPath = path.join(dir, 'resources', 'u.md');
 
-      const result = await handler.execute(
-        { db, resourceService: { update } },
-        { rid: 'r1', updates: { name: 'b.md' } },
-      );
+      const { operationId, result } = await repo.executeOperation('resource.update', {
+        rid: created.rid,
+        updates: { content: '# 新内容' },
+      });
 
-      expect(db.get).toHaveBeenCalledWith(
-        'SELECT * FROM resources WHERE rid = ? AND deleted = 0',
-        ['r1'],
-      );
-      expect(update).toHaveBeenCalledWith('r1', { name: 'b.md' });
-      expect(result).toMatchObject({ rid: 'r1', name: 'b.md' });
-      // before 快照：capabilities 解析成数组，其余透传
-      expect(result.before.capabilities).toEqual([]);
-      expect(result.before.tags).toEqual([]);
-      expect(result.before.metadata).toBe('{"title":"A"}');
+      expect(result.contentSnapshot).toBe(`${operationId}.bak`);
+      expect(await fs.readFile(absPath, 'utf8')).toBe('# 新内容');
+      // 快照 = 旧内容原字节
+      const snap = path.join(dir, '.repo', 'operations', `${operationId}.bak`);
+      expect(await fs.pathExists(snap)).toBe(true);
+      expect(await fs.readFile(snap, 'utf8')).toBe('# 旧内容');
+      await repo.close();
+      await fs.remove(dir);
     });
 
-    test('parses stringified capabilities from before row', async () => {
-      const beforeRow = {
-        rid: 'r1',
-        name: 'a.md',
-        path: '/a.md',
-        hash: 'h1',
-        metadata: '{}',
-        type: 'note',
-        layer: 0,
-        container_schema: '{}',
-        capabilities: '["container","project"]',
-        tags: null,
-      };
-      const db = { get: jest.fn().mockResolvedValue(beforeRow) };
-      const result = await handler.execute(
-        { db, resourceService: { update: jest.fn().mockResolvedValue({ rid: 'r1' }) } },
-        { rid: 'r1', updates: {} },
-      );
-      expect(result.before.capabilities).toEqual(['container', 'project']);
-    });
-
-    test('passes through array capabilities and normalizes null to []', async () => {
-      const get = jest.fn()
-        .mockResolvedValueOnce({
-          rid: 'r1', name: 'a.md', path: '/a.md', hash: 'h1', metadata: '{}',
-          type: 'note', layer: 0, container_schema: '{}', capabilities: ['x'], tags: ['t'],
-        })
-        .mockResolvedValueOnce({
-          rid: 'r2', name: 'b.md', path: '/b.md', hash: 'h2', metadata: '{}',
-          type: 'note', layer: 0, container_schema: '{}', capabilities: null, tags: null,
-        });
-      const ctx = { db: { get }, resourceService: { update: jest.fn().mockResolvedValue({ rid: 'r1' }) } };
-
-      const result1 = await handler.execute(ctx, { rid: 'r1', updates: {} });
-      expect(result1.before.capabilities).toEqual(['x']);
-      expect(result1.before.tags).toEqual(['t']);
-
-      const result2 = await handler.execute(ctx, { rid: 'r2', updates: {} });
-      expect(result2.before.capabilities).toEqual([]);
-      expect(result2.before.tags).toEqual([]);
-    });
-
-    test('throws when resource is missing', async () => {
-      const db = { get: jest.fn().mockResolvedValue(null) };
-      await expect(
-        handler.execute({ db, resourceService: { update: jest.fn() } }, { rid: 'x' }),
-      ).rejects.toThrow('资源不存在或已删除');
-    });
-
-    test('propagates service errors', async () => {
-      const db = { get: jest.fn().mockResolvedValue({ rid: 'r1' }) };
-      const update = jest.fn().mockRejectedValue(new Error('lock'));
-      await expect(
-        handler.execute({ db, resourceService: { update } }, { rid: 'r1', updates: {} }),
-      ).rejects.toThrow('lock');
+    test('虚拟资源（无文件）→ 不建快照', async () => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'lo-op-update-'));
+      const repo = await Repository.create(dir);
+      const virt = await repo.resourceService.create({
+        type: 'vocabulary',
+        location_kind: 'virtual',
+        location: '',
+        name: 'v-update',
+      });
+      const { result } = await repo.executeOperation('resource.update', {
+        rid: virt.rid,
+        updates: { metadata: { title: 'x' } },
+      });
+      expect(result.contentSnapshot).toBeNull();
+      await repo.close();
+      await fs.remove(dir);
     });
   });
 
-  describe('undo', () => {
-    test('restores name/path/hash/type/container_schema/metadata from before snapshot', async () => {
-      const update = jest.fn().mockResolvedValue({ rid: 'r1', name: 'a.md' });
-      const operationResult = {
-        rid: 'r1',
-        before: {
-          name: 'a.md',
-          path: '/repo/a.md',
-          hash: 'h1',
-          type: 'note',
-          container_schema: '{"allowed_types":["note"]}',
-          metadata: '{"title":"old"}',
-        },
-      };
+  describe('集成：execute → undo 完整恢复', () => {
+    test('content 更新 undo 后：文件内容恢复、hash/metadata 一致、快照删除', async () => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'lo-op-update-'));
+      const repo = await Repository.create(dir);
+      const created = await repo.createResource('note', '# 旧内容\n\n正文', { filename: 'u.md' });
+      const absPath = path.join(dir, 'resources', 'u.md');
+      const oldHash = created.hash;
 
-      const result = await handler.undo(
-        { resourceService: { update } },
-        { operationResult },
+      const { operationId, result } = await repo.executeOperation('resource.update', {
+        rid: created.rid,
+        updates: { content: '# 新内容\n\n改过' },
+      });
+      const midHash = result.hash;
+      expect(midHash).not.toBe(oldHash);
+      expect(await fs.readFile(absPath, 'utf8')).toContain('新内容');
+
+      await repo.undoContainerOperation(operationId);
+
+      // 文件内容恢复旧
+      expect(await fs.readFile(absPath, 'utf8')).toBe('# 旧内容\n\n正文');
+      // DB hash/metadata 与文件一致（refresh 派生）
+      const after = await repo.resourceService.getByRid(created.rid);
+      const recomputed = require('../../src/utils/hash.cjs').fromBuffer(
+        Buffer.from('# 旧内容\n\n正文', 'utf8'),
       );
+      expect(after.hash).toBe(recomputed);
+      expect(after.metadata.title).toBe('旧内容');
+      // 快照已删除
+      const snap = path.join(dir, '.repo', 'operations', `${operationId}.bak`);
+      expect(await fs.pathExists(snap)).toBe(false);
+      await repo.close();
+      await fs.remove(dir);
+    });
 
-      expect(update).toHaveBeenCalledWith('r1', {
-        name: 'a.md',
-        path: '/repo/a.md',
-        hash: 'h1',
-        type: 'note',
-        container_schema: '{"allowed_types":["note"]}',
-        metadata: { title: 'old' },
+    test('name 更新 undo 后恢复', async () => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'lo-op-update-'));
+      const repo = await Repository.create(dir);
+      const created = await repo.createResource('note', '# A', { filename: 'n.md' });
+
+      const { operationId } = await repo.executeOperation('resource.update', {
+        rid: created.rid,
+        updates: { name: 'renamed-note' },
       });
-      expect(result).toEqual({ restored: true, rid: 'r1' });
+      expect((await repo.resourceService.getByRid(created.rid)).name).toBe('renamed-note');
+
+      await repo.undoContainerOperation(operationId);
+      expect((await repo.resourceService.getByRid(created.rid)).name).toBe(created.name);
+      await repo.close();
+      await fs.remove(dir);
     });
 
-    test('throws when operationResult missing', async () => {
-      await expect(handler.undo({}, {})).rejects.toThrow('无法撤销 resource.update');
-    });
+    test('metadata-only 更新 undo 恢复（无快照场景）', async () => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'lo-op-update-'));
+      const repo = await Repository.create(dir);
+      const created = await repo.createResource('note', '# A', { filename: 'm.md' });
 
-    test('skips undefined fields and passes object metadata through as-is', async () => {
-      const update = jest.fn().mockResolvedValue({ rid: 'r1' });
-      const operationResult = {
-        rid: 'r1',
-        before: {
-          name: undefined,
-          path: '/repo/b.md',
-          metadata: { title: 'old' },
-        },
-      };
-
-      await handler.undo({ resourceService: { update } }, { operationResult });
-
-      expect(update).toHaveBeenCalledWith('r1', {
-        path: '/repo/b.md',
-        metadata: { title: 'old' },
+      const { operationId } = await repo.executeOperation('resource.update', {
+        rid: created.rid,
+        updates: { metadata: { title: '新标题', tags: ['t1'] } },
       });
+      await repo.undoContainerOperation(operationId);
+      const after = await repo.resourceService.getByRid(created.rid);
+      expect(after.metadata.title).toBe(created.metadata.title);
+      expect(after.metadata.tags).toBeUndefined();
+      await repo.close();
+      await fs.remove(dir);
     });
+  });
 
-    test('propagates service errors', async () => {
-      const update = jest.fn().mockRejectedValue(new Error('fk'));
-      const operationResult = { rid: 'r1', before: { name: 'a.md' } };
+  describe('失败路径', () => {
+    test('写文件失败（updateContent 抛错）→ execute 失败且快照被清理，可重试成功', async () => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'lo-op-update-'));
+      const repo = await Repository.create(dir);
+      const created = await repo.createResource('note', '# 旧', { filename: 'f.md' });
+
+      // mock fs-extra.writeFile 在写文件阶段抛错（模拟文件写入失败）
+      const spy = jest.spyOn(fs, 'writeFile').mockRejectedValueOnce(new Error('io-fail'));
+
       await expect(
-        handler.undo({ resourceService: { update } }, { operationResult }),
-      ).rejects.toThrow('fk');
+        repo.executeOperation('resource.update', {
+          rid: created.rid,
+          updates: { content: '# 新' },
+        }),
+      ).rejects.toThrow('io-fail');
+
+      spy.mockRestore();
+
+      // 快照已清理（无残留）
+      const opsDir = path.join(dir, '.repo', 'operations');
+      const leftovers = (await fs.pathExists(opsDir))
+        ? await fs.readdir(opsDir)
+        : [];
+      expect(leftovers).toEqual([]);
+
+      // 重试成功 → 新快照 + undo 恢复
+      const { operationId } = await repo.executeOperation('resource.update', {
+        rid: created.rid,
+        updates: { content: '# 新' },
+      });
+      await repo.undoContainerOperation(operationId);
+      expect(await fs.readFile(path.join(dir, 'resources', 'f.md'), 'utf8')).toBe('# 旧');
+      await repo.close();
+      await fs.remove(dir);
+    });
+
+    test('undo 写回失败 → 快照保留；重试 undo 成功 → 快照删除', async () => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'lo-op-update-'));
+      const repo = await Repository.create(dir);
+      const created = await repo.createResource('note', '# 旧', { filename: 'r.md' });
+      const { operationId } = await repo.executeOperation('resource.update', {
+        rid: created.rid,
+        updates: { content: '# 新' },
+      });
+
+      const snap = path.join(dir, '.repo', 'operations', `${operationId}.bak`);
+      const spy = jest.spyOn(fs, 'copy').mockRejectedValueOnce(new Error('disk-busy'));
+      await expect(repo.undoContainerOperation(operationId)).rejects.toThrow('disk-busy');
+      spy.mockRestore();
+
+      // 快照保留 → 可重试
+      expect(await fs.pathExists(snap)).toBe(true);
+      await repo.undoContainerOperation(operationId);
+      expect(await fs.readFile(path.join(dir, 'resources', 'r.md'), 'utf8')).toBe('# 旧');
+      expect(await fs.pathExists(snap)).toBe(false);
+      await repo.close();
+      await fs.remove(dir);
     });
   });
 });

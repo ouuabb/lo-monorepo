@@ -778,13 +778,13 @@ class ResourceService {
   }
 
   async update(rid, updates) {
-    const { path, hash, metadata, capabilities, container_schema, type } =
+    const { path, hash, metadata, capabilities, container_schema, type, name } =
       updates;
 
     // ── Hook: beforeResourceUpdate ──
     const beforePayload = await this._runBefore("beforeResourceUpdate", {
       rid,
-      updates: { path, hash, metadata, capabilities, container_schema, type },
+      updates: { path, hash, metadata, capabilities, container_schema, type, name },
     });
     const finalRid = beforePayload.rid !== undefined ? beforePayload.rid : rid;
     const finalUpdates =
@@ -796,6 +796,7 @@ class ResourceService {
       capabilities: fCaps,
       container_schema: fSchema,
       type: fType,
+      name: fName,
     } = finalUpdates;
 
     await this.db.run("SAVEPOINT tx_update");
@@ -814,6 +815,10 @@ class ResourceService {
         const loc = this.locationFromPath(fPath);
         sql += ", location_kind = ?, location = ?";
         params.push(loc.kind, loc.value);
+      }
+      if (fName !== undefined) {
+        sql += ", name = ?";
+        params.push(fName);
       }
       if (fHash) {
         sql += ", hash = ?";
@@ -1004,14 +1009,21 @@ class ResourceService {
     return { rid: finalRid, deleted: true };
   }
 
-  async importFile(filePath, type = null, options = {}) {
-    // 去重语义与 location 唯一性一致（016 §6）：仅 local 路径去重；
-    // external 同一绝对路径可被多个 Resource 引用，不做查重。
+  /**
+   * 导入准备（P2：与 create 分离，供 operation 承载复用）
+   *
+   * 去重语义与 location 唯一性一致（016 §6）：仅 local 路径去重；
+   * external 同一绝对路径可被多个 Resource 引用，不做查重。
+   * @param {string} filePath
+   * @param {string|null} type
+   * @returns {Promise<{ existing: object } | { params: object }>}
+   */
+  async prepareImport(filePath, type = null) {
     const importedLoc = this.locationFromPath(filePath);
     if (importedLoc.kind === 'local') {
       const existing = await this.getByPath(filePath);
       if (existing) {
-        return existing;
+        return { existing };
       }
     }
 
@@ -1029,14 +1041,23 @@ class ResourceService {
 
     // 判定导入文件的 Location（仓库内 → local，仓库外 → external）
     const loc = this.locationFromPath(filePath);
-    return this.create({
-      type: resourceType,
-      location_kind: loc.kind,
-      location: loc.value,
-      name,
-      metadata,
-      ...options,
-    });
+    return {
+      params: {
+        type: resourceType,
+        location_kind: loc.kind,
+        location: loc.value,
+        name,
+        metadata,
+      },
+    };
+  }
+
+  async importFile(filePath, type = null, options = {}) {
+    const prepared = await this.prepareImport(filePath, type);
+    if (prepared.existing) {
+      return prepared.existing;
+    }
+    return this.create({ ...prepared.params, ...options });
   }
 
   async move(rid, newPath) {

@@ -3,7 +3,21 @@
  *
  * Operation 唯一入口：资源更新经 OperationEngine 记录。
  * execute 前抓取旧状态（before），undo 据此恢复。
+ *
+ * content 更新语义（P1 收敛）：
+ *   - execute：写新内容前将旧文件快照到 `.repo/operations/<opId>.bak`；
+ *     after 记录 contentSnapshot（快照名，无文件时 null），不将旧内容内联入 DB。
+ *   - undo：快照存在 → 写回旧文件 + refresh（文件/hash/metadata 三者一致）→ 删除快照。
+ *   - 失败：execute/undo 各自清理本次快照，可重试。
  */
+const fs = require('fs-extra');
+const path = require('path');
+
+/** 快照目录（.repo/operations/，随仓库移动/备份保持相对仓库） */
+function snapshotDir(ctx) {
+  return path.join(ctx.resourceService.repoPath, '.repo', 'operations');
+}
+
 module.exports = {
   type: 'resource.update',
 
@@ -32,8 +46,29 @@ module.exports = {
     // content 更新走 resourceService.updateContent（写文件 + refresh）
     // 其余字段走 resourceService.update（含空 updates，保持原行为）
     const { content, ...restUpdates } = updates || {};
+    let contentSnapshot = null;
     if (content !== undefined) {
-      await ctx.resourceService.updateContent(rid, content);
+      // 旧文件内容快照（原字节，加密状态原样保留）→ 供 undo 恢复
+      const absPath = ctx.resourceService.resolveLocation({
+        kind: before.location_kind,
+        value: before.location,
+      });
+      if (absPath && (await fs.pathExists(absPath))) {
+        await fs.ensureDir(snapshotDir(ctx));
+        contentSnapshot = `${ctx.opId}.bak`;
+        await fs.copy(absPath, path.join(snapshotDir(ctx), contentSnapshot));
+      }
+      try {
+        await ctx.resourceService.updateContent(rid, content);
+      } catch (e) {
+        // 写文件/refresh 失败：清理本次快照，保持可重试（操作记为 failed）
+        if (contentSnapshot) {
+          await fs
+            .remove(path.join(snapshotDir(ctx), contentSnapshot))
+            .catch(() => {});
+        }
+        throw e;
+      }
     }
     const result = await ctx.resourceService.update(rid, restUpdates);
 
@@ -41,6 +76,7 @@ module.exports = {
     return {
       ...result,
       rid,
+      contentSnapshot,
       before: {
         name: before.name,
         path: before.path,
@@ -67,7 +103,7 @@ module.exports = {
     }
     const rid = operationResult.rid;
 
-    // 恢复 name / path / hash / type / container_schema
+    // 恢复 name / path / hash / type / container_schema / metadata
     const restores = {};
     if (before && before.name !== undefined) restores.name = before.name;
     if (before && before.path !== undefined) restores.path = before.path;
@@ -77,11 +113,38 @@ module.exports = {
       restores.container_schema = before.container_schema;
     }
     if (before && before.metadata !== undefined) {
-      restores.metadata = typeof before.metadata === 'string'
-        ? JSON.parse(before.metadata)
-        : before.metadata;
+      restores.metadata =
+        typeof before.metadata === 'string'
+          ? JSON.parse(before.metadata)
+          : before.metadata;
     }
     await ctx.resourceService.update(rid, restores);
+
+    // 文件内容恢复（content 更新场景）：写回快照 → refresh 使文件/hash/metadata 一致
+    if (operationResult.contentSnapshot) {
+      const current = await ctx.resourceService.getByRid(rid);
+      const absPath =
+        current &&
+        ctx.resourceService.resolveLocation({
+          kind: current.location_kind,
+          value: current.location,
+        });
+      const snapshotPath = path.join(
+        snapshotDir(ctx),
+        operationResult.contentSnapshot,
+      );
+      if (absPath && (await fs.pathExists(snapshotPath))) {
+        try {
+          await fs.copy(snapshotPath, absPath);
+          await ctx.resourceService.refresh(rid);
+        } catch (e) {
+          // 恢复失败：保留快照，可重试 undo
+          throw e;
+        }
+        await fs.remove(snapshotPath);
+      }
+    }
+
     return { restored: true, rid };
   },
 };

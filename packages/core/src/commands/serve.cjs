@@ -547,13 +547,9 @@ route("PUT", "/api/notes/:rid", async (req, res, { repo, url }) => {
 
   try {
     if (content !== undefined) {
-      // 内容写入下沉到 resourceService.updateContent（加密感知 + refresh）
-      const refreshed = await repo.resourceService.updateContent(rid, content);
-      updates.hash = refreshed.hash;
-      if (!body.metadata && !body.title) {
-        // 未显式传 metadata 时，使用 refresh 提取的结果
-        updates.metadata = refreshed.metadata;
-      }
+      // 内容写入统一经 resource.update operation（含旧内容快照，可 undo）；
+      // hash/metadata 由 operation 内 refresh 派生，不在此处预取
+      updates.content = content;
     }
 
     // 用户显式传入的 metadata/title/tags/category 覆盖 refresh 结果

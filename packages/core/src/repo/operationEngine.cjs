@@ -109,6 +109,7 @@ class OperationEngine {
     // 执行
     try {
       const ctx = this._ctx();
+      ctx.opId = operationId; // 供 handler 使用（如文件快照命名）
       const result = await handler.execute(ctx, params);
 
       // 成功 → 写入 after 快照
