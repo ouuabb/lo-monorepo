@@ -79,7 +79,8 @@ const actions = {
     if (!params.type) throw new Error('resource.create 需要 type');
     const path = require('path');
     const result = params.path
-      ? await ctx.repo.resourceService.create({
+      ? // 按路径登记已有文件 → 统一经 resource.create operation（P4-2）
+        await ctx.repo.executeOperation('resource.create', {
           type: params.type,
           ...ctx.repo.resourceService.locationFromPath(
             path.isAbsolute(params.path)
@@ -88,7 +89,7 @@ const actions = {
           ),
           name: params.name,
           metadata: params.metadata || {},
-        })
+        }).then((r) => r.result)
       : await ctx.repo.createResource(params.type, params.content || '', {
           filename: params.name, metadata: params.metadata || {}
         });

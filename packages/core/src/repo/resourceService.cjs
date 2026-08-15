@@ -715,7 +715,19 @@ class ResourceService {
       typeof content === "string" ? content : JSON.stringify(content);
 
     // 保持文件的加密状态不变（已加密的继续加密，明文的保持明文）
-    const wasEncrypted = resource.encrypted;
+    // 以 DB 标志为准，文件 MAGIC 兜底（防 DB 标志丢失/未同步场景，如手动加密文件）
+    let wasEncrypted = resource.encrypted;
+    if (!wasEncrypted) {
+      try {
+        const head = await fs.readFile(filePath);
+        const CryptoUtils = require("../utils/crypto.cjs");
+        wasEncrypted =
+          head.length >= 4 &&
+          head.subarray(0, 4).equals(CryptoUtils.MAGIC);
+      } catch {
+        wasEncrypted = false;
+      }
+    }
     if (this._cryptoKey && wasEncrypted) {
       const CryptoUtils = require("../utils/crypto.cjs");
       const encrypted = CryptoUtils.encryptFile(

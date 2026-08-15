@@ -79,16 +79,13 @@ module.exports = async function edit(argv) {
       if (tempFilePath) {
         try {
           const editedContent = await fs.readFile(tempFilePath);
-          if (cryptoKey) {
-            await CryptoUtils.writeEncryptedFile(
-              editPath0,
-              editedContent,
-              cryptoKey,
-            );
-          } else {
-            await fs.writeFile(editPath0, editedContent);
-          }
-          Logger.success("文件已保存并重新加密");
+          // P4-3：保存统一经 resource.update operation（P1 快照 undo + recordOp 内置）
+          // updateContent 按资源加密状态保持加密写入
+          const repo2 = new Repository(process.cwd());
+          await repo2.open({ skipAuth: true });
+          await repo2.updateResource(resource.rid, { content: editedContent });
+          await repo2.close();
+          Logger.success("文件已保存并同步");
         } catch (e) {
           Logger.error(`保存失败: ${e.message}`);
         } finally {
@@ -100,34 +97,16 @@ module.exports = async function edit(argv) {
         }
       } else {
         Logger.info("编辑完成");
-        // 非加密文件也被编辑器直接修改了，需要同步
-      }
-
-      // 重新打开仓库，同步 metadata 和 hash 到 SQLite
-      try {
-        const repo2 = new Repository(process.cwd());
-        await repo2.open({ skipAuth: true });
-        const refreshed = await repo2.resourceService.refresh(resource.rid);
-
-        // 记录操作日志（同步到远程）
-        if (repo2.syncOps) {
-          await repo2.syncOps.recordOp(
-            require("../repo/syncOps.cjs").OP_TYPES.RESOURCE_UPDATED,
-            resource.rid,
-            {
-              path:
-                resource.location_kind === 'local' ? resource.location : '',
-              old_hash: resource.hash,
-              new_hash: refreshed.hash,
-              metadata: refreshed.metadata,
-            },
-          );
+        // 非加密文件也被编辑器直接修改了，需要同步（operation + refresh + recordOp）
+        try {
+          const repo2 = new Repository(process.cwd());
+          await repo2.open({ skipAuth: true });
+          const editedContent = await fs.readFile(editPath0);
+          await repo2.updateResource(resource.rid, { content: editedContent });
+          await repo2.close();
+        } catch (e) {
+          Logger.warn(`元数据同步失败: ${e.message}`);
         }
-
-        Logger.success(`元数据已同步: ${resource.rid}`);
-        await repo2.close();
-      } catch (e) {
-        Logger.warn(`元数据同步失败: ${e.message}`);
       }
 
       process.exit(0);

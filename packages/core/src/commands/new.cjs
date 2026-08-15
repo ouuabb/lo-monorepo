@@ -58,17 +58,14 @@ module.exports = async function newResource(argv) {
     const encryptionEnabled = CryptoUtils.isEncryptionEnabled(process.cwd());
 
     let resource;
-    if (shouldEncrypt && cryptoKey && encrypt === true) {
-      // 显式 --encrypt：强制加密该文件
-      await CryptoUtils.writeEncryptedFile(filePath, Buffer.from(content, 'utf-8'), cryptoKey);
-      const loc = repo.resourceService.locationFromPath(filePath);
-      resource = await repo.resourceService.create({
-        type,
-        location_kind: loc.kind,
-        location: loc.value,
+    if (encrypt === true && cryptoKey) {
+      // 显式 --encrypt（密钥可用）：统一走 createResource({ encrypt: true })
+      // → resource.create operation（P4-1），内部加密写入 + 自动 encrypted 标志
+      resource = await repo.createResource(type, content, {
+        filename,
         metadata,
+        encrypt: true,
       });
-      await repo.db.run('UPDATE resources SET encrypted = 1 WHERE rid = ?', [resource.rid]);
     } else {
       if (encrypt && !cryptoKey) {
         Logger.error('无法加密：加密密钥未加载。请确认仓库已初始化加密或已完成 SSH 认证。');

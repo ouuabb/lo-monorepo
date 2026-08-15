@@ -582,7 +582,13 @@ class Repository {
   }
 
   async createResource(type, content, options = {}) {
-    const { filename, metadata = {}, overwrite = false, schema } = options;
+    const {
+      filename,
+      metadata = {},
+      overwrite = false,
+      schema,
+      encrypt = false,
+    } = options;
 
     // 顶层 title 选项并入 metadata（如 epub:note 传入的笔记标题）
     const finalMeta = { ...metadata };
@@ -623,11 +629,15 @@ class Repository {
       throw err;
     }
 
-    // 使用 ResourceService 的统一写入方法（根据加密策略决定是否加密）
+    // 使用 ResourceService 的统一写入方法（根据加密策略决定是否加密；
+    // 显式 encrypt: true 强制加密写入——P4-1：new --encrypt 统一入口）
     const contentBuf = Buffer.isBuffer(content)
       ? content
       : Buffer.from(content, "utf-8");
-    if (this._cryptoKey && this._encryptByDefault) {
+    if (options.encrypt && !this._cryptoKey) {
+      throw new Error("无法加密：加密密钥未加载，请先完成 SSH 认证");
+    }
+    if ((this._cryptoKey && this._encryptByDefault) || options.encrypt) {
       await CryptoUtils.writeEncryptedFile(
         filePath,
         contentBuf,
