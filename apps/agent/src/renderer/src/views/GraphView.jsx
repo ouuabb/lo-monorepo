@@ -95,7 +95,6 @@ export default function GraphView(props) {
   const nodes = ((graph && graph.nodes) || []).filter((n) => n.type !== 'system');
   const edges = (graph && graph.edges) || [];
   const positions = layout(nodes);
-  const byId = new Map(nodes.map((n) => [n.id, n]));
 
   return (
     <div className="graph-view">
