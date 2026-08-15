@@ -64,8 +64,10 @@
   external  —— 仓库外
   virtual   —— 无文件（no local path）
   ```
-- **Container 是能力维度（capabilities），非第四类位置**：Container Resource 的 location
-  仍归 local / external（内容源目录可在仓库内或外）；member 定位 = Container source + memberPath。
+- **Container 是能力维度（capabilities），非第四类位置**：Container Resource **本体为 virtual**
+  （`location_kind='virtual'`、`location=''`，容器没有单一可定位文件）；内容来源由
+  `resource_sources` 承担（绝对路径，可多源 / 仓库内或外）；member 定位 =
+  **source.location + memberPath**（解析在 Core）。Container 本体不归 local / external。
 - kind 决定解析方式，**禁止从字符串形式推断 kind**（绝对路径 ≠ 必然 external）。
 - Repository-local Resource 的 location **相对 Repository.currentPath**，而非历史绝对路径。
 
@@ -93,7 +95,8 @@
 ## 8. Container Member
 
 - `memberPath` = 容器内部相对内容源目录的路径（现有语义保持）。
-- member 定位 = Container source + memberPath，解析在 Core。
+- member 定位 = **source.location + memberPath**，解析在 Core（与 Container Resource
+  本体的 Resource Location（virtual）解耦；promoted member 另持自身 Resource）。
 
 ## 9. Path Resolution
 
@@ -135,7 +138,8 @@
 2. Repository Location 每次打开重解析，与 Identity 相互独立。
 3. Resource Identity = rid，永不变化。
 4. Resource Location 三分类（local/external/virtual）+ Container 能力层；kind 决定解析，
-   禁止形式推断。
+   禁止形式推断。Container Resource 本体归 virtual（内容源在 resource_sources，member
+   定位 = source.location + memberPath，与本体 Resource Location 解耦）。
 5. 仓库内资源 location 相对 Repository.currentPath。
 6. Resource Source 与 Location 解耦（source 不承载定位）。
 7. 移动/复制后 Identity 不变；副本独立化必须经 reinitialize（Core 不自动猜测 OS 行为）。
@@ -172,7 +176,8 @@
                                  -- external: 绝对路径
                                  -- virtual: ''
   ```
-- Container：location_kind 归 local/external；capabilities=['container'] 保持；member 定位 = Container location + memberPath。
+- Container：**本体 location_kind='virtual'、location=''**（无本地文件）；capabilities=['container']
+  为能力标识；内容源存 `resource_sources`（绝对路径）；member 定位 = source.location + memberPath。
 
 ### D5 · Resolver（定稿）
 - 唯一入口：`ResourceService.resolveResourceLocation(rid)`。

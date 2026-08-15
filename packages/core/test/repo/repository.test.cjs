@@ -686,6 +686,9 @@ describe('Repository', () => {
 
     const project = await repo.createResourceWithContainer('project', dir, { name: 'demo-proj' });
     expect(project.capabilities).toContain('container');
+    // Container 本体为 virtual（016 §6/D4：无本地文件，内容源在 resource_sources）
+    expect(project.location_kind).toBe('virtual');
+    expect(project.location).toBe('');
     const projectRow = await repo.getResource(project.rid);
     expect(projectRow.container_schema.allowed_types).toBeDefined();
 

@@ -26,7 +26,7 @@
 | `resources.path`（仓库内绝对） | `location_kind='local'` + `location`（相对 currentPath） | 开发期转换 |
 | `resources.path`（import 仓库外绝对） | `location_kind='external'` + `location`（绝对） | 开发期转换 |
 | `resources.path=""`（虚拟资源） | `location_kind='virtual'` + `location=''` | 开发期转换 |
-| container 内容源目录（path） | `location_kind` 归 local/external（能力层 capabilities=['container'] 保持） | 转换 |
+| container 内容源目录（path） | 本体 `location_kind='virtual'`（capabilities=['container'] 能力标识）；内容源进 `resource_sources`（绝对路径） | 转换/保持 |
 | container `memberPath`（相对 source） | 保持相对语义 | **不迁移** |
 | `repoPath`（Repository 构造路径） | `RepositoryContext.currentPath`（打开时解析） | 重构 |
 | 临时 filesystem path（导入源/备份目标/watcher 根/插件目录） | 非 Resource Location | **不转换、不经过 Resolver** |
@@ -66,7 +66,7 @@
 - watcher：FileWatcher 事件路径与 location 相对语义对齐。
 - sync：syncOps 相对语义一致化（device_id 不变；历史不迁移）。
 - import：外部文件 → external kind。
-- container：location 归 local/external；member 解析在 Core。
+- container：本体 location 归 virtual（内容源在 resource_sources）；member 定位 = source.location + memberPath，解析在 Core。
 - backup/restore：metadata.json 随备份；恢复后 Identity 保持。
 - encrypt/decrypt：路径经 Resolver。
 

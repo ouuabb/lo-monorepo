@@ -91,6 +91,10 @@ describe('Repository Model Invariants (016 §12)', () => {
     await fs.ensureDir(conDir);
     const con = await repo.createResourceWithContainer('album', conDir, { name: 'i4-con' });
     expect(con.capabilities).toContain('container'); // 能力层，非位置 kind
+    // Container 本体为 virtual（016 §6/D4：无本地文件；内容源在 resource_sources，
+    // member 定位 = source.location + memberPath，与本体 Resource Location 解耦）
+    expect(con.location_kind).toBe('virtual');
+    expect(con.location).toBe('');
     await repo.close();
   });
 
