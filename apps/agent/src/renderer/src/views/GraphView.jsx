@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as d3 from 'd3';
 
 /**
- * GraphView —— 知识图谱视图（G 功能，第一版）
+ * GraphView —— 知识图谱视图（d3 力导向）
  *
- * 纯消费 loCore.graph()（GET /api/admin/graph → { nodes, edges }）：
- * - SVG 静态环形布局（按 type 分组扇区），无第三方图依赖
- * - 节点点击 → onOpen(rid)（复用现有资源打开机制，不解析任何路径）
- * - hover 显示资源 label；基础 type 区分；节点/边统计；空态；手动刷新
+ * 样式：原有按 type 着色（彩色节点/边），沿用 App 主题
+ * 交互：对齐参考实现的力导向交互——hover 邻接高亮（相邻边提升、非相邻
+ * 淡化）、hover 节点描边加粗、非相邻节点降透明、tooltip 跟随显示标题；
+ * 拖拽（d3.drag，松手回到力模拟）。纯展示，无节点点击跳转。
  */
 const NODE_COLORS = {
   note: '#4a9eff',
@@ -24,9 +25,6 @@ const EDGE_COLORS = {
   reference: '#9e9e9e',
 };
 
-const W = 900;
-const H = 600;
-
 function typeColor(type) {
   return NODE_COLORS[type] || '#b0bec5';
 }
@@ -35,40 +33,12 @@ function edgeColor(type) {
   return EDGE_COLORS[type] || '#757575';
 }
 
-/** 环形布局：按 type 分组扇区，组内均分角度 */
-function layout(nodes) {
-  const groups = new Map();
-  for (const n of nodes) {
-    const key = n.type || 'other';
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(n);
-  }
-  const entries = Array.from(groups.entries());
-  const total = nodes.length;
-  const radius = Math.max(170, Math.min(300, total * 16 + 120));
-  const positions = new Map();
-  let angle = -Math.PI / 2;
-  for (const [, group] of entries) {
-    const groupAngle = (group.length / total) * Math.PI * 2;
-    group.forEach((n, i) => {
-      const a = group.length === 1
-        ? angle + groupAngle / 2
-        : angle + ((i + 0.5) / group.length) * groupAngle;
-      positions.set(n.id, {
-        x: W / 2 + radius * Math.cos(a),
-        y: H / 2 + radius * Math.sin(a),
-      });
-    });
-    angle += groupAngle;
-  }
-  return positions;
-}
-
 export default function GraphView(props) {
-  const { onOpen, onNotify } = props;
+  const { onNotify } = props;
+  const svgRef = useRef(null);
+  const tooltipRef = useRef(null);
   const [graph, setGraph] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [hover, setHover] = useState(null);
 
   const load = useCallback(async () => {
     const api = window.loAgent && window.loAgent.loCore;
@@ -92,9 +62,154 @@ export default function GraphView(props) {
     load();
   }, [load]);
 
-  const nodes = ((graph && graph.nodes) || []).filter((n) => n.type !== 'system');
-  const edges = (graph && graph.edges) || [];
-  const positions = layout(nodes);
+  const nodes = useMemo(
+    () => ((graph && graph.nodes) || []).filter((n) => n.type !== 'system'),
+    [graph],
+  );
+  const edges = useMemo(() => (graph && graph.edges) || [], [graph]);
+
+  useEffect(() => {
+    const svgEl = svgRef.current;
+    const tooltipEl = tooltipRef.current;
+    if (!svgEl || nodes.length === 0) return undefined;
+
+    const W = svgEl.clientWidth || 860;
+    const H = svgEl.clientHeight || 520;
+
+    const svg = d3.select(svgEl);
+    svg.selectAll('*').remove();
+
+    const simNodes = nodes.map((n) => ({ ...n }));
+    const simLinks = edges.map((e) => ({
+      source: e.from,
+      target: e.to,
+      type: e.type,
+    }));
+
+    const simulation = d3
+      .forceSimulation(simNodes)
+      .force(
+        'link',
+        d3
+          .forceLink(simLinks)
+          .id((d) => d.id)
+          .distance(140)
+          .strength(0.6),
+      )
+      .force('charge', d3.forceManyBody().strength(-480))
+      .force('center', d3.forceCenter(W / 2, H / 2).strength(0.06))
+      .force('x', d3.forceX(W / 2).strength(0.03))
+      .force('y', d3.forceY(H / 2).strength(0.03))
+      .force('collision', d3.forceCollide().radius(28).strength(0.5));
+
+    const link = svg
+      .append('g')
+      .selectAll('line')
+      .data(simLinks)
+      .join('line')
+      .attr('class', 'graph-link')
+      .attr('stroke', (d) => edgeColor(d.type))
+      .attr('stroke-opacity', 0.55)
+      .attr('stroke-width', 1.2);
+
+    const node = svg
+      .append('g')
+      .selectAll('g')
+      .data(simNodes)
+      .join('g')
+      .attr('class', 'graph-node')
+      .style('cursor', 'pointer')
+      .call(
+        d3
+          .drag()
+          .on('start', (event, d) => {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+          })
+          .on('drag', (event, d) => {
+            d.fx = event.x;
+            d.fy = event.y;
+          })
+          .on('end', (event, d) => {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+          }),
+      )
+      .on('mouseenter', (event, d) => {
+        // 相邻边提升、非相邻边淡化
+        link
+          .attr('stroke-opacity', (l) =>
+            l.source.id === d.id || l.target.id === d.id ? 0.95 : 0.08,
+          )
+          .attr('stroke-width', (l) =>
+            l.source.id === d.id || l.target.id === d.id ? 3.5 : 1.2,
+          );
+        // 节点：hover 节点描边加粗、非相邻节点降透明
+        node
+          .selectAll('circle')
+          .attr('stroke-width', (n) => (n.id === d.id ? 4.5 : 1.5))
+          .attr('opacity', (n) => {
+            if (n.id === d.id) return 1;
+            const linked = simLinks.some(
+              (l) =>
+                (l.source.id === d.id && l.target.id === n.id) ||
+                (l.target.id === d.id && l.source.id === n.id),
+            );
+            return linked ? 1 : 0.25;
+          });
+        if (tooltipEl) {
+          tooltipEl.textContent = d.label || d.id;
+          tooltipEl.style.opacity = 1;
+          tooltipEl.style.left = `${event.pageX + 14}px`;
+          tooltipEl.style.top = `${event.pageY - 10}px`;
+        }
+      })
+      .on('mousemove', (event) => {
+        if (tooltipEl) {
+          tooltipEl.style.left = `${event.pageX + 14}px`;
+          tooltipEl.style.top = `${event.pageY - 10}px`;
+        }
+      })
+      .on('mouseleave', () => {
+        link.attr('stroke-opacity', 0.55).attr('stroke-width', 1.2);
+        node
+          .selectAll('circle')
+          .attr('stroke-width', 1.5)
+          .attr('opacity', 1);
+        if (tooltipEl) tooltipEl.style.opacity = 0;
+      });
+
+    node
+      .append('circle')
+      .attr('r', 9)
+      .attr('fill', (d) => typeColor(d.type))
+      .attr('stroke', '#fff')
+      .attr('stroke-width', 1.5);
+
+    node
+      .append('text')
+      .attr('dy', 22)
+      .attr('text-anchor', 'middle')
+      .attr('font-size', 10)
+      .attr('fill', '#bbb')
+      .text((d) => d.label || d.id);
+
+    simulation.on('tick', () => {
+      link
+        .attr('x1', (d) => d.source.x)
+        .attr('y1', (d) => d.source.y)
+        .attr('x2', (d) => d.target.x)
+        .attr('y2', (d) => d.target.y);
+      node.attr('transform', (d) => `translate(${d.x}, ${d.y})`);
+    });
+
+    return () => {
+      simulation.stop();
+      svg.selectAll('*').remove();
+    };
+  }, [nodes, edges]);
 
   return (
     <div className="graph-view">
@@ -115,57 +230,14 @@ export default function GraphView(props) {
         </div>
       ) : (
         <svg
+          ref={svgRef}
           className="graph-svg"
-          viewBox={`0 0 ${W} ${H}`}
           role="img"
           aria-label="知识图谱"
-        >
-          {edges.map((e) => {
-            const from = positions.get(e.from);
-            const to = positions.get(e.to);
-            return (
-              <line
-                key={`e${e.id}`}
-                x1={from ? from.x : W / 2}
-                y1={from ? from.y : H / 2}
-                x2={to ? to.x : W / 2}
-                y2={to ? to.y : H / 2}
-                stroke={edgeColor(e.type)}
-                strokeWidth={1}
-                opacity={0.6}
-              />
-            );
-          })}
-          {nodes.map((n) => {
-            const p = positions.get(n.id);
-            if (!p) return null;
-            const active = hover === n.id;
-            return (
-              <g
-                key={n.id}
-                transform={`translate(${p.x}, ${p.y})`}
-                className="graph-node"
-                onMouseEnter={() => setHover(n.id)}
-                onMouseLeave={() => setHover(null)}
-                onClick={() => onOpen && onOpen(n.id)}
-                style={{ cursor: 'pointer' }}
-              >
-                <title>{n.label || n.id}</title>
-                <circle r={active ? 12 : 9} fill={typeColor(n.type)} stroke="#fff" strokeWidth={1.5} />
-                <text
-                  y={-14}
-                  textAnchor="middle"
-                  fontSize={11}
-                  fill={active ? '#fff' : '#bbb'}
-                  style={{ pointerEvents: 'none' }}
-                >
-                  {active ? (n.label || n.id) : ''}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+        />
       )}
+
+      <div ref={tooltipRef} className="graph-tooltip" />
     </div>
   );
 }

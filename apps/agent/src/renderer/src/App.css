@@ -733,10 +733,26 @@ body.no-select {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
+  cursor: grab;
 }
 
-.graph-node circle {
-  transition: r 0.12s ease;
+.graph-svg:active {
+  cursor: grabbing;
+}
+
+.graph-tooltip {
+  position: fixed;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1a2634;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  border: 1px solid #d0d8e2;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 100;
+  white-space: nowrap;
 }
 
 .sub-nav {
