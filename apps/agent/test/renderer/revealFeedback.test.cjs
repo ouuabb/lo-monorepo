@@ -1,10 +1,18 @@
 /**
  * revealFeedback 契约测试（A 功能：revealResource 结果 → 用户提示）
  * 覆盖 LoCoreService.revealResource 全部返回形态的文案映射。
+ * 模块为 ESM（renderer 侧），测试经动态 import 加载。
  */
-const { revealFeedback, REVEAL_REASONS } = require('../../src/renderer/src/services/revealFeedback.cjs');
-
 describe('revealFeedback（A：系统资源管理器打开反馈）', () => {
+  let revealFeedback;
+  let REVEAL_REASONS;
+
+  beforeAll(async () => {
+    ({ revealFeedback, REVEAL_REASONS } = await import(
+      '../../src/renderer/src/services/revealFeedback.mjs'
+    ));
+  });
+
   test('ok: true → 已打开', () => {
     expect(revealFeedback({ ok: true })).toBe('已在系统资源管理器中打开');
   });

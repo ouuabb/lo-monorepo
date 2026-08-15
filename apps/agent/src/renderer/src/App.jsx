@@ -4,7 +4,7 @@ import PluginUiMount from './plugin/PluginUiMount.jsx';
 import { hasUi } from './plugin/pluginUi.js';
 import { BarArea, Bar } from './layout/BarArea.jsx';
 import CoreViewPanel from './views/ViewPanel.jsx';
-import { revealFeedback } from './services/revealFeedback.cjs';
+import { revealFeedback } from './services/revealFeedback.mjs';
 import './App.css';
 
 const api = window.loAgent && window.loAgent.loCore;
@@ -61,6 +61,7 @@ const [repoCtx, setRepoCtx] = useState(null);
   const deleteRidRef = useRef(null);
   const toastTimerRef = useRef(null);
   const autoSaveTimerRef = useRef(null);
+  const [toastCopied, setToastCopied] = useState(false);
 
   const notify = useCallback((text) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -934,7 +935,24 @@ useEffect(() => {
 
         {message && (
           <div className="app-toast" aria-live="polite">
-            {message}
+            <span className="app-toast-text">{message}</span>
+            <button
+              type="button"
+              className="app-toast-copy"
+              title="复制提示信息"
+              aria-label="复制提示信息"
+              onClick={() => {
+                navigator.clipboard
+                  .writeText(message)
+                  .then(() => {
+                    setToastCopied(true);
+                    setTimeout(() => setToastCopied(false), 1500);
+                  })
+                  .catch(() => {});
+              }}
+            >
+              {toastCopied ? '已复制' : '复制'}
+            </button>
           </div>
         )}
 
