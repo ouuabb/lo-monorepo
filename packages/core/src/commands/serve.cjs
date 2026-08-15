@@ -1631,14 +1631,8 @@ route("GET", "/api/admin/graph", async (req, res, { repo, url }) => {
     const nodes = resources.map((r) => ({
       id: r.rid,
       type: r.type,
-      label: (() => {
-        try {
-          const m = JSON.parse(r.metadata || "{}");
-          return r.name || r.rid;
-        } catch {
-          return r.name || r.rid;
-        }
-      })(),
+      // 018：图节点 label = Resource name
+      label: r.name || r.rid,
       resourceType: r.type,
     }));
 
