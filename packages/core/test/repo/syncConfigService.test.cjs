@@ -17,9 +17,9 @@ describe('SyncConfigService', () => {
     const now = Date.now();
     for (const rid of ['container1', 'container2']) {
       await db.run(
-        `INSERT INTO resources (rid, name, layer, type, path, hash, created, updated, deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        [rid, rid, 0, 'container', '', null, now, now]
+        `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, created, updated, deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        [rid,                                       rid,                                       0,                                       'container', 'local',                                       '',                                       null,                                       now,                                       now]
       );
     }
     for (const [id, rid] of [[1, 'container1'], [2, 'container1'], [3, 'container2']]) {

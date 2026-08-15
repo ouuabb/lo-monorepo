@@ -77,10 +77,17 @@ const actions = {
    */
   async 'resource.create'(ctx, params) {
     if (!params.type) throw new Error('resource.create 需要 type');
+    const path = require('path');
     const result = params.path
       ? await ctx.repo.resourceService.create({
-          type: params.type, path: params.path, name: params.name,
-          metadata: params.metadata || {}
+          type: params.type,
+          ...ctx.repo.resourceService.locationFromPath(
+            path.isAbsolute(params.path)
+              ? params.path
+              : path.join(ctx.repo.repoPath, params.path),
+          ),
+          name: params.name,
+          metadata: params.metadata || {},
         })
       : await ctx.repo.createResource(params.type, params.content || '', {
           filename: params.name, metadata: params.metadata || {}

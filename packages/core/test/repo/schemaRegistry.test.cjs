@@ -25,7 +25,7 @@ describe('SchemaRegistry', () => {
     db = new Database(tempDir);
     await db.init();
     registry = new SchemaRegistry(db);
-    resourceService = new ResourceService(db);
+    resourceService = new ResourceService(db, { repoPath: tempDir });
   });
 
   afterEach(async () => {
@@ -581,7 +581,7 @@ describe('SchemaRegistry', () => {
 
   describe('resourceService.create 集成', () => {
     beforeEach(() => {
-      resourceService = new ResourceService(db, {
+      resourceService = new ResourceService(db, { repoPath: tempDir,
         getSchemaRegistry: () => registry,
       });
       // 模拟插件/用户扩展的开放元数据字段

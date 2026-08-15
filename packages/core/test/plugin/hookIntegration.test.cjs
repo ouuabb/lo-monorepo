@@ -36,7 +36,7 @@ describe('Plugin Hook integration', () => {
     hookManager = new HookManager();
     extRegistry = new ExtensionRegistry();
 
-    resourceService = new ResourceService(db, {
+    resourceService = new ResourceService(db, { repoPath: tempDir,
       getHookManager: () => hookManager,
       getExtensionRegistry: () => extRegistry
     });
@@ -64,7 +64,7 @@ describe('Plugin Hook integration', () => {
 
     const result = await resourceService.create({
       type: 'note',
-      path: filePath,
+      location_kind: 'local', location: path.relative(tempDir, filePath),
       name: 'hello'
     });
 
@@ -88,7 +88,7 @@ describe('Plugin Hook integration', () => {
 
     const result = await resourceService.create({
       type: 'note',
-      path: filePath,
+      location_kind: 'local', location: path.relative(tempDir, filePath),
       name: 'hello'
     });
 
@@ -105,7 +105,7 @@ describe('Plugin Hook integration', () => {
 
     await expect(resourceService.create({
       type: 'note',
-      path: filePath,
+      location_kind: 'local', location: path.relative(tempDir, filePath),
       name: 'hello'
     })).rejects.toThrow(/被 hook/);
 
@@ -119,7 +119,7 @@ describe('Plugin Hook integration', () => {
     const filePath = path.join(tempDir, 'note.md');
     await fs.writeFile(filePath, '# Hello');
     const created = await resourceService.create({
-      type: 'note', path: filePath, name: 'hello'
+      type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'hello'
     });
 
     const events = [];
@@ -140,8 +140,8 @@ describe('Plugin Hook integration', () => {
     // 准备两个资源
     const f1 = path.join(tempDir, 'a.md'); await fs.writeFile(f1, '# A');
     const f2 = path.join(tempDir, 'b.md'); await fs.writeFile(f2, '# B');
-    const a = await resourceService.create({ type: 'note', path: f1, name: 'a' });
-    const b = await resourceService.create({ type: 'note', path: f2, name: 'b' });
+    const a = await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, f1), name: 'a' });
+    const b = await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, f2), name: 'b' });
 
     const events = [];
     hookManager.register('afterRelationCreate', async (p) => events.push(['create', p.relation.from_rid, p.relation.to_rid]));
@@ -160,8 +160,8 @@ describe('Plugin Hook integration', () => {
   test('beforeRelationCreate hook 可改写 type', async () => {
     const f1 = path.join(tempDir, 'a.md'); await fs.writeFile(f1, '# A');
     const f2 = path.join(tempDir, 'b.md'); await fs.writeFile(f2, '# B');
-    const a = await resourceService.create({ type: 'note', path: f1, name: 'a' });
-    const b = await resourceService.create({ type: 'note', path: f2, name: 'b' });
+    const a = await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, f1), name: 'a' });
+    const b = await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, f2), name: 'b' });
 
     hookManager.register('beforeRelationCreate', async (payload) => {
       return { ...payload, type: 'embed' };
@@ -187,7 +187,7 @@ describe('Plugin Hook integration', () => {
 
     const result = await resourceService.create({
       type: 'epub',
-      path: filePath,
+      location_kind: 'local', location: path.relative(tempDir, filePath),
       name: 'demo-book'
     });
 
@@ -208,7 +208,7 @@ describe('Plugin Hook integration', () => {
     // 应该不抛错
     const result = await resourceService.create({
       type: 'epub',
-      path: filePath,
+      location_kind: 'local', location: path.relative(tempDir, filePath),
       name: 'demo-book'
     });
     expect(result.rid).toMatch(/^res_/);
@@ -235,12 +235,12 @@ describe('Plugin Hook integration', () => {
 
   // ── 10. 没有 hookManager 时一切正常（向后兼容） ──
   test('未注入 hookManager 时向后兼容', async () => {
-    const plainService = new ResourceService(db);  // 不传 hookManager
+    const plainService = new ResourceService(db, { repoPath: tempDir });  // 不传 hookManager
     const filePath = path.join(tempDir, 'note.md');
     await fs.writeFile(filePath, '# Hello');
 
     const result = await plainService.create({
-      type: 'note', path: filePath, name: 'compat'
+      type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'compat'
     });
     expect(result.rid).toMatch(/^res_/);
 
@@ -270,7 +270,7 @@ describe('Plugin Hook integration', () => {
 
     const result = await resourceService.create({
       type: 'note',
-      path: filePath,
+      location_kind: 'local', location: path.relative(tempDir, filePath),
       name: 'hello'
     });
 
@@ -296,7 +296,7 @@ describe('Plugin Hook integration', () => {
     }, { pluginId: 'good', priority: 5 });
 
     const result = await resourceService.create({
-      type: 'note', path: filePath, name: 'after-boom'
+      type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'after-boom'
     });
 
     // bad 抛错，但 good 仍然执行，主流程正常返回
@@ -310,7 +310,7 @@ describe('Plugin Hook integration', () => {
     await fs.writeFile(filePath, '# Hello');
 
     const created = await resourceService.create({
-      type: 'note', path: filePath, name: 'cap-test',
+      type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'cap-test',
       capabilities: ['can-edit', 'can-delete']
     });
     expect(created.capabilities.sort()).toEqual(['can-edit', 'can-delete'].sort());
@@ -332,7 +332,7 @@ describe('Plugin Hook integration', () => {
     const filePath = path.join(tempDir, 'note.md');
     await fs.writeFile(filePath, '# Hello');
     const created = await resourceService.create({
-      type: 'note', path: filePath, name: 'soft-test'
+      type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'soft-test'
     });
 
     let seenPayload = null;
@@ -367,7 +367,7 @@ describe('Plugin Hook integration', () => {
     });
 
     const result = await resourceService.create({
-      type: 'note', path: filePath, name: 'empty-meta'
+      type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'empty-meta'
     });
     expect(result.rid).toMatch(/^res_/);
   });
@@ -376,8 +376,8 @@ describe('Plugin Hook integration', () => {
   test('beforeResourceUpdate hook 可改写 rid 重定向更新', async () => {
     const f1 = path.join(tempDir, 'a.md'); await fs.writeFile(f1, '# A');
     const f2 = path.join(tempDir, 'b.md'); await fs.writeFile(f2, '# B');
-    const a = await resourceService.create({ type: 'note', path: f1, name: 'rid-a' });
-    const b = await resourceService.create({ type: 'note', path: f2, name: 'rid-b' });
+    const a = await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, f1), name: 'rid-a' });
+    const b = await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, f2), name: 'rid-b' });
 
     // hook 把对 a 的更新重定向到 b
     hookManager.register('beforeResourceUpdate', async (payload) => {
@@ -416,7 +416,7 @@ describe('Plugin Hook integration', () => {
     const filePath = path.join(tempDir, 'note.md');
     await fs.writeFile(filePath, '# Hello');
     const created = await resourceService.create({
-      type: 'note', path: filePath, name: 'override-test'
+      type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'override-test'
     });
 
     // hook 返回的 updates 只含 type，不含 metadata

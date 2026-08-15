@@ -12,7 +12,8 @@ describe('resource.create handler', () => {
 
       const result = await handler.execute(ctx, {
         type: 'note',
-        path: '/repo/resources/a.md',
+        location_kind: 'local',
+        location: 'resources/a.md',
         name: 'a',
         metadata: { title: 'A' },
         capabilities: ['container'],
@@ -21,7 +22,8 @@ describe('resource.create handler', () => {
 
       expect(create).toHaveBeenCalledWith({
         type: 'note',
-        path: '/repo/resources/a.md',
+        location_kind: 'local',
+        location: 'resources/a.md',
         metadata: { title: 'A' },
         name: 'a',
         capabilities: ['container'],
@@ -32,11 +34,12 @@ describe('resource.create handler', () => {
 
     test('provides empty defaults for omitted fields', async () => {
       const create = jest.fn().mockResolvedValue({ rid: 'r1' });
-      await handler.execute({ resourceService: { create } }, { type: 'note', path: '/x' });
+      await handler.execute({ resourceService: { create } }, { type: 'note' });
 
       expect(create).toHaveBeenCalledWith({
         type: 'note',
-        path: '/x',
+        location_kind: 'virtual',
+        location: '',
         metadata: {},
         name: undefined,
         capabilities: [],
@@ -47,7 +50,7 @@ describe('resource.create handler', () => {
     test('propagates service errors', async () => {
       const create = jest.fn().mockRejectedValue(new Error('db down'));
       await expect(
-        handler.execute({ resourceService: { create } }, { type: 'note', path: '/x' }),
+        handler.execute({ resourceService: { create } }, { type: 'note' }),
       ).rejects.toThrow('db down');
     });
   });

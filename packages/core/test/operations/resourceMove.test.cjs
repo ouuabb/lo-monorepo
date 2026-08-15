@@ -7,8 +7,8 @@ describe('resource.move handler', () => {
 
   describe('execute', () => {
     test('captures old path and delegates to resourceService.move', async () => {
-      const db = { get: jest.fn().mockResolvedValue({ path: '/repo/a.md' }) };
-      const move = jest.fn().mockResolvedValue({ rid: 'r1', path: '/repo/b.md' });
+      const db = { get: jest.fn().mockResolvedValue({ location_kind: 'local', location: 'resources/a.md' }) };
+      const move = jest.fn().mockResolvedValue({ rid: 'r1', location: 'resources/b.md' });
 
       const result = await handler.execute(
         { db, resourceService: { move } },
@@ -16,11 +16,11 @@ describe('resource.move handler', () => {
       );
 
       expect(db.get).toHaveBeenCalledWith(
-        'SELECT path FROM resources WHERE rid = ? AND deleted = 0',
+        'SELECT location_kind, location FROM resources WHERE rid = ? AND deleted = 0',
         ['r1'],
       );
       expect(move).toHaveBeenCalledWith('r1', '/repo/b.md');
-      expect(result).toMatchObject({ rid: 'r1', oldPath: '/repo/a.md', path: '/repo/b.md' });
+      expect(result).toMatchObject({ rid: 'r1', oldPath: 'resources/a.md' });
     });
 
     test('throws when resource missing', async () => {
@@ -31,7 +31,7 @@ describe('resource.move handler', () => {
     });
 
     test('propagates service errors', async () => {
-      const db = { get: jest.fn().mockResolvedValue({ path: '/a.md' }) };
+      const db = { get: jest.fn().mockResolvedValue({ location_kind: 'local', location: 'a.md' }) };
       const move = jest.fn().mockRejectedValue(new Error('no fs'));
       await expect(
         handler.execute({ db, resourceService: { move } }, { rid: 'r1', newPath: '/b.md' }),

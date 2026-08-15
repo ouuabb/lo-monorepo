@@ -6,7 +6,7 @@ describe('Repository', () => {
   let tempDir;
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(require('os').tmpdir(), 'lo-test-repo-'));
+    tempDir = await testUtils.createTempRepo();
   });
 
   afterEach(async () => {
@@ -335,10 +335,11 @@ describe('Repository', () => {
     const resource = await repo.createResource('note', 'content', { filename: 'move.md' });
     const newPath = path.join(tempDir, 'resources', 'moved.md');
     const moved = await repo.moveResource(resource.rid, newPath);
+    const oldAbs = path.join(tempDir, resource.location);
 
-    expect(moved.path).toBe(newPath);
+    expect(moved.location).toBe(path.relative(tempDir, newPath));
     expect(await fs.pathExists(newPath)).toBe(true);
-    expect(await fs.pathExists(resource.path)).toBe(false);
+    expect(await fs.pathExists(oldAbs)).toBe(false);
 
     await repo.close();
   });
@@ -659,11 +660,12 @@ describe('Repository', () => {
     await repo.open({ skipAuth: true });
 
     const res = await repo.createResource('note', 'content', { filename: 'unique-name.md' });
+    const resAbs = path.join(tempDir, res.location);
 
     expect((await repo.resolveResource(res.rid)).rid).toBe(res.rid);
     expect((await repo.resolveResource('unique-name')).rid).toBe(res.rid);
-    expect((await repo.resolveResource(res.path)).rid).toBe(res.rid);
-    expect((await repo.resolveResource(res.path))).toBeDefined();
+    expect((await repo.resolveResource(resAbs)).rid).toBe(res.rid);
+    expect((await repo.resolveResource(resAbs))).toBeDefined();
     expect(await repo.resolveResource('')).toBeNull();
 
     const absName = path.join(tempDir, 'resources', 'unique-name.md');

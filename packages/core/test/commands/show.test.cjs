@@ -78,8 +78,8 @@ describe('show command', () => {
     const encPath = path.join(ctx.dir, 'encrypted.md');
     await fs.writeFile(encPath, CryptoUtils.encryptFile(Buffer.from('secret', 'utf-8'), key));
     await repo.db.run(
-      'INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      ['res_encrypted', 'encrypted', 0, 'note', encPath, 'h', '{}', 1, Date.now(), Date.now()]
+      'INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      ['res_encrypted', 'encrypted', 0, 'note', 'local', encPath, 'h', '{}', 1, Date.now(), Date.now()]
     );
     const text = await runWithCapture({ rid: 'res_encrypted' });
     expect(text).toContain('查看资源失败');
@@ -93,8 +93,8 @@ describe('show command', () => {
     const encPath = path.join(ctx.dir, 'locked.md');
     await fs.writeFile(encPath, CryptoUtils.encryptFile(Buffer.from('DECRYPTED CONTENT', 'utf-8'), key));
     await repo.db.run(
-      'INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      ['res_locked', 'locked', 0, 'note', encPath, 'h', '{}', 1, Date.now(), Date.now()]
+      'INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      ['res_locked', 'locked', 0, 'note', 'local', encPath, 'h', '{}', 1, Date.now(), Date.now()]
     );
     const text = await runWithCapture({ rid: 'res_locked' });
     expect(text).toContain('DECRYPTED CONTENT');

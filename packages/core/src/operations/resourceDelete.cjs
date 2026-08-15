@@ -23,7 +23,7 @@ module.exports = {
   async execute(ctx, params) {
     const { rid } = params;
     const before = await ctx.db.get(
-      'SELECT name, path, hash, metadata, type, layer, container_schema FROM resources WHERE rid = ? AND deleted = 0',
+      'SELECT name, location_kind, location, hash, metadata, type, layer, container_schema FROM resources WHERE rid = ? AND deleted = 0',
       [rid],
     );
     if (!before) throw new Error(`资源不存在或已删除: ${rid}`);

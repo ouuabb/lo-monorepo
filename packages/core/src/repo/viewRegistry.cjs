@@ -79,7 +79,8 @@ const GENERIC_FIELDS = new Set([
   "updated",
   "tags",
   "type",
-  "path",
+  "location",
+  "location_kind",
 ]);
 
 class ViewRegistry {
@@ -902,7 +903,8 @@ class ViewRegistry {
         rid: row.rid,
         name: row.name,
         type: row.type,
-        path: row.path,
+        location_kind: row.location_kind,
+        location: row.location,
         metadata:
           typeof row.metadata === "string"
             ? JSON.parse(row.metadata)
@@ -994,8 +996,10 @@ class ViewRegistry {
         return (row.metadata && row.metadata.title) || row.name;
       case "type":
         return row.type;
-      case "path":
-        return row.path;
+      case "location":
+        return row.location;
+      case "location_kind":
+        return row.location_kind;
       case "tags":
         return row.tags;
       case "created":

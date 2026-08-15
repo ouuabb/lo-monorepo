@@ -30,8 +30,10 @@ afterEach(async () => {
 global.testUtils = {
   async createTempRepo() {
     const tempDir = await fs.mkdtemp(path.join(require('os').tmpdir(), 'lo-test-'));
-    const repoDir = path.join(tempDir, '.repo');
-    await fs.ensureDir(repoDir);
+    // 完整初始化仓库（含 .repo/metadata.json 与 Identity），供 open() 校验通过
+    const Repository = require('../src/repo/repository.cjs');
+    const repo = await Repository.create(tempDir);
+    await repo.close();
     return tempDir;
   },
 

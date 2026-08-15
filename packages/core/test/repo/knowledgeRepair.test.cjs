@@ -23,9 +23,9 @@ describe('KnowledgeRepair', () => {
   async function addResource(rid, name) {
     const now = Date.now();
     await db.run(
-      `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-       VALUES (?, ?, 0, 'note', ?, '', '{}', 0, ?, ?, 0)`,
-      [rid, name, `/${rid}`, now, now]
+      `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+       VALUES (?, ?, 0, 'note', ?, ?, '', '{}', 0, ?, ?, 0)`,
+      [rid, name, 'local', `/${rid}`, now, now]
     );
   }
 

@@ -21,7 +21,7 @@ module.exports = {
   async execute(ctx, params) {
     const { rid, newPath } = params;
     const before = await ctx.db.get(
-      'SELECT path FROM resources WHERE rid = ? AND deleted = 0',
+      'SELECT location_kind, location FROM resources WHERE rid = ? AND deleted = 0',
       [rid],
     );
     if (!before) throw new Error(`资源不存在或已删除: ${rid}`);
@@ -31,7 +31,7 @@ module.exports = {
     return {
       ...result,
       rid,
-      oldPath: before.path,
+      oldPath: before.location,
     };
   },
 

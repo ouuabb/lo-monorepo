@@ -55,8 +55,8 @@ describe('Database', () => {
       const db = new Database(tempDir);
       await db.init();
       const result = await db.run(
-        'INSERT INTO resources (rid, name, layer, type, path, created, updated) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        ['res_1', 'note-1', 0, 'note', '/a.md', 1, 1]
+        'INSERT INTO resources (rid, name, layer, type, location_kind, location, created, updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        ['res_1',                                       'note-1',                                       0,                                       'note', 'local',                                       '/a.md',                                       1,                                       1]
       );
       expect(result.lastID).toBeGreaterThan(0);
       expect(result.changes).toBe(1);
@@ -102,8 +102,8 @@ describe('Database', () => {
     test('all should return all matching rows', async () => {
       const db = new Database(tempDir);
       await db.init();
-      await db.run('INSERT INTO resources (rid, name, layer, type, path, created, updated) VALUES (?, ?, 0, ?, ?, 1, 1)', ['res_a', 'a', 'note', '/a.md']);
-      await db.run('INSERT INTO resources (rid, name, layer, type, path, created, updated) VALUES (?, ?, 0, ?, ?, 1, 1)', ['res_b', 'b', 'note', '/b.md']);
+      await db.run('INSERT INTO resources (rid, name, layer, type, location_kind, location, created, updated) VALUES (?, ?, 0, ?, ?, ?, 1, 1)', ['res_a', 'a', 'note', 'local', '/a.md']);
+      await db.run('INSERT INTO resources (rid, name, layer, type, location_kind, location, created, updated) VALUES (?, ?, 0, ?, ?, ?, 1, 1)', ['res_b', 'b', 'note', 'local', '/b.md']);
       const rows = await db.all('SELECT rid FROM resources WHERE type = ? ORDER BY rid', ['note']);
       expect(rows.map(r => r.rid)).toEqual(['res_a', 'res_b']);
       await db.close();

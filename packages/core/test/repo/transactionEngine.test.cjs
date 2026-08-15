@@ -19,8 +19,8 @@ describe('TransactionEngine', () => {
     };
     txEngine = new TransactionEngine(db, opEngine);
     await db.run(
-      `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-       VALUES ('other', 'other', 0, 'container', '/other', '', '{}', 0, ?, ?, 0)`,
+      `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+       VALUES ('other', 'other', 0, 'container', 'local', '/other', '', '{}', 0, ?, ?, 0)`,
       [Date.now(), Date.now()]
     );
   });

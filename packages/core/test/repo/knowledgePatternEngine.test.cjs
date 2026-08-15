@@ -35,9 +35,9 @@ describe('KnowledgePatternEngine', () => {
   async function addResource(rid, type) {
     const now = Date.now();
     await db.run(
-      `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-       VALUES (?, ?, 0, ?, ?, '', '{}', 0, ?, ?, 0)`,
-      [rid, rid, type, `/${rid}`, now, now]
+      `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+       VALUES (?, ?, 0, ?, ?, ?, '', '{}', 0, ?, ?, 0)`,
+      [rid, rid, type, 'local', `/${rid}`, now, now]
     );
   }
 

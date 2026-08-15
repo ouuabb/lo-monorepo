@@ -205,8 +205,8 @@ class SyncOpsEngine {
             { lenient: true, resourceType: data.type },
           );
           await this.db.run(
-            `INSERT OR IGNORE INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+            `INSERT OR IGNORE INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
             [
               rid,
               data.name ||
@@ -217,7 +217,8 @@ class SyncOpsEngine {
                   : data.name || rid),
               data.layer || 0,
               data.type,
-              absPath,
+              hasFile ? "local" : "virtual",
+              hasFile ? data.path : "",
               data.hash,
               JSON.stringify(validatedMeta),
               data.encrypted ? 1 : 0,
@@ -278,13 +279,14 @@ class SyncOpsEngine {
               { lenient: true, resourceType: local.type },
             );
             await this.db.run(
-              `INSERT OR REPLACE INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+              `INSERT OR REPLACE INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
               [
                 `${rid}_conflict_${Date.now()}`,
                 resourceName,
                 0,
                 local.type,
+                "local",
                 conflictPath,
                 local.hash,
                 JSON.stringify(conflictMeta),
@@ -323,13 +325,14 @@ class SyncOpsEngine {
           );
 
           await this.db.run(
-            `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+            `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
             [
               stackRid,
               resourceName,
               targetLayer,
               local.type || data.type || "note",
+              "local",
               remotePath,
               data.new_hash || data.hash,
               JSON.stringify(stackedMeta),
@@ -404,8 +407,9 @@ class SyncOpsEngine {
       }
 
       case OP_TYPES.RESOURCE_MOVED: {
+        // data.new_path 为仓库内相对路径（recordOp 时相对化）
         await this.db.run(
-          `UPDATE resources SET path = ?, updated = ? WHERE rid = ? AND deleted = 0`,
+          `UPDATE resources SET location_kind = 'local', location = ?, updated = ? WHERE rid = ? AND deleted = 0`,
           [data.new_path, opTimestamp, rid],
         );
         break;

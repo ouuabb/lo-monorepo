@@ -64,7 +64,7 @@ class StagingArea {
     // 检测已删除的文件
     const allResources = await repository.resourceService.getAll();
     for (const resource of allResources) {
-      const absPath = path.resolve(this.repoPath, resource.path);
+      const absPath = resource.location_kind === 'local' ? path.join(this.repoPath, resource.location) : '';
       if (!absPath.startsWith(this.repoPath + path.sep) && absPath !== this.repoPath) continue;
       if (!await fs.pathExists(absPath)) {
         const relPath = this._relative(absPath);
@@ -208,7 +208,7 @@ class StagingArea {
       if (await fs.pathExists(absPath)) {
         const resource = await repository.resourceService.importFile(absPath);
         if (syncOps && resource) {
-          const relResourcePath = path.relative(repository.repoPath, resource.path);
+          const relResourcePath = (resource.location_kind === 'local' ? resource.location : '');
           await syncOps.recordOp(SyncOpsEngine.OP_TYPES.RESOURCE_CREATED, resource.rid, {
             name: resource.name, layer: resource.layer || 0, type: resource.type,
             path: relResourcePath, hash: resource.hash, metadata: resource.metadata,
@@ -227,7 +227,7 @@ class StagingArea {
           const oldHash = existing.hash;
           const refreshed = await repository.resourceService.refresh(existing.rid);
           if (syncOps) {
-            const relResourcePath = path.relative(repository.repoPath, existing.path);
+            const relResourcePath = (existing.location_kind === 'local' ? existing.location : '');
             await syncOps.recordOp(SyncOpsEngine.OP_TYPES.RESOURCE_UPDATED, existing.rid, {
               path: relResourcePath, old_hash: oldHash, new_hash: refreshed.hash, metadata: refreshed.metadata
             });
@@ -236,7 +236,7 @@ class StagingArea {
         } else {
           const resource = await repository.resourceService.importFile(absPath);
           if (syncOps && resource) {
-            const relResourcePath = path.relative(repository.repoPath, resource.path);
+            const relResourcePath = (resource.location_kind === 'local' ? resource.location : '');
             await syncOps.recordOp(SyncOpsEngine.OP_TYPES.RESOURCE_CREATED, resource.rid, {
               name: resource.name, layer: resource.layer || 0, type: resource.type,
               path: relResourcePath, hash: resource.hash, metadata: resource.metadata,
@@ -255,7 +255,7 @@ class StagingArea {
         await repository.resourceService.delete(existing.rid, true);
         if (syncOps) {
           await syncOps.recordOp(SyncOpsEngine.OP_TYPES.RESOURCE_DELETED, existing.rid, {
-            path: path.relative(repository.repoPath, existing.path), type: existing.type, hash: existing.hash
+            path: (existing.location_kind === 'local' ? existing.location : ''), type: existing.type, hash: existing.hash
           });
         }
         results.deleted++;
@@ -287,7 +287,7 @@ class StagingArea {
           if (syncOps) {
             const refreshed = await repository.resourceService.getByRid(meta.rid);
             await syncOps.recordOp(SyncOpsEngine.OP_TYPES.RESOURCE_UPDATED, meta.rid, {
-              path: path.relative(repository.repoPath, resource.path),
+              path: (resource.location_kind === 'local' ? resource.location : ''),
               old_hash: resource.hash, new_hash: refreshed.hash, metadata: refreshed.metadata
             });
           }

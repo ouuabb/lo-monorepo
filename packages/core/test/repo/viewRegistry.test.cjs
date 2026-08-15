@@ -30,7 +30,7 @@ describe('ViewRegistry', () => {
     await db.init();
     schemaRegistry = new SchemaRegistry(db);
     registry = new ViewRegistry(db, { getSchemaRegistry: () => schemaRegistry });
-    resourceService = new ResourceService(db, { getSchemaRegistry: () => schemaRegistry });
+    resourceService = new ResourceService(db, { repoPath: tempDir, getSchemaRegistry: () => schemaRegistry });
     relationService = new RelationService(db);
   });
 

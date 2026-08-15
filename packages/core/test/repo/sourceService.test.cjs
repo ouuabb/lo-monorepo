@@ -24,9 +24,9 @@ describe('SourceService', () => {
   async function seedResource(rid) {
     const now = Date.now();
     await db.run(
-      `INSERT INTO resources (rid, name, layer, type, path, hash, created, updated, deleted)
-       VALUES (?, ?, 0, 'note', ?, NULL, ?, ?, 0)`,
-      [rid, rid, `/virtual/${  rid}`, now, now]
+      `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, created, updated, deleted)
+       VALUES (?, ?, 0, 'note', ?, ?, NULL, ?, ?, ?)`,
+      [rid, rid, 'local', `/virtual/${rid}`, now, now]
     );
   }
 

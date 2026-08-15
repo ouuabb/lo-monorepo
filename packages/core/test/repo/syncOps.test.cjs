@@ -246,10 +246,10 @@ describe('SyncOpsEngine', () => {
       const now = Date.now();
       // Insert an existing resource
       await db.run(
-        `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        ['res_update', 'test-update', 0, 'note', '/tmp/test.md', 'oldhash123',
-         '{}', 0, now - 10000, now - 10000]
+        `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        ['res_update',  'test-update',  0,  'note', 'local',  '/tmp/test.md',  'oldhash123', 
+         '{}',  0,  now - 10000,  now - 10000]
       );
 
       const op = {
@@ -283,10 +283,10 @@ describe('SyncOpsEngine', () => {
       await fs.writeFile(filePath, '# Delete me');
 
       await db.run(
-        `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        ['res_delete', 'to-delete', 0, 'note', filePath, 'hash_del',
-         '{}', 0, now - 20000, now - 20000]
+        `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        ['res_delete',  'to-delete',  0,  'note', 'local',  filePath,  'hash_del', 
+         '{}',  0,  now - 20000,  now - 20000]
       );
 
       const op = {
@@ -315,10 +315,10 @@ describe('SyncOpsEngine', () => {
     test('should update resource path', async () => {
       const now = Date.now();
       await db.run(
-        `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        ['res_move', 'move-me', 0, 'note', '/old/path/move-me.md', 'hash_move',
-         '{}', 0, now - 10000, now - 10000]
+        `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        ['res_move',  'move-me',  0,  'note', 'local',  '/old/path/move-me.md',  'hash_move', 
+         '{}',  0,  now - 10000,  now - 10000]
       );
 
       const op = {
@@ -336,7 +336,7 @@ describe('SyncOpsEngine', () => {
       expect(result.applied).toBe(1);
 
       const resource = await db.get('SELECT * FROM resources WHERE rid = ?', ['res_move']);
-      expect(resource.path).toBe('/new/path/move-me.md');
+      expect(resource.location).toBe('/new/path/move-me.md');
       expect(resource.updated).toBe(now);
     });
   });
@@ -445,10 +445,10 @@ describe('SyncOpsEngine', () => {
       const now = Date.now();
       // Insert a local resource that has a different hash and was updated more recently
       await db.run(
-        `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        ['res_conflict', 'conflict-file', 0, 'note', '/tmp/conflict.md', 'local_hash_newer',
-         '{}', 0, now - 50000, now - 1000] // local updated is very recent
+        `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        ['res_conflict',  'conflict-file',  0,  'note', 'local',  '/tmp/conflict.md',  'local_hash_newer', 
+         '{}',  0,  now - 50000,  now - 1000] // local updated is very recent
       );
 
       // Pre-fill stack layers 1-19 to force the .conflict fallback path
@@ -457,10 +457,10 @@ describe('SyncOpsEngine', () => {
       //  which are valid)
       for (let i = 1; i < 20; i++) {
         await db.run(
-          `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-          [`res_conflict_stack_${  i}`, 'conflict-file', i, 'note', '/tmp/conflict_stack.md', 'hash_stack',
-           '{}', 0, now - 50000, now - 50000]
+          `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+          [`res_conflict_stack_${  i}`,  'conflict-file',  i,  'note', 'local',  '/tmp/conflict_stack.md',  'hash_stack', 
+           '{}',  0,  now - 50000,  now - 50000]
         );
       }
 
@@ -511,10 +511,10 @@ describe('SyncOpsEngine', () => {
       await fs.writeFile(filePath, '# Keep me');
 
       await db.run(
-        `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        ['res_keep', 'keep-me', 0, 'note', filePath, 'local_hash',
-         '{}', 0, now - 20000, now - 500] // local updated is recent
+        `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        ['res_keep',  'keep-me',  0,  'note', 'local',  filePath,  'local_hash', 
+         '{}',  0,  now - 20000,  now - 500] // local updated is recent
       );
 
       const op = {
@@ -550,10 +550,10 @@ describe('SyncOpsEngine', () => {
       await fs.writeFile(filePath, '# Delete me');
 
       await db.run(
-        `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        ['res_del_ok', 'delete-me', 0, 'note', filePath, 'hash_del',
-         '{}', 0, now - 20000, now - 15000] // local is older than remote
+        `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        ['res_del_ok',  'delete-me',  0,  'note', 'local',  filePath,  'hash_del', 
+         '{}',  0,  now - 20000,  now - 15000] // local is older than remote
       );
 
       const op = {

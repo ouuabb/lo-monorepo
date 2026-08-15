@@ -51,16 +51,16 @@ describe('SyncEngine', () => {
       // Insert some test resources into the source DB
       const now = Date.now();
       await sourceDb.run(
-        `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        ['res_source_1', 'source-note-1', 0, 'note', '/src/note1.md', 'hash_src_1',
-         '{}', 0, now - 5000, now - 5000]
+        `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        ['res_source_1',  'source-note-1',  0,  'note', 'local',  '/src/note1.md',  'hash_src_1', 
+         '{}',  0,  now - 5000,  now - 5000]
       );
       await sourceDb.run(
-        `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        ['res_source_2', 'source-note-2', 0, 'note', '/src/note2.md', 'hash_src_2',
-         '{}', 0, now - 4000, now - 4000]
+        `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        ['res_source_2',  'source-note-2',  0,  'note', 'local',  '/src/note2.md',  'hash_src_2', 
+         '{}',  0,  now - 4000,  now - 4000]
       );
     });
 
@@ -116,10 +116,10 @@ describe('SyncEngine', () => {
 
       const now = Date.now();
       await sourceDb.run(
-        `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        ['res_conflict_1', 'conflict-note', 0, 'note', '/src/conflict.md', 'hash_v2',
-         '{}', 0, now - 5000, now - 5000]
+        `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        ['res_conflict_1',  'conflict-note',  0,  'note', 'local',  '/src/conflict.md',  'hash_v2', 
+         '{}',  0,  now - 5000,  now - 5000]
       );
 
       // Pre-populate the target with the same remote resource but different hash
@@ -170,10 +170,10 @@ describe('SyncEngine', () => {
 
       const now = Date.now();
       await sourceDb.run(
-        `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        ['res_unchanged', 'unchanged-note', 0, 'note', '/src/unchanged.md', 'same_hash',
-         '{}', 0, now - 5000, now - 5000]
+        `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        ['res_unchanged',  'unchanged-note',  0,  'note', 'local',  '/src/unchanged.md',  'same_hash', 
+         '{}',  0,  now - 5000,  now - 5000]
       );
 
       // Pre-populate the target with the same remote resource with same hash

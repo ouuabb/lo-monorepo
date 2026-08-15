@@ -61,7 +61,13 @@ module.exports = async function newResource(argv) {
     if (shouldEncrypt && cryptoKey && encrypt === true) {
       // 显式 --encrypt：强制加密该文件
       await CryptoUtils.writeEncryptedFile(filePath, Buffer.from(content, 'utf-8'), cryptoKey);
-      resource = await repo.resourceService.create({ type, path: filePath, metadata });
+      const loc = repo.resourceService.locationFromPath(filePath);
+      resource = await repo.resourceService.create({
+        type,
+        location_kind: loc.kind,
+        location: loc.value,
+        metadata,
+      });
       await repo.db.run('UPDATE resources SET encrypted = 1 WHERE rid = ?', [resource.rid]);
     } else {
       if (encrypt && !cryptoKey) {

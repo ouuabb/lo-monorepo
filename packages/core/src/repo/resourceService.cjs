@@ -9,6 +9,7 @@ class ResourceService {
   /**
    * @param {import('./database.cjs')} db
    * @param {{
+   *   repoPath?: string,
    *   getCryptoKey?: () => Buffer|null,
    *   isEncryptByDefault?: () => boolean,
    *   getHookManager?: () => import('../plugin/hookManager.cjs')|null,
@@ -18,6 +19,8 @@ class ResourceService {
    */
   constructor(db, options = {}) {
     this.db = db;
+    /** 仓库根路径（Resource Location 解析基准：local 相对此路径） */
+    this.repoPath = options.repoPath || process.cwd();
     /** 懒加载加密密钥获取函数（仅内存中存在） */
     this._getCryptoKey = options.getCryptoKey || null;
     /** 是否默认加密新文件（从仓库配置读取） */
@@ -28,6 +31,30 @@ class ResourceService {
     this._getExtensionRegistry = options.getExtensionRegistry || (() => null);
     /** 懒加载 SchemaRegistry 获取函数 */
     this._getSchemaRegistry = options.getSchemaRegistry || (() => null);
+
+    /**
+     * 绝对路径 → Resource Location（kind 判定唯一规则）
+     * @param {string} absPath
+     * @returns {{ kind: 'local'|'external', value: string }}
+     */
+    this.locationFromPath = (absPath) => {
+      const rel = path.relative(this.repoPath, absPath);
+      if (rel && !rel.startsWith("..") && !path.isAbsolute(rel)) {
+        return { kind: "local", value: rel };
+      }
+      return { kind: "external", value: absPath };
+    };
+
+    /**
+     * Resource Location → 当前绝对路径（Core 唯一解析规则；virtual 返回 null）
+     * @param {{ kind?: string, value?: string }|null} loc
+     * @returns {string|null}
+     */
+    this.resolveLocation = (loc) => {
+      if (!loc || loc.kind === "virtual" || !loc.value) return null;
+      if (loc.kind === "external") return loc.value;
+      return path.join(this.repoPath, loc.value);
+    };
   }
 
   /**
@@ -135,7 +162,8 @@ class ResourceService {
    * 创建资源（入库）
    * @param {object} resource
    * @param {string} resource.type - 资源类型
-   * @param {string} resource.path - 文件路径
+   * @param {string} resource.location_kind - 'local' | 'external' | 'virtual'
+   * @param {string} resource.location - local: 相对 Repository.currentPath；external: 绝对；virtual: ''
    * @param {string} [resource.rid] - 预生成的 RID（可选，不提供则自动生成）
    * @param {string} resource.name - 资源逻辑名称（全局唯一）
    * @param {object} [resource.metadata] - 元数据
@@ -146,7 +174,8 @@ class ResourceService {
   async create(resource) {
     const {
       type,
-      path: filePath,
+      location_kind,
+      location,
       metadata: callerMeta = {},
       rid: preRid,
       capabilities = [],
@@ -160,7 +189,8 @@ class ResourceService {
     const beforePayload = await this._runBefore("beforeResourceCreate", {
       resource: {
         type,
-        path: filePath,
+        location_kind,
+        location,
         name,
         metadata: callerMeta,
         rid: preRid,
@@ -173,7 +203,10 @@ class ResourceService {
     const pick = (k, fallback) =>
       hookRes[k] !== undefined ? hookRes[k] : fallback;
     const finalType = pick("type", type);
-    let finalPath = pick("path", filePath);
+    const finalLocation = {
+      kind: pick("location_kind", location_kind) || "virtual",
+      value: pick("location", location) || "",
+    };
     const finalRid = pick("rid", preRid);
     const finalCapabilities = pick("capabilities", capabilities);
     const finalContainerSchema = pick("container_schema", container_schema);
@@ -181,11 +214,13 @@ class ResourceService {
     const finalMeta = { ...callerMeta, ...(hookRes.metadata || {}) };
     // name 保留在 scope 中，在后续自动推导逻辑里再 pick 一次
     let finalName = pick("name", name);
+    // 当前绝对路径（仅当有文件时可用；virtual 为 null）
+    const absPath = this.resolveLocation(finalLocation);
 
     if (!finalName) {
-      if (finalPath && typeof finalPath === "string") {
+      if (absPath) {
         // 自动推导 name：从文件路径提取
-        const basename = path.basename(finalPath, path.extname(finalPath));
+        const basename = path.basename(absPath, path.extname(absPath));
         finalName = basename
           .replace(/^\d{4}-\d{2}-\d{2}-/, "")
           .replace(/-[a-f0-9]{8}$/, "");
@@ -216,16 +251,12 @@ class ResourceService {
     }
 
     // 无文件资源（虚拟资源，如翻译记录、浏览历史等）跳过文件操作
-    // 参考 1.md §6："资源可能没有文件"
-    const hasFile =
-      finalPath && typeof finalPath === "string" && finalPath.length > 0;
-    // resources.path 列有 NOT NULL 约束，无文件时用空字符串占位
-    if (!hasFile) finalPath = "";
+    const hasFile = absPath != null && absPath.length > 0;
 
     // 自动提取元数据（title, wordCount, size, mtime），调用方传入的优先级更高
     // ── 扩展点: resourceTypes.<type>.extractMetadata ──
     const extracted = hasFile
-      ? await this._extractMetadata(finalPath, finalType)
+      ? await this._extractMetadata(absPath, finalType)
       : {};
 
     // ── Schema 解析（先于 metadata 校验）──
@@ -281,12 +312,12 @@ class ResourceService {
     let contentBuffer = null;
 
     if (hasFile) {
-      // 检查 path 是否是目录（Container Resource 等场景）
-      const stats = await fs.stat(finalPath);
+      // 检查 location 指向的文件是否是目录（Container Resource 等场景）
+      const stats = await fs.stat(absPath);
       isDirectory = stats.isDirectory();
 
       if (!isDirectory) {
-        contentBuffer = await fs.readFile(finalPath);
+        contentBuffer = await fs.readFile(absPath);
         const CryptoUtils = require("../utils/crypto.cjs");
 
         // 检测是否为已加密文件
@@ -298,7 +329,7 @@ class ResourceService {
         if (alreadyEncrypted) {
           if (!this._cryptoKey) {
             throw new Error(
-              `文件已加密但无法获取解密密钥: ${finalPath}。请确保已通过 SSH 认证。`,
+              `文件已加密但无法获取解密密钥: ${absPath}。请确保已通过 SSH 认证。`,
             );
           }
           const plaintext = CryptoUtils.decryptFile(
@@ -311,7 +342,7 @@ class ResourceService {
           // 仅在全仓库加密模式下才自动加密未加密文件
           if (this._cryptoKey && this._isEncryptByDefault()) {
             await CryptoUtils.writeEncryptedFile(
-              finalPath,
+              absPath,
               contentBuffer,
               this._cryptoKey,
             );
@@ -334,15 +365,16 @@ class ResourceService {
     try {
       await this.db.run(
         `
-        INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, container_schema, created, updated)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, container_schema, created, updated)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
         [
           rid,
           finalName,
           layer,
           finalType,
-          finalPath,
+          finalLocation.kind,
+          finalLocation.value,
           plainHash,
           JSON.stringify(cleanMeta),
           encrypted ? 1 : 0,
@@ -398,7 +430,8 @@ class ResourceService {
       name: finalName,
       layer,
       type: finalType,
-      path: finalPath,
+      location_kind: finalLocation.kind,
+      location: finalLocation.value,
       hash: plainHash,
       metadata,
       encrypted,
@@ -571,12 +604,17 @@ class ResourceService {
     return { rid, removed: true };
   }
 
+  /**
+   * 按本地绝对路径查找资源（路径 → Location 判定后匹配）
+   * @param {string} filePath — 本地绝对路径
+   */
   async getByPath(filePath) {
+    const loc = this.locationFromPath(filePath);
     const row = await this.db.get(
       `
-      SELECT * FROM resources WHERE path = ? AND deleted = 0
+      SELECT * FROM resources WHERE location_kind = ? AND location = ? AND deleted = 0
     `,
-      [filePath],
+      [loc.kind, loc.value],
     );
 
     if (!row) return null;
@@ -658,7 +696,10 @@ class ResourceService {
       throw new Error(`资源不存在: ${rid}`);
     }
 
-    const filePath = path.resolve(resource.path);
+    const filePath = this.resolveLocation({
+      kind: resource.location_kind,
+      value: resource.location,
+    });
     const rawContent =
       typeof content === "string" ? content : JSON.stringify(content);
 
@@ -712,8 +753,10 @@ class ResourceService {
           : (await this.getByRid(finalRid))?.type || undefined;
 
       if (fPath) {
-        sql += ", path = ?";
-        params.push(fPath);
+        // updates.path 语义保持"本地绝对路径"，内部转换为 Resource Location
+        const loc = this.locationFromPath(fPath);
+        sql += ", location_kind = ?, location = ?";
+        params.push(loc.kind, loc.value);
       }
       if (fHash) {
         sql += ", hash = ?";
@@ -915,9 +958,12 @@ class ResourceService {
 
     // 重名校验（交给 create 统一报错）
 
+    // 判定导入文件的 Location（仓库内 → local，仓库外 → external）
+    const loc = this.locationFromPath(filePath);
     return this.create({
       type: resourceType,
-      path: filePath,
+      location_kind: loc.kind,
+      location: loc.value,
       name,
       metadata,
       ...options,
@@ -930,7 +976,11 @@ class ResourceService {
       throw new Error("Resource not found");
     }
 
-    await fs.move(resource.path, newPath);
+    const fromAbs = this.resolveLocation({
+      kind: resource.location_kind,
+      value: resource.location,
+    });
+    await fs.move(fromAbs, newPath);
 
     return this.update(rid, { path: newPath });
   }
@@ -946,8 +996,12 @@ class ResourceService {
       throw new Error("Resource not found");
     }
 
+    const absPath = this.resolveLocation({
+      kind: resource.location_kind,
+      value: resource.location,
+    });
     // 读取文件内容并计算明文散列（加密文件需要先解密再散列）
-    const rawBuffer = await fs.readFile(resource.path);
+    const rawBuffer = await fs.readFile(absPath);
     const CryptoUtils = require("../utils/crypto.cjs");
 
     let plaintextBuffer;
@@ -958,7 +1012,7 @@ class ResourceService {
     if (isEncrypted) {
       if (!this._cryptoKey) {
         throw new Error(
-          `文件已加密但无法获取解密密钥: ${resource.path}。请确保已通过 SSH 认证。`,
+          `文件已加密但无法获取解密密钥: ${absPath}。请确保已通过 SSH 认证。`,
         );
       }
       plaintextBuffer = CryptoUtils.decryptFile(rawBuffer, this._cryptoKey);
@@ -981,9 +1035,13 @@ class ResourceService {
       throw new Error("Resource not found");
     }
 
-    const newMeta = await this._extractMetadata(resource.path, resource.type);
+    const absPath = this.resolveLocation({
+      kind: resource.location_kind,
+      value: resource.location,
+    });
+    const newMeta = await this._extractMetadata(absPath, resource.type);
 
-    const rawBuffer = await fs.readFile(resource.path);
+    const rawBuffer = await fs.readFile(absPath);
     const CryptoUtils = require("../utils/crypto.cjs");
     let plaintextBuffer;
     if (

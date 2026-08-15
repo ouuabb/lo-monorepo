@@ -54,7 +54,7 @@ class QueryEngine {
 
   async queryByPathPattern(pattern) {
     const rows = await this.db.all(`
-      SELECT * FROM resources WHERE deleted = 0 AND path LIKE ?
+      SELECT * FROM resources WHERE deleted = 0 AND location LIKE ?
     `, [`%${pattern}%`]);
     
     return rows.map(row => this._hydrate(row));
@@ -84,7 +84,7 @@ class QueryEngine {
       WHERE deleted = 0 AND (
         name LIKE '%${escaped}%' OR
         metadata LIKE '%${escaped}%' OR
-        path LIKE '%${escaped}%'
+        location LIKE '%${escaped}%'
       )
       ORDER BY created DESC
       LIMIT 20

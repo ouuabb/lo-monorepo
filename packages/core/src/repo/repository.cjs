@@ -108,14 +108,51 @@ class Repository {
     this._cryptoKey = null;
     /** @type {boolean} 是否默认加密新文件 */
     this._encryptByDefault = false;
+    /** @type {string|null} Repository Identity（逻辑仓库身份，open/init 时载入） */
+    this.repositoryId = null;
+    /** @type {number|null} 数据模型版本（metadata.schemaVersion） */
+    this.schemaVersion = null;
+  }
+
+  /**
+   * Repository Context：逻辑仓库身份 + 当前物理位置
+   * @returns {{ repositoryId: string, currentPath: string }}
+   */
+  getRepositoryContext() {
+    return {
+      repositoryId: this.repositoryId,
+      currentPath: this.repoPath,
+    };
+  }
+
+  /**
+   * reinitialize：重新生成 Repository Identity（副本独立化的显式途径）。
+   * lineage.origin 记录原 Identity；Resource/DB 数据不变；旧 metadata 备份。
+   * @returns {Promise<{ oldId: string|null, newId: string }>}
+   */
+  async reinitialize() {
+    const RepoMetadata = require("./repositoryMetadata.cjs");
+    const { oldId, newId } = await RepoMetadata.reinitializeMetadata(this.repoPath);
+    this.repositoryId = newId;
+    return { oldId, newId };
   }
 
   async init() {
+    // 初始化语义：确保 Repository metadata 存在（缺失则创建新 Identity）
+    const RepoMetadata = require("./repositoryMetadata.cjs");
+    let meta = await RepoMetadata.readMetadata(this.repoPath);
+    if (!meta || !RepoMetadata.validateMetadata(meta).ok) {
+      meta = await RepoMetadata.createMetadata(this.repoPath);
+    }
+    this.repositoryId = meta.repositoryId;
+    this.schemaVersion = meta.schemaVersion;
+
     this.db = new Database(this.repoPath);
     await this.db.init();
 
     this.schemaRegistry = new SchemaRegistry(this.db);
     this.resourceService = new ResourceService(this.db, {
+      repoPath: this.repoPath,
       getCryptoKey: () => this._cryptoKey,
       isEncryptByDefault: () => this._encryptByDefault,
       getHookManager: () =>
@@ -166,11 +203,24 @@ class Repository {
   }
 
   async open({ skipAuth = false } = {}) {
+    // 打开语义：metadata 必须存在且合法（开发期原则：缺失视为未完成迁移，拒绝打开）
+    const RepoMetadata = require("./repositoryMetadata.cjs");
+    const meta = await RepoMetadata.readMetadata(this.repoPath);
+    const check = RepoMetadata.validateMetadata(meta);
+    if (!check.ok) {
+      throw new Error(
+        `${check.message}（请确认这是已初始化的 lo Repository；如为未完成迁移的仓库，需重新初始化）`,
+      );
+    }
+    this.repositoryId = meta.repositoryId;
+    this.schemaVersion = meta.schemaVersion;
+
     this.db = new Database(this.repoPath);
     await this.db.init();
 
     this.schemaRegistry = new SchemaRegistry(this.db);
     this.resourceService = new ResourceService(this.db, {
+      repoPath: this.repoPath,
       getCryptoKey: () => this._cryptoKey,
       isEncryptByDefault: () => this._encryptByDefault,
       getHookManager: () =>
@@ -462,7 +512,8 @@ class Repository {
 
     // 记录操作日志
     if (this.syncOps && resource) {
-      const relPath = path.relative(this.repoPath, resource.path);
+      const relPath =
+        resource.location_kind === 'local' ? resource.location : '';
       await this.syncOps.recordOp(
         SyncOpsEngine.OP_TYPES.RESOURCE_CREATED,
         resource.rid,
@@ -539,15 +590,16 @@ class Repository {
     const ext = ResourceType.getExtensions(finalType)[0] || ".md";
     const name = filename || `${Date.now()}${ext}`;
     const filePath = path.join(this.repoPath, "resources", name);
+    const loc = this.resourceService.locationFromPath(filePath);
 
     await fs.ensureDir(path.dirname(filePath));
 
-    // 防覆盖：目标文件已存在，或该 path 已有活跃 layer-0 记录时，默认拒绝
-    // （覆盖是显式操作，需显式传 overwrite: true；name-stack 的 layer>0 版本共享 path，不受此约束）
+    // 防覆盖：目标文件已存在，或该 location 已有活跃 layer-0 记录时，默认拒绝
+    // （覆盖是显式操作，需显式传 overwrite: true；name-stack 的 layer>0 版本共享 location，不受此约束）
     const fileExists = await fs.pathExists(filePath);
     const ownerRow = await this.db.get(
-      "SELECT rid FROM resources WHERE path = ? AND deleted = 0 AND layer = 0",
-      [filePath],
+      "SELECT rid FROM resources WHERE location_kind = ? AND location = ? AND deleted = 0 AND layer = 0",
+      [loc.kind, loc.value],
     );
     const existing = ownerRow
       ? await this.resourceService.getByRid(ownerRow.rid)
@@ -604,7 +656,8 @@ class Repository {
 
     const { result } = await this.operationEngine.execute("resource.create", {
       type: finalType,
-      path: filePath,
+      location_kind: loc.kind,
+      location: loc.value,
       metadata: finalMeta,
       schema,
     });
@@ -1504,7 +1557,8 @@ class Repository {
         SyncOpsEngine.OP_TYPES.RESOURCE_UPDATED,
         rid,
         {
-          path: path.relative(this.repoPath, oldResource.path),
+          path:
+            oldResource.location_kind === 'local' ? oldResource.location : '',
           old_hash: oldResource.hash,
           new_hash: result.hash,
           metadata: result.metadata,
@@ -1531,7 +1585,8 @@ class Repository {
         SyncOpsEngine.OP_TYPES.RESOURCE_DELETED,
         rid,
         {
-          path: path.relative(this.repoPath, resource.path),
+          path:
+            resource.location_kind === 'local' ? resource.location : '',
           type: resource.type,
           hash: resource.hash,
         },
@@ -1551,7 +1606,8 @@ class Repository {
     // 记录操作日志
     if (this.syncOps && oldResource) {
       await this.syncOps.recordOp(SyncOpsEngine.OP_TYPES.RESOURCE_MOVED, rid, {
-        old_path: path.relative(this.repoPath, oldResource.path),
+        old_path:
+          oldResource.location_kind === 'local' ? oldResource.location : '',
         new_path: path.relative(this.repoPath, newPath),
       });
     }
@@ -3863,7 +3919,10 @@ class Repository {
 
     try {
       const content = await this.resourceService._readFile(
-        resource.path,
+        this.resourceService.resolveLocation({
+          kind: resource.location_kind,
+          value: resource.location,
+        }),
         "utf-8",
       );
 
@@ -3980,8 +4039,8 @@ class Repository {
     // 2. 尝试基于 source resource 的路径上下文解析
     //    notes/test.md 引用 ./assets/photo.png
     //    → 拼接为 notes/assets/photo.png → resolveResource
-    if (sourceResource && sourceResource.path) {
-      const sourceDir = sourceResource.path.replace(/[^/\\]*$/, "");
+    if (sourceResource && sourceResource.location_kind === 'local' && sourceResource.location) {
+      const sourceDir = sourceResource.location.replace(/[^/\\]*$/, "");
       const combinedPath = sourceDir + targetPath.replace(/^\.\/?/);
       const resource = await this.resolveResource(combinedPath);
       if (resource) return resource.rid;
@@ -4176,7 +4235,12 @@ class Repository {
     });
 
     const dbResources = await this.resourceService.getAll();
-    const dbByPath = new Map(dbResources.map((r) => [r.path, r]));
+    // 文件同步只覆盖仓库内（local）资源：key = 解析后的绝对路径
+    const dbByPath = new Map(
+      dbResources
+        .filter((r) => r.location_kind === 'local' && r.location)
+        .map((r) => [path.join(this.repoPath, r.location), r]),
+    );
 
     // 第一阶段：处理路径匹配的文件（刷新已存在的），收集"疑似新增"文件
     const newFileCandidates = [];
@@ -4242,9 +4306,12 @@ class Repository {
     }
 
     // 收集"疑似删除"的 DB 记录（路径在磁盘上不存在）
+    // 跳过无文件资源（virtual）与仓库外资源（external）——不属于文件同步范畴
     const deletedCandidates = [];
     for (const resource of dbResources) {
-      if (!(await fs.pathExists(resource.path))) {
+      if (resource.location_kind !== 'local' || !resource.location) continue;
+      const abs = path.join(this.repoPath, resource.location);
+      if (!(await fs.pathExists(abs))) {
         deletedCandidates.push(resource);
       }
     }
@@ -4265,6 +4332,10 @@ class Repository {
 
     const matchedNewPaths = new Set();
     for (const deletedResource of deletedCandidates) {
+      const deletedAbs = path.join(
+        this.repoPath,
+        deletedResource.location_kind === 'local' ? deletedResource.location : '',
+      );
       let matched = false;
       for (const [newFile, newHash] of newFileHashes) {
         if (matchedNewPaths.has(newFile)) continue;
@@ -4272,18 +4343,21 @@ class Repository {
           // 重命名：更新路径，RID 不变
           await this.resourceService.updatePath(deletedResource.rid, newFile);
           result.renamed.push({
-            oldPath: deletedResource.path,
+            oldPath: deletedAbs,
             newPath: newFile,
             rid: deletedResource.rid,
           });
           await this.logSync(
             "renamed",
-            `${deletedResource.path} -> ${newFile}`,
+            `${deletedAbs} -> ${newFile}`,
             "hash matched",
           );
 
           if (this.syncOps) {
-            const oldRel = path.relative(this.repoPath, deletedResource.path);
+            const oldRel =
+              deletedResource.location_kind === 'local'
+                ? deletedResource.location
+                : '';
             const newRel = path.relative(this.repoPath, newFile);
             await this.syncOps.recordOp(
               SyncOpsEngine.OP_TYPES.RESOURCE_MOVED,
@@ -4304,14 +4378,17 @@ class Repository {
         // 真正的删除
         await this.resourceService.delete(deletedResource.rid, true);
         result.deleted.push({
-          path: deletedResource.path,
+          path: deletedAbs,
           type: deletedResource.type,
           rid: deletedResource.rid,
         });
-        await this.logSync("deleted", deletedResource.path, "file not found");
+        await this.logSync("deleted", deletedAbs, "file not found");
 
         if (this.syncOps) {
-          const relPath = path.relative(this.repoPath, deletedResource.path);
+          const relPath =
+            deletedResource.location_kind === 'local'
+              ? deletedResource.location
+              : '';
           await this.syncOps.recordOp(
             SyncOpsEngine.OP_TYPES.RESOURCE_DELETED,
             deletedResource.rid,

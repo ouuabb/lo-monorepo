@@ -13,7 +13,12 @@ module.exports = {
       return {
         rid: result && result.rid,
         type: result && result.type ? result.type : params.type,
-        path: result && result.path ? result.path : params.path,
+        location_kind: result && result.location_kind
+          ? result.location_kind
+          : params.location_kind,
+        location: result && result.location
+          ? result.location
+          : params.location,
         metadata: result && result.metadata,
         hash: result && result.hash,
         name: result && result.name,
@@ -23,10 +28,19 @@ module.exports = {
   },
 
   async execute(ctx, params) {
-    const { type, path: filePath, metadata, name, capabilities, container_schema } = params;
+    const {
+      type,
+      location_kind,
+      location,
+      metadata,
+      name,
+      capabilities,
+      container_schema,
+    } = params;
     const resource = await ctx.resourceService.create({
       type,
-      path: filePath,
+      location_kind: location_kind || 'virtual',
+      location: location || '',
       metadata: metadata || {},
       name,
       capabilities: capabilities || [],

@@ -13,6 +13,7 @@
  */
 
 const fs = require("fs-extra");
+const path = require("path");
 
 class ResourceWatcher {
   /**
@@ -30,7 +31,7 @@ class ResourceWatcher {
    */
   async check() {
     const resources = await this.db.all(`
-      SELECT rid, name, type, path, hash, updated FROM resources WHERE deleted = 0 ORDER BY rid
+      SELECT rid, name, type, location_kind, location, hash, updated FROM resources WHERE deleted = 0 ORDER BY rid
     `);
 
     const missing = [];
@@ -38,16 +39,23 @@ class ResourceWatcher {
     const suggestions = [];
 
     for (const res of resources) {
-      if (!res.path) continue;
+      // 解析资源本地路径（local/external 有文件；virtual 无）
+      const abs =
+        res.location_kind === 'local'
+          ? path.join(this.repoPath, res.location)
+          : res.location_kind === 'external'
+            ? res.location
+            : null;
+      if (!abs) continue;
 
-      const exists = await fs.pathExists(res.path);
+      const exists = await fs.pathExists(abs);
 
       if (!exists) {
         // 文件被删除
         missing.push({
           rid: res.rid,
           name: res.name,
-          path: res.path,
+          path: abs,
           issue: "resource.missing",
         });
         suggestions.push({
@@ -57,10 +65,10 @@ class ResourceWatcher {
           confidence: 1.0,
           priority: "high",
           sourceCategory: "watcher",
-          reason: `File deleted: ${res.path}`,
+          reason: `File deleted: ${abs}`,
           payload: {
             rid: res.rid,
-            path: res.path,
+            path: abs,
             actions: ["restore", "remove_relation", "ignore"],
           },
         });
@@ -68,12 +76,12 @@ class ResourceWatcher {
         // 检查文件内容是否被修改（hash 变化）
         try {
           const HashUtils = require("../utils/hash.cjs");
-          const currentHash = await HashUtils.fromFile(res.path);
+          const currentHash = await HashUtils.fromFile(abs);
           if (currentHash && currentHash !== res.hash) {
             modified.push({
               rid: res.rid,
               name: res.name,
-              path: res.path,
+              path: abs,
               oldHash: res.hash,
               newHash: currentHash,
               issue: "resource.modified",
@@ -85,10 +93,10 @@ class ResourceWatcher {
               confidence: 0.9,
               priority: "medium",
               sourceCategory: "watcher",
-              reason: `File modified: ${res.path}`,
+              reason: `File modified: ${abs}`,
               payload: {
                 rid: res.rid,
-                path: res.path,
+                path: abs,
                 oldHash: res.hash,
                 newHash: currentHash,
               },
@@ -99,7 +107,7 @@ class ResourceWatcher {
           missing.push({
             rid: res.rid,
             name: res.name,
-            path: res.path,
+            path: abs,
             issue: "resource.unreadable",
             error: e.message,
           });

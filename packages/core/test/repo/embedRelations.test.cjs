@@ -1,6 +1,5 @@
 const fs = require('fs-extra');
 const path = require('path');
-const os = require('os');
 const Repository = require('../../src/repo/repository.cjs');
 
 describe('syncMarkdownRelations', () => {
@@ -8,8 +7,7 @@ describe('syncMarkdownRelations', () => {
   let repo;
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lo-test-embed-'));
-    await fs.ensureDir(path.join(tempDir, '.repo'));
+    tempDir = await testUtils.createTempRepo();
     repo = new Repository(tempDir);
     await repo.open({ skipAuth: true });
   });

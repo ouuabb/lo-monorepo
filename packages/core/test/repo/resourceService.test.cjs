@@ -13,7 +13,7 @@ describe('ResourceService', () => {
     await fs.ensureDir(path.join(tempDir, '.repo'));
     db = new Database(tempDir);
     await db.init();
-    resourceService = new ResourceService(db);
+    resourceService = new ResourceService(db, { repoPath: tempDir });
   });
 
   afterEach(async () => {
@@ -30,13 +30,13 @@ describe('ResourceService', () => {
 
     const resource = await resourceService.create({
       type: 'note',
-      path: filePath,
+      location_kind: 'local', location: path.relative(tempDir, filePath),
       name: 'test'
     });
 
     expect(resource).not.toBeNull();
     expect(resource.type).toBe('note');
-    expect(resource.path).toBe(filePath);
+    expect(resource.location_kind).toBe('local'); expect(resource.location).toBe(path.relative(tempDir, filePath));
     expect(resource.rid).toMatch(/^res_/);
   });
 
@@ -47,7 +47,7 @@ describe('ResourceService', () => {
 
     const created = await resourceService.create({
       type: 'note',
-      path: filePath,
+      location_kind: 'local', location: path.relative(tempDir, filePath),
       name: 'test'
     });
 
@@ -63,7 +63,7 @@ describe('ResourceService', () => {
 
     await resourceService.create({
       type: 'note',
-      path: filePath,
+      location_kind: 'local', location: path.relative(tempDir, filePath),
       name: 'unique-name'
     });
 
@@ -79,13 +79,13 @@ describe('ResourceService', () => {
 
     await resourceService.create({
       type: 'note',
-      path: filePath,
+      location_kind: 'local', location: path.relative(tempDir, filePath),
       name: 'test'
     });
 
     const retrieved = await resourceService.getByPath(filePath);
     expect(retrieved).not.toBeNull();
-    expect(retrieved.path).toBe(filePath);
+    expect(retrieved.location_kind).toBe('local'); expect(retrieved.location).toBe(path.relative(tempDir, filePath));
   });
 
   test('should get all resources', async () => {
@@ -95,8 +95,8 @@ describe('ResourceService', () => {
     await fs.writeFile(filePath1, '# Test 1');
     await fs.writeFile(filePath2, '# Test 2');
 
-    await resourceService.create({ type: 'note', path: filePath1, name: 'test1' });
-    await resourceService.create({ type: 'note', path: filePath2, name: 'test2' });
+    await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath1), name: 'test1' });
+    await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath2), name: 'test2' });
 
     const resources = await resourceService.getAll();
     expect(resources.length).toBeGreaterThanOrEqual(2);
@@ -109,7 +109,7 @@ describe('ResourceService', () => {
 
     const created = await resourceService.create({
       type: 'note',
-      path: filePath,
+      location_kind: 'local', location: path.relative(tempDir, filePath),
       name: 'test',
       metadata: { title: 'Original' }
     });
@@ -130,7 +130,7 @@ describe('ResourceService', () => {
 
     const created = await resourceService.create({
       type: 'note',
-      path: filePath,
+      location_kind: 'local', location: path.relative(tempDir, filePath),
       name: 'test'
     });
 
@@ -147,7 +147,7 @@ describe('ResourceService', () => {
     const resource = await resourceService.importFile(filePath);
     expect(resource).not.toBeNull();
     expect(resource.type).toBe('note');
-    expect(resource.path).toBe(filePath);
+    expect(resource.location_kind).toBe('local'); expect(resource.location).toBe(path.relative(tempDir, filePath));
   });
 
   test('importFile returns existing resource when path already registered', async () => {
@@ -167,7 +167,7 @@ describe('ResourceService', () => {
 
     const resource = await resourceService.create({
       type: 'note',
-      path: filePath,
+      location_kind: 'local', location: path.relative(tempDir, filePath),
       name: 'tagged',
       metadata: { tags: ['alpha', ' beta '], title: 'T' },
       capabilities: ['container'],
@@ -190,21 +190,22 @@ describe('ResourceService', () => {
     await fs.writeFile(filePath, '# Pre');
 
     const withRid = await resourceService.create({
-      type: 'note', path: filePath, name: 'prerid', rid: 'res_abc123_def456'
+      type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'prerid', rid: 'res_abc123_def456'
     });
     expect(withRid.rid).toBe('res_abc123_def456');
 
     const badPath = path.join(tempDir, 'resources', 'badrid.md');
     await fs.writeFile(badPath, '# Bad');
     await expect(
-      resourceService.create({ type: 'note', path: badPath, name: 'badrid', rid: 'invalid-rid' })
+      resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, badPath), name: 'badrid', rid: 'invalid-rid' })
     ).rejects.toThrow(/res_/);
   });
 
   test('create derives name from type when no path or name given', async () => {
     const resource = await resourceService.create({ type: 'note', path: '' });
     expect(resource.name).toMatch(/^note-\d+$/);
-    expect(resource.path).toBe('');
+    expect(resource.location_kind).toBe('virtual');
+    expect(resource.location).toBe('');
   });
 
   test('create with schema binds schema and validates values', async () => {
@@ -215,14 +216,14 @@ describe('ResourceService', () => {
       name: 'schema-one',
       fields: [{ name: 'status', type: 'text', required: true }]
     });
-    const svc = new ResourceService(db, { getSchemaRegistry: () => schemaRegistry });
+    const svc = new ResourceService(db, { repoPath: tempDir, getSchemaRegistry: () => schemaRegistry });
 
     const filePath = path.join(tempDir, 'resources', 'schema1.md');
     await fs.ensureDir(path.dirname(filePath));
     await fs.writeFile(filePath, '# Schema');
 
     const resource = await svc.create({
-      type: 'note', path: filePath, name: 'schema1',
+      type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'schema1',
       schema: 's1', metadata: { status: 'ok' }
     });
     expect(resource.schema.id).toBe('s1');
@@ -235,13 +236,13 @@ describe('ResourceService', () => {
     const missing = path.join(tempDir, 'resources', 'schema-missing.md');
     await fs.writeFile(missing, '# M');
     await expect(
-      svc.create({ type: 'note', path: missing, name: 'schema-missing', schema: 'nope', metadata: { status: 'x' } })
+      svc.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, missing), name: 'schema-missing', schema: 'nope', metadata: { status: 'x' } })
     ).rejects.toThrow(/不存在/);
 
     const invalid = path.join(tempDir, 'resources', 'schema-invalid.md');
     await fs.writeFile(invalid, '# I');
     await expect(
-      svc.create({ type: 'note', path: invalid, name: 'schema-invalid', schema: 's1', metadata: {} })
+      svc.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, invalid), name: 'schema-invalid', schema: 's1', metadata: {} })
     ).rejects.toThrow(/校验失败/);
   });
 
@@ -250,7 +251,7 @@ describe('ResourceService', () => {
     await fs.ensureDir(path.dirname(filePath));
     await fs.writeFile(filePath, '# N');
     await expect(
-      resourceService.create({ type: 'note', path: filePath, name: 'no-reg', schema: 's1' })
+      resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'no-reg', schema: 's1' })
     ).rejects.toThrow(/SchemaRegistry/);
   });
 
@@ -268,17 +269,17 @@ describe('ResourceService', () => {
       }),
       runAfter: jest.fn(async () => {})
     };
-    const svc = new ResourceService(db, { getHookManager: () => modifying });
-    const resource = await svc.create({ type: 'note', path: filePath, name: 'hook' });
+    const svc = new ResourceService(db, { repoPath: tempDir, getHookManager: () => modifying });
+    const resource = await svc.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'hook' });
     expect(resource.metadata.title).toBe('Hooked');
     expect(modifying.runAfter).toHaveBeenCalled();
 
     const cancelled = {
       runBefore: jest.fn(async () => ({ cancelled: true, payload: {} }))
     };
-    const svcCancel = new ResourceService(db, { getHookManager: () => cancelled });
+    const svcCancel = new ResourceService(db, { repoPath: tempDir, getHookManager: () => cancelled });
     await expect(
-      svcCancel.create({ type: 'note', path: filePath, name: 'hook2' })
+      svcCancel.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'hook2' })
     ).rejects.toMatchObject({ cancelledByHook: 'beforeResourceCreate' });
   });
 
@@ -286,11 +287,11 @@ describe('ResourceService', () => {
     const filePath1 = path.join(tempDir, 'resources', 'stack.md');
     await fs.ensureDir(path.dirname(filePath1));
     await fs.writeFile(filePath1, '# Stack 1');
-    const r0 = await resourceService.create({ type: 'note', path: filePath1, name: 'stacked' });
+    const r0 = await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath1), name: 'stacked' });
 
     const filePath2 = path.join(tempDir, 'resources', 'stack2.md');
     await fs.writeFile(filePath2, '# Stack 2');
-    const r1 = await resourceService.create({ type: 'note', path: filePath2, name: 'stacked' });
+    const r1 = await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath2), name: 'stacked' });
 
     expect(r0.layer).toBe(0);
     expect(r1.layer).toBe(1);
@@ -306,11 +307,11 @@ describe('ResourceService', () => {
     const filePath1 = path.join(tempDir, 'resources', 'pstack.md');
     await fs.ensureDir(path.dirname(filePath1));
     await fs.writeFile(filePath1, '# P1');
-    const r0 = await resourceService.create({ type: 'note', path: filePath1, name: 'pstack' });
+    const r0 = await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath1), name: 'pstack' });
 
     const filePath2 = path.join(tempDir, 'resources', 'pstack2.md');
     await fs.writeFile(filePath2, '# P2');
-    const r1 = await resourceService.create({ type: 'note', path: filePath2, name: 'pstack' });
+    const r1 = await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath2), name: 'pstack' });
 
     const promoted = await resourceService.promote(r1.rid);
     expect(promoted.layer).toBe(0);
@@ -333,7 +334,7 @@ describe('ResourceService', () => {
     const filePath = path.join(tempDir, 'resources', 'byhash.md');
     await fs.ensureDir(path.dirname(filePath));
     await fs.writeFile(filePath, '# ByHash');
-    const created = await resourceService.create({ type: 'note', path: filePath, name: 'byhash' });
+    const created = await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'byhash' });
     const byHash = await resourceService.getByHash(filePath);
     expect(byHash.rid).toBe(created.rid);
   });
@@ -364,7 +365,7 @@ describe('ResourceService', () => {
     const SchemaRegistry = require('../../src/repo/schemaRegistry.cjs');
     const schemaRegistry = new SchemaRegistry(db);
     await schemaRegistry.createSchema({ id: 'sf', name: 'schema-filter', fields: [] });
-    const svc = new ResourceService(db, { getSchemaRegistry: () => schemaRegistry });
+    const svc = new ResourceService(db, { repoPath: tempDir, getSchemaRegistry: () => schemaRegistry });
 
     const p1 = path.join(tempDir, 'resources', 'sf1.md');
     const p2 = path.join(tempDir, 'resources', 'sf2.md');
@@ -382,7 +383,7 @@ describe('ResourceService', () => {
     const filePath = path.join(tempDir, 'resources', 'upd.md');
     await fs.ensureDir(path.dirname(filePath));
     await fs.writeFile(filePath, '# Upd');
-    const created = await resourceService.create({ type: 'note', path: filePath, name: 'upd' });
+    const created = await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'upd' });
 
     const updated = await resourceService.update(created.rid, {
       capabilities: ['container'],
@@ -407,11 +408,11 @@ describe('ResourceService', () => {
       name: 'schema-update',
       fields: [{ name: 'status', type: 'text' }]
     });
-    const svc = new ResourceService(db, { getSchemaRegistry: () => schemaRegistry });
+    const svc = new ResourceService(db, { repoPath: tempDir, getSchemaRegistry: () => schemaRegistry });
     const filePath = path.join(tempDir, 'resources', 'supd.md');
     await fs.ensureDir(path.dirname(filePath));
     await fs.writeFile(filePath, '# SUpd');
-    const created = await svc.create({ type: 'note', path: filePath, name: 'supd', schema: 'su', metadata: { status: 'ok' } });
+    const created = await svc.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'supd', schema: 'su', metadata: { status: 'ok' } });
 
     await expect(
       svc.update(created.rid, { metadata: { status: 42 } })
@@ -422,7 +423,7 @@ describe('ResourceService', () => {
     const filePath = path.join(tempDir, 'resources', 'del.md');
     await fs.ensureDir(path.dirname(filePath));
     await fs.writeFile(filePath, '# Del');
-    const created = await resourceService.create({ type: 'note', path: filePath, name: 'del' });
+    const created = await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'del' });
 
     await resourceService.delete(created.rid, true);
     expect(await resourceService.getByRid(created.rid)).toBeNull();
@@ -445,11 +446,11 @@ describe('ResourceService', () => {
     const filePath = path.join(tempDir, 'resources', 'move.md');
     await fs.ensureDir(path.dirname(filePath));
     await fs.writeFile(filePath, '# Move');
-    const created = await resourceService.create({ type: 'note', path: filePath, name: 'move' });
+    const created = await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'move' });
 
     const newPath = path.join(tempDir, 'resources', 'moved-dest.md');
     const moved = await resourceService.move(created.rid, newPath);
-    expect(moved.path).toBe(newPath);
+    expect(moved.location_kind).toBe('local'); expect(moved.location).toBe(path.relative(tempDir, newPath));
     expect(await fs.pathExists(newPath)).toBe(true);
     expect(await fs.pathExists(filePath)).toBe(false);
 
@@ -460,7 +461,7 @@ describe('ResourceService', () => {
     const filePath = path.join(tempDir, 'resources', 'rehash.md');
     await fs.ensureDir(path.dirname(filePath));
     await fs.writeFile(filePath, '# Rehash');
-    const created = await resourceService.create({ type: 'note', path: filePath, name: 'rehash' });
+    const created = await resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'rehash' });
     const oldHash = created.hash;
 
     await fs.writeFile(filePath, '# Rehash changed content');
@@ -478,7 +479,7 @@ describe('ResourceService', () => {
     await fs.ensureDir(path.dirname(filePath));
     await fs.writeFile(filePath, '# Old');
     const created = await resourceService.create({
-      type: 'note', path: filePath, name: 'refresh', metadata: { category: 'manual' }
+      type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'refresh', metadata: { category: 'manual' }
     });
 
     await fs.writeFile(filePath, '# New Title');
@@ -493,7 +494,7 @@ describe('ResourceService', () => {
   test('_writeFile encrypts with key and encrypt option', async () => {
     const CryptoUtils = require('../../src/utils/crypto.cjs');
     const key = CryptoUtils.generateKey();
-    const svc = new ResourceService(db, { getCryptoKey: () => key });
+    const svc = new ResourceService(db, { repoPath: tempDir, getCryptoKey: () => key });
 
     const plainPath = path.join(tempDir, 'plain.txt');
     await svc._writeFile(plainPath, 'hello');
@@ -508,7 +509,7 @@ describe('ResourceService', () => {
   test('create auto-encrypts when crypto key and default policy enabled', async () => {
     const CryptoUtils = require('../../src/utils/crypto.cjs');
     const key = CryptoUtils.generateKey();
-    const svc = new ResourceService(db, {
+    const svc = new ResourceService(db, { repoPath: tempDir,
       getCryptoKey: () => key,
       isEncryptByDefault: () => true
     });
@@ -516,7 +517,7 @@ describe('ResourceService', () => {
     const filePath = path.join(tempDir, 'resources', 'autoenc.md');
     await fs.ensureDir(path.dirname(filePath));
     await fs.writeFile(filePath, '# Secret');
-    const resource = await svc.create({ type: 'note', path: filePath, name: 'autoenc' });
+    const resource = await svc.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'autoenc' });
 
     expect(resource.encrypted).toBe(true);
     expect(CryptoUtils.isEncryptedFile(filePath)).toBe(true);
@@ -526,7 +527,7 @@ describe('ResourceService', () => {
   test('_extractMetadata uses plugin extension handler', async () => {
     const { registerMetadataField } = require('../../src/utils/validateMetadata.cjs');
     registerMetadataField('extraField', { type: 'string', check: (v) => typeof v === 'string' }, { owner: 'test' });
-    const svc = new ResourceService(db, {
+    const svc = new ResourceService(db, { repoPath: tempDir,
       getExtensionRegistry: () => ({
         get: (ns, type) => (ns === 'resourceTypes' && type === 'note')
           ? { extractMetadata: async () => ({ extraField: 'yes' }) }
@@ -536,7 +537,7 @@ describe('ResourceService', () => {
     const filePath = path.join(tempDir, 'resources', 'ext.md');
     await fs.ensureDir(path.dirname(filePath));
     await fs.writeFile(filePath, '# Ext');
-    const resource = await svc.create({ type: 'note', path: filePath, name: 'ext' });
+    const resource = await svc.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'ext' });
     expect(resource.metadata.extraField).toBe('yes');
     expect(resource.metadata.title).toBe('Ext');
   });
@@ -551,7 +552,7 @@ describe('ResourceService', () => {
   test('isEncrypted detects encrypted files', async () => {
     const CryptoUtils = require('../../src/utils/crypto.cjs');
     const key = CryptoUtils.generateKey();
-    const svc = new ResourceService(db, { getCryptoKey: () => key });
+    const svc = new ResourceService(db, { repoPath: tempDir, getCryptoKey: () => key });
     const filePath = path.join(tempDir, 'detect.txt');
     await fs.writeFile(filePath, 'plain');
     expect(svc.isEncrypted(filePath)).toBe(false);
@@ -561,7 +562,7 @@ describe('ResourceService', () => {
 
   test('delete runs after hook', async () => {
     const afterDelete = jest.fn(async () => {});
-    const svc = new ResourceService(db, {
+    const svc = new ResourceService(db, { repoPath: tempDir,
       getHookManager: () => ({
         runBefore: jest.fn(async (name, payload) => ({ cancelled: false, payload })),
         runAfter: async (name, payload) => { if (name === 'afterResourceDelete') afterDelete(payload); }
@@ -570,7 +571,7 @@ describe('ResourceService', () => {
     const filePath = path.join(tempDir, 'resources', 'hookdel.md');
     await fs.ensureDir(path.dirname(filePath));
     await fs.writeFile(filePath, '# HD');
-    const created = await svc.create({ type: 'note', path: filePath, name: 'hookdel' });
+    const created = await svc.create({ type: 'note', location_kind: 'local', location: path.relative(tempDir, filePath), name: 'hookdel' });
     await svc.delete(created.rid, true);
     expect(afterDelete).toHaveBeenCalled();
   });

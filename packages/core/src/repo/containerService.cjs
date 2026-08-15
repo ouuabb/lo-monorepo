@@ -515,9 +515,11 @@ class ContainerService {
 
     // 创建 Resource
     const resourceType = type || ResourceType.fromPath(absolutePath);
+    const loc = this.resourceService.locationFromPath(absolutePath);
     const resource = await this.resourceService.create({
       type: resourceType,
-      path: absolutePath,
+      location_kind: loc.kind,
+      location: loc.value,
       name: member.name.replace(/\.[^.]+$/, ""), // 去掉扩展名
       metadata: meta,
       capabilities: [],

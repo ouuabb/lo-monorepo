@@ -25,9 +25,9 @@ describe('FederatedGraphEngine', () => {
     await rdb.run("DELETE FROM resources WHERE rid = '__system__'");
     for (const row of data.resources || []) {
       await rdb.run(
-        `INSERT INTO resources (rid, name, layer, type, path, hash, created, updated, deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        [row.rid, row.name, 0, row.type || 'note', row.path || '', null, Date.now(), Date.now()]
+        `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, created, updated, deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        [row.rid,  row.name,  0,  row.type || 'note', 'local',  row.path || '',  null,  Date.now(),  Date.now()]
       );
     }
     for (const row of data.relations || []) {
@@ -81,9 +81,9 @@ describe('FederatedGraphEngine', () => {
   test('_loadGraph should map resources and relations to nodes and edges', async () => {
     await db.run("DELETE FROM resources WHERE rid = '__system__'");
     await db.run(
-      `INSERT INTO resources (rid, name, layer, type, path, hash, created, updated, deleted)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-      ['r1', 'Graph Note', 0, 'doc', '', null, 1, 2]
+      `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, created, updated, deleted)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      ['r1',                                       'Graph Note',                                       0,                                       'doc', 'local',                                       '',                                       null,                                       1,                                       2]
     );
     await db.run(
       `INSERT INTO relations (from_rid, to_rid, type, created, deleted)
@@ -102,14 +102,14 @@ describe('FederatedGraphEngine', () => {
   test('buildFederatedGraph should merge local and remote graphs', async () => {
     await db.run("DELETE FROM resources WHERE rid = '__system__'");
     await db.run(
-      `INSERT INTO resources (rid, name, layer, type, path, hash, created, updated, deleted)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-      ['l1', 'Local A', 0, 'note', '', null, Date.now(), Date.now()]
+      `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, created, updated, deleted)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      ['l1',  'Local A',  0,  'note', 'local',  '',  null,  Date.now(),  Date.now()]
     );
     await db.run(
-      `INSERT INTO resources (rid, name, layer, type, path, hash, created, updated, deleted)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-      ['l2', 'Local B', 0, 'note', '', null, Date.now(), Date.now()]
+      `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, created, updated, deleted)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      ['l2',  'Local B',  0,  'note', 'local',  '',  null,  Date.now(),  Date.now()]
     );
     await db.run(
       `INSERT INTO relations (from_rid, to_rid, type, created, deleted)

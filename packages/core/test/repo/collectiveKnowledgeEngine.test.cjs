@@ -24,9 +24,9 @@ describe('CollectiveKnowledgeEngine', () => {
   async function seedLocal(rows) {
     for (const row of rows) {
       await db.run(
-        `INSERT INTO resources (rid, name, layer, type, path, hash, created, updated, deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        [row.rid, row.name, 0, row.type || 'note', row.path || '', null, Date.now(), Date.now()]
+        `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, created, updated, deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        [row.rid,  row.name,  0,  row.type || 'note', 'local',  row.path || '',  null,  Date.now(),  Date.now()]
       );
     }
   }
@@ -38,9 +38,9 @@ describe('CollectiveKnowledgeEngine', () => {
     await runMigrations(rdb, path.join(__dirname, '../../src/repo/migrations'));
     for (const row of rows) {
       await rdb.run(
-        `INSERT INTO resources (rid, name, layer, type, path, hash, created, updated, deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        [row.rid, row.name, 0, row.type || 'note', row.path || '', null, Date.now(), Date.now()]
+        `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, created, updated, deleted)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        [row.rid,  row.name,  0,  row.type || 'note', 'local',  row.path || '',  null,  Date.now(),  Date.now()]
       );
     }
     await rdb.close();

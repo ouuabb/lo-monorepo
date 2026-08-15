@@ -16,8 +16,8 @@ describe('KnowledgeTimeline', () => {
     await runMigrations(db, path.join(__dirname, '../../src/repo/migrations'));
     timeline = new KnowledgeTimeline(db);
     await db.run(
-      `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-       VALUES ('container-1', 'c1', 0, 'container', '/container-1', '', '{}', 0, ?, ?, 0)`,
+      `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+       VALUES ('container-1', 'c1', 0, 'container', 'local', '/container-1', '', '{}', 0, ?, ?, 0)`,
       [Date.now(), Date.now()]
     );
   });

@@ -22,7 +22,7 @@ describe('无文件资源（虚拟资源）', () => {
     await fs.ensureDir(path.join(tempDir, '.repo'));
     db = new Database(tempDir);
     await db.init();
-    resourceService = new ResourceService(db);
+    resourceService = new ResourceService(db, { repoPath: tempDir });
 
     // 注册测试用自定义字段（模拟插件注册）
     registerMetadataField('testRecordId', {
@@ -56,7 +56,8 @@ describe('无文件资源（虚拟资源）', () => {
     expect(resource.rid).toMatch(/^res_/);
     expect(resource.type).toBe('vocabulary');
     expect(resource.name).toBe('serendipity');
-    expect(resource.path).toBe(''); // 空字符串，不是 null/undefined
+    expect(resource.location_kind).toBe('virtual'); // 无文件 → virtual
+    expect(resource.location).toBe('');
     expect(resource.hash).toBe(''); // 无文件无 hash
   });
 
@@ -68,7 +69,8 @@ describe('无文件资源（虚拟资源）', () => {
     });
 
     expect(resource).not.toBeNull();
-    expect(resource.path).toBe('');
+    expect(resource.location_kind).toBe('virtual');
+    expect(resource.location).toBe('');
   });
 
   test('虚拟资源的 metadata 正确保存', async () => {
@@ -97,7 +99,8 @@ describe('无文件资源（虚拟资源）', () => {
     const retrieved = await resourceService.getByName('unique-virtual-word');
     expect(retrieved).not.toBeNull();
     expect(retrieved.name).toBe('unique-virtual-word');
-    expect(retrieved.path).toBe('');
+    expect(retrieved.location_kind).toBe('virtual');
+    expect(retrieved.location).toBe('');
   });
 
   test('虚拟资源不加密（encrypted 为 0）', async () => {
@@ -116,12 +119,14 @@ describe('无文件资源（虚拟资源）', () => {
 
     const resource = await resourceService.create({
       type: 'note',
-      path: filePath,
+      location_kind: 'local',
+      location: path.relative(tempDir, filePath),
       name: 'note-test',
     });
 
     expect(resource).not.toBeNull();
-    expect(resource.path).toBe(filePath);
+    expect(resource.location_kind).toBe('local');
+    expect(resource.location).toBe(path.relative(tempDir, filePath));
     expect(resource.hash).not.toBe(''); // 有文件有 hash
   });
 });

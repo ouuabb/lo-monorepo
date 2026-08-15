@@ -10,7 +10,9 @@ describe('MigrationRunner', () => {
   let tempDir, db;
 
   beforeEach(async () => {
-    tempDir = await testUtils.createTempRepo();
+    // Database 层测试：裸目录即可（迁移由测试手动执行，不需要 Repository 初始化）
+    tempDir = await fs.mkdtemp(path.join(require('os').tmpdir(), 'lo-test-mig-'));
+    await fs.ensureDir(path.join(tempDir, '.repo'));
     db = new Database(tempDir);
     await db.open();
   });

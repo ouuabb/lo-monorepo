@@ -116,7 +116,7 @@ describe('diff command', () => {
 
   test('should skip staged modify when file is not tracked', async () => {
     const repo = await openRepo(ctx.tempDir);
-    await repo.db.run("INSERT INTO staging_changes (type, path, created_at) VALUES ('modify', 'ghost.md', ?)", [Date.now()]);
+    await repo.db.run("INSERT INTO staging_changes (type, location_kind, location, created_at) VALUES ('modify', 'ghost.md', ?)", [Date.now()]);
     await repo.close();
 
     const output = await runDiff({ _: ['lo'] });
@@ -244,9 +244,9 @@ describe('diff command', () => {
 
     const repo = await openRepo(ctx.tempDir);
     await repo.db.run(
-      `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ['res_locked2', 'locked2', 0, 'note', filePath, 'different-hash', '{}', 1, Date.now(), Date.now()]
+      `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['res_locked2',  'locked2',  0,  'note', 'local',  filePath,  'different-hash',  '{}',  1,  Date.now(),  Date.now()]
     );
     await repo.close();
 

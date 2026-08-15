@@ -35,9 +35,9 @@ describe('FederationManager', () => {
       created: now,
       updated: now, ...overrides};
     await db.run(
-      `INSERT INTO resources (rid, name, layer, type, path, hash, created, updated, deleted)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-      [data.rid, data.name, data.layer, data.type, data.path, data.hash, data.created, data.updated]
+      `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, created, updated, deleted)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      [data.rid,                                       data.name,                                       data.layer,                                       data.type, 'local',                                       data.path,                                       data.hash,                                       data.created,                                       data.updated]
     );
     return data;
   }

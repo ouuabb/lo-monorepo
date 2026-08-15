@@ -21,9 +21,9 @@ describe('OperationLogger', () => {
     logger = new OperationLogger(db, containerService);
     for (const rid of ['c1', 'c2']) {
       await db.run(
-        `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-         VALUES (?, ?, 0, 'container', ?, '', '{}', 0, ?, ?, 0)`,
-        [rid, rid, `/${rid}`, Date.now(), Date.now()]
+        `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+         VALUES (?, ?, 0, 'container', ?, ?, '', '{}', 0, ?, ?, 0)`,
+        [rid, rid, 'local', `/${rid}`, Date.now(), Date.now()]
       );
     }
   });

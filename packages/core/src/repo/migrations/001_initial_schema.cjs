@@ -13,7 +13,8 @@ module.exports = {
         name              TEXT NOT NULL,
         layer             INTEGER NOT NULL DEFAULT 0,
         type              TEXT NOT NULL,
-        path              TEXT NOT NULL,
+        location_kind     TEXT NOT NULL,   -- 'local' | 'external' | 'virtual'
+        location          TEXT NOT NULL,   -- local: 相对 Repository.currentPath；external: 绝对路径；virtual: ''
         hash              TEXT,
         metadata          TEXT DEFAULT '{}',
         encrypted         INTEGER DEFAULT 0,
@@ -23,10 +24,10 @@ module.exports = {
         container_schema  TEXT DEFAULT '{}'
       );
       CREATE INDEX IF NOT EXISTS idx_resources_type ON resources(type);
-      CREATE INDEX IF NOT EXISTS idx_resources_path ON resources(path);
+      CREATE INDEX IF NOT EXISTS idx_resources_location ON resources(location);
       CREATE UNIQUE INDEX IF NOT EXISTS idx_resources_name_layer ON resources(name, layer);
-      -- 同文件仅一条活跃 layer-0 记录（name-stack 的 layer>0 版本共享 path；path='' 虚拟资源不受约束）
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_resources_path_active ON resources(path) WHERE deleted = 0 AND layer = 0 AND path <> '';
+      -- 同文件仅一条活跃 layer-0 记录（name-stack 的 layer>0 版本共享 location；location='' 虚拟资源不受约束）
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_resources_location_active ON resources(location) WHERE deleted = 0 AND layer = 0 AND location <> '';
     `);
 
     // ======================== 标签 / 能力 / 容器忽略模式 ========================
@@ -744,8 +745,8 @@ module.exports = {
     // ======================== 系统种子数据 ========================
     const now = Date.now();
     await db.run(
-      `INSERT OR IGNORE INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated)
-       VALUES ('__system__', '__system__', 0, 'system', '', '', '{}', 0, ?, ?)`,
+      `INSERT OR IGNORE INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated)
+       VALUES ('__system__', '__system__', 0, 'system', 'virtual', '', '', '{}', 0, ?, ?)`,
       [now, now]
     );
   }

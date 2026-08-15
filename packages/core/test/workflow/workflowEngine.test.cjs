@@ -28,8 +28,8 @@ function makeTaskWorkflow() {
 async function seedResource(db, rid, metadata = {}) {
   const now = Date.now();
   await db.run(
-    `INSERT INTO resources (rid, name, layer, type, path, metadata, encrypted, created, updated)
-     VALUES (?, ?, 0, 'note', '', ?, 0, ?, ?)`,
+    `INSERT INTO resources (rid, name, layer, type, location_kind, location, metadata, encrypted, created, updated)
+     VALUES (?, ?, 0, 'note', 'local', '', ?, 0, ?, ?)`,
     [rid, rid, JSON.stringify(metadata), now, now]
   );
 }

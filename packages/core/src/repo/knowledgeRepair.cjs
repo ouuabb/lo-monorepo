@@ -117,7 +117,7 @@ class KnowledgeRepair {
    */
   async findDuplicateCandidates() {
     const resources = await this.db.all(`
-      SELECT rid, name, type, path FROM resources WHERE deleted = 0 ORDER BY name
+      SELECT rid, name, type, location_kind, location FROM resources WHERE deleted = 0 ORDER BY name
     `);
 
     const candidates = [];

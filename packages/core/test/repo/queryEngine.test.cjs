@@ -6,8 +6,8 @@ const testUtils = global.testUtils;
 
 async function insertResource(db, { rid, name, type, path: p, metadata = {}, created = 1, updated = 1, deleted = 0 }) {
   await db.run(
-    'INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted) VALUES (?, ?, 0, ?, ?, ?, ?, 0, ?, ?, ?)',
-    [rid, name, type, p, `hash-${  rid}`, JSON.stringify(metadata), created, updated, deleted]
+    'INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted) VALUES (?, ?, 0, ?, ?, ?, ?, ?, 0, ?, ?, ?)',
+    [rid, name, type, 'local', p, `hash-${rid}`, JSON.stringify(metadata), created, updated, deleted]
   );
 }
 

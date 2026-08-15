@@ -24,9 +24,9 @@ describe('KnowledgeScheduler', () => {
 
   async function addResource(rid, name, created, updated) {
     await db.run(
-      `INSERT INTO resources (rid, name, layer, type, path, hash, metadata, encrypted, created, updated, deleted)
-       VALUES (?, ?, 0, 'note', ?, '', '{}', 0, ?, ?, 0)`,
-      [rid, name, `/${rid}`, created, updated]
+      `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated, deleted)
+       VALUES (?, ?, 0, 'note', ?, ?, '', '{}', 0, ?, ?, 0)`,
+      [rid, name, 'local', `/${rid}`, created, updated]
     );
   }
 

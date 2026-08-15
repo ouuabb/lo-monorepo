@@ -108,7 +108,7 @@ class WorkflowEngine {
     let resource = {};
     if (this.db) {
       const row = await this.db.get(
-        'SELECT rid, name, type, path, metadata FROM resources WHERE rid = ?',
+        'SELECT rid, name, type, location_kind, location, metadata FROM resources WHERE rid = ?',
         [instance.resourceRid]
       );
       if (row) {
@@ -116,7 +116,8 @@ class WorkflowEngine {
           rid: row.rid,
           name: row.name,
           type: row.type,
-          path: row.path,
+          location_kind: row.location_kind,
+          location: row.location,
           metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata || {}
         };
       } else {
