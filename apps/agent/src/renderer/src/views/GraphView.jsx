@@ -120,20 +120,25 @@ export default function GraphView(props) {
           role="img"
           aria-label="知识图谱"
         >
-          {edges.map((e) => (
-            <line
-              key={`e${e.id}`}
-              x1={positions[e.from] ? positions[e.from].x : W / 2}
-              y1={positions[e.from] ? positions[e.from].y : H / 2}
-              x2={positions[e.to] ? positions[e.to].x : W / 2}
-              y2={positions[e.to] ? positions[e.to].y : H / 2}
-              stroke={edgeColor(e.type)}
-              strokeWidth={1}
-              opacity={0.6}
-            />
-          ))}
+          {edges.map((e) => {
+            const from = positions.get(e.from);
+            const to = positions.get(e.to);
+            return (
+              <line
+                key={`e${e.id}`}
+                x1={from ? from.x : W / 2}
+                y1={from ? from.y : H / 2}
+                x2={to ? to.x : W / 2}
+                y2={to ? to.y : H / 2}
+                stroke={edgeColor(e.type)}
+                strokeWidth={1}
+                opacity={0.6}
+              />
+            );
+          })}
           {nodes.map((n) => {
-            const p = positions[n.id];
+            const p = positions.get(n.id);
+            if (!p) return null;
             const active = hover === n.id;
             return (
               <g
