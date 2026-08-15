@@ -27,7 +27,7 @@ describe('MigrationRunner', () => {
     const table = await db.get("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'");
     expect(table).not.toBeNull();
     const rows = await db.all('SELECT migration_id FROM schema_migrations');
-    expect(rows.map(r => r.migration_id)).toEqual(['001_initial_schema', '002_automation']);
+    expect(rows.map(r => r.migration_id)).toEqual(['001_initial_schema', '002_automation', '003_name_layer_partial_unique']);
     const res = await db.get('SELECT rid FROM resources WHERE rid = ?', ['__system__']);
     expect(res).not.toBeNull();
   });
@@ -38,7 +38,7 @@ describe('MigrationRunner', () => {
     logSpy.mockClear();
     await runMigrations(db, MIGRATIONS_DIR);
     const rows = await db.all('SELECT migration_id FROM schema_migrations');
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(3);
     expect(logSpy).not.toHaveBeenCalledWith(expect.stringContaining('[MIGRATION] Running 001_initial_schema'));
     logSpy.mockRestore();
   });

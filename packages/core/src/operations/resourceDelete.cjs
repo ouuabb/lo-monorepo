@@ -43,12 +43,12 @@ module.exports = {
   async undo(ctx, params) {
     const { operationResult } = params;
     const rid = operationResult && operationResult.rid;
-    const before = operationResult && operationResult.before;
     if (!rid) throw new Error('无法撤销 resource.delete：缺少资源 RID');
 
+    // 018 §6：undo 只恢复 deleted=0，name/rid/layer 原样（删除未修改过 name）
     await ctx.db.run(
-      'UPDATE resources SET deleted = 0, name = ?, updated = ? WHERE rid = ?',
-      [before && before.name ? before.name : rid, Date.now(), rid],
+      'UPDATE resources SET deleted = 0, updated = ? WHERE rid = ?',
+      [Date.now(), rid],
     );
     return { restored: true, rid };
   },

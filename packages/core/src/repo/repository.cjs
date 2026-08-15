@@ -1561,6 +1561,21 @@ class Repository {
     return this.resourceService.getAll(options);
   }
 
+  /**
+   * 正式 rename 入口（018 §5）：唯一修改 name 的 Repository 操作。
+   *
+   * - 统一经 normalizeResourceName；冲突（目标 (name, layer) 活跃占用）→ RENAME_CONFLICT
+   * - 走 resource.update operation（可撤销）；rid/location/layer/content/metadata 不变
+   * - 不自动入栈、不自动重写 [[name]]
+   * @param {string} rid
+   * @param {string} newName
+   * @returns {Promise<object>} 更新后的 Resource
+   */
+  async renameResource(rid, newName) {
+    const result = await this.updateResource(rid, { name: newName });
+    return result;
+  }
+
   async updateResource(rid, updates) {
     const oldResource = await this.resourceService.getByRid(rid);
     const { result } = await this.operationEngine.execute("resource.update", {

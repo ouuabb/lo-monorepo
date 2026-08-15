@@ -832,8 +832,23 @@ class ResourceService {
         params.push(loc.kind, loc.value);
       }
       if (fName !== undefined) {
+        // 018 §5：rename 统一经 normalizeResourceName + 活跃冲突检查（RENAME_CONFLICT）
+        const normalizedName = StringUtils.normalizeResourceName(fName);
+        const current = await this.getByRid(finalRid);
+        const ownLayer = current ? current.layer : 0;
+        const clash = await this.db.get(
+          `SELECT rid FROM resources WHERE name = ? AND layer = ? AND deleted = 0 AND rid != ?`,
+          [normalizedName, ownLayer, finalRid],
+        );
+        if (clash) {
+          const err = new Error(
+            `RENAME_CONFLICT: 目标名称 "${normalizedName}" 已被占用（rid: ${clash.rid}）`,
+          );
+          err.code = "RENAME_CONFLICT";
+          throw err;
+        }
         sql += ", name = ?";
-        params.push(fName);
+        params.push(normalizedName);
       }
       if (fHash) {
         sql += ", hash = ?";
@@ -979,25 +994,15 @@ class ResourceService {
     const finalSoft =
       beforePayload.soft !== undefined ? beforePayload.soft : soft;
 
-    const resource = finalSoft ? await this.getByRid(finalRid) : null;
-
     if (finalSoft) {
-      // 软删除前释放名称（追加 rid 后缀），允许同名资源重新创建
-      if (resource && resource.name) {
-        await this.db.run(
-          `
-          UPDATE resources SET name = ?, deleted = 1, updated = ? WHERE rid = ?
-        `,
-          [`${resource.name}_del_${finalRid.slice(-8)}`, Date.now(), finalRid],
-        );
-      } else {
-        await this.db.run(
-          `
-          UPDATE resources SET deleted = 1, updated = ? WHERE rid = ?
-        `,
-          [Date.now(), finalRid],
-        );
-      }
+      // 018 §6：删除只置 deleted=1，name/rid/layer 保持不变
+      // （(name, layer) 部分唯一索引 WHERE deleted=0 已释放约束，无需改名）
+      await this.db.run(
+        `
+        UPDATE resources SET deleted = 1, updated = ? WHERE rid = ?
+      `,
+        [Date.now(), finalRid],
+      );
     } else {
       await this.db.run(
         `

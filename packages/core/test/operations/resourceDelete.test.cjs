@@ -74,7 +74,7 @@ describe('resource.delete handler', () => {
   });
 
   describe('undo', () => {
-    test('restores deleted resource (deleted=0 and original name)', async () => {
+    test('restores deleted resource (deleted=0 only; name 未删改，不重写)', async () => {
       const run = jest.fn().mockResolvedValue({ changes: 1 });
       const operationResult = {
         rid: 'r1',
@@ -87,16 +87,10 @@ describe('resource.delete handler', () => {
       const [sql, params] = run.mock.calls[0];
       expect(sql).toContain('UPDATE resources');
       expect(sql).toContain('deleted = 0');
-      expect(params[0]).toBe('a.md');
-      expect(params[2]).toBe('r1');
+      expect(sql).not.toContain('name');
+      expect(typeof params[0]).toBe('number'); // updated 时间戳
+      expect(params[1]).toBe('r1');
       expect(result).toEqual({ restored: true, rid: 'r1' });
-    });
-
-    test('falls back to rid as name when before snapshot missing', async () => {
-      const run = jest.fn().mockResolvedValue({ changes: 1 });
-      await handler.undo({ db: { run } }, { operationResult: { rid: 'r1', before: null } });
-      const [sql, params] = run.mock.calls[0];
-      expect(params[0]).toBe('r1');
     });
 
     test('throws when operationResult missing rid', async () => {
