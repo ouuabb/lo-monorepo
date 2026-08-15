@@ -60,7 +60,7 @@ module.exports = async function edit(argv) {
 
     await repo.close();
 
-    Logger.info(`正在编辑: ${resource.metadata.title || "未命名资源"}`);
+    Logger.info(`正在编辑: ${resource.name || "未命名资源"}`);
 
     exec(`"${useEditor}" "${editPath}"`, async (error) => {
       if (error) {

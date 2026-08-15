@@ -830,7 +830,7 @@ describe('notes.upload（multipart 构造）', () => {
         { name: 'a.md', data: Buffer.from('# 标题A'), contentType: 'text/markdown' },
         { name: 'b.txt', data: Buffer.from('hello') },
       ],
-      { title: '导入测试', tags: ['t1', 't2'] },
+      { name: '导入测试', tags: ['t1', 't2'] },
     );
     expect(res.uploaded).toBe(2);
     expect(calls[0].method).toBe('POST');
@@ -840,7 +840,7 @@ describe('notes.upload（multipart 构造）', () => {
     const boundary = requestOpts.headers['Content-Type'].match(/boundary=(.+)/)[1];
     expect(requestOpts.headers['Content-Type']).toContain('multipart/form-data');
     const parsed = parseMultipart(requestOpts.body, boundary);
-    expect(parsed.fields.title).toBe('导入测试');
+    expect(parsed.fields.name).toBe('导入测试');
     expect(parsed.fields.tags).toBe('t1,t2');
     expect(parsed.files.length).toBe(2);
     expect(parsed.files[0].name).toBe('file');

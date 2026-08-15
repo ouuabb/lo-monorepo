@@ -22,7 +22,7 @@ module.exports = async function move(argv) {
 
     await repo.moveResource(resource.rid, targetPath);
 
-    Logger.success(`资源已移动: ${resource.metadata.title || "未命名资源"}`);
+    Logger.success(`资源已移动: ${resource.name || "未命名资源"}`);
     Logger.info(`新位置: ${targetPath}`);
 
     await repo.close();

@@ -53,7 +53,7 @@ module.exports = async function stack(argv) {
             `${chalk.bold(name)}  ${chalk.gray("(活跃:")} ${activeStr}${chalk.gray(")")}`,
           );
           for (const r of group.stacked) {
-            const title = r.metadata?.title || "(无标题)";
+            const title = r.name || "(无名称)";
             console.log(
               `  [layer ${r.layer}] ${chalk.yellow.bold(truncateRid(r.rid))}  ${chalk.yellow(title)}  ${chalk.gray(r.path)}  ${chalk.gray(formatDate(r.created))}`,
             );
@@ -94,7 +94,7 @@ module.exports = async function stack(argv) {
         const newStack = await rs.getStack(target.name);
         console.log(`${chalk.green("✓")} 提升成功！`);
         console.log(
-          `  新活跃 (layer=0): ${truncateRid(newActive.rid)} ${chalk.yellow(newActive.metadata?.title || "")}  (${newActive.path})`,
+          `  新活跃 (layer=0): ${truncateRid(newActive.rid)} ${chalk.yellow(newActive.name || "")}  (${newActive.path})`,
         );
         console.log(
           `  当前栈: ${

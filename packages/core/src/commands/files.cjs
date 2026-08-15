@@ -65,7 +65,7 @@ module.exports = async function files(argv) {
             metadata: dbResource
               ? dbResource.metadata
               : {
-                  title: path.basename(relPath, ".md"),
+                  name: path.basename(relPath, ".md"),
                   tags: [],
                   category: null,
                 },
@@ -139,7 +139,7 @@ module.exports = async function files(argv) {
           type: ResourceType.fromPath(absPath) || "note",
           path: absPath,
           metadata: {
-            title: path.basename(relPath, ".md"),
+            name: path.basename(relPath, ".md"),
             tags: [],
             category: null,
           },
@@ -216,7 +216,7 @@ module.exports = async function files(argv) {
     };
 
     display.forEach((file) => {
-      const title = file.metadata.title || "未命名";
+      const title = file.name || "未命名";
       const date = new Date(file.created).toLocaleDateString();
       const statusLabel = getStatusLabel(file._status);
       console.log(`${statusLabel} ${title} ${chalk.gray(date)}`);

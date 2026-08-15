@@ -196,7 +196,7 @@ describe('EpubReaderPlugin _importEpub', () => {
     const resource = result.resources[0];
     expect(resource.rid).toBe('mock-rid-001');
     expect(resource.type).toBe('epub');
-    expect(resource.title).toBe('测试书');
+    expect(resource.name).toBe('测试书');
     expect(resource.metadata.title).toBe('测试书');
     expect(resource.metadata.author).toBe('作者');
     expect(resource.metadata.spineCount).toBe(1);

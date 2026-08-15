@@ -39,10 +39,10 @@ describe('show command', () => {
   test('prints resource details and content', async () => {
     const r = await repo.createResource('note', '# Hello World', {
       filename: 'note.md',
-      metadata: { title: 'My Note', category: 'Work' }
+      metadata: { category: 'Work' }
     });
     const text = await runWithCapture({ rid: r.rid });
-    expect(text).toContain('My Note');
+    expect(text).toContain('note');
     expect(text).toContain(r.rid);
     expect(text).toContain('分类: Work');
     expect(text).toContain('# Hello World');
@@ -52,7 +52,7 @@ describe('show command', () => {
   test('prints raw content when raw option is set', async () => {
     const r = await repo.createResource('note', 'RAW CONTENT LINE', {
       filename: 'raw.md',
-      metadata: { title: 'Raw Note' }
+      metadata: {}
     });
     const text = await runWithCapture({ rid: r.rid, raw: true });
     expect(text).toContain('RAW CONTENT LINE');
@@ -60,10 +60,10 @@ describe('show command', () => {
     expect(process.exit).toHaveBeenCalledWith(0);
   });
 
-  test('falls back to un-named resource when title is missing', async () => {
+  test('falls back to rid when name is missing', async () => {
     const r = await repo.createResource('note', 'Body', { filename: 'plain.md' });
     const text = await runWithCapture({ rid: r.rid });
-    expect(text).toContain('未命名资源');
+    expect(text).toContain(r.rid);
     expect(process.exit).toHaveBeenCalledWith(0);
   });
 

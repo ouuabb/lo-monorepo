@@ -86,7 +86,7 @@ module.exports = async function tag(argv) {
         break;
 
       case "list":
-        Logger.title(`资源 "${resource.metadata.title || "未命名"}" 的标签`);
+        Logger.title(`资源 "${resource.name || "未命名"}" 的标签`);
         const showTags = resource.tags || [];
         if (showTags.length === 0) {
           Logger.info("暂无标签");

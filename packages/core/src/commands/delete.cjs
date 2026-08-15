@@ -24,7 +24,7 @@ module.exports = async function deleteResource(argv) {
 
       const confirmed = await new Promise((resolve) => {
         readline.question(
-          `确定要删除 "${resource.metadata.title || "未命名资源"}" 吗？(y/n): `,
+          `确定要删除 "${resource.name || "未命名资源"}" 吗？(y/n): `,
           (answer) => {
             readline.close();
             resolve(answer.toLowerCase() === "y");

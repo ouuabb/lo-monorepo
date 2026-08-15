@@ -127,12 +127,12 @@ describe('list command', () => {
 
     const output = await runWithCapture({});
     expect(process.exit).toHaveBeenCalledWith(0);
-    expect(output).toContain('Committed');
-    expect(output).toContain('Modified');
-    expect(output).toContain('Staged Add');
-    expect(output).toContain('Staged New');
-    expect(output).toContain('Staged Del');
-    expect(output).toContain('Deleted');
+    expect(output).toContain('committed');
+    expect(output).toContain('modified');
+    expect(output).toContain('stagedadd');
+    expect(output).toContain('stagednew');
+    expect(output).toContain('stageddel');
+    expect(output).toContain('deleted');
     expect(output).toContain('untracked');
     expect(output).toContain('stagedUntracked');
     expect(output).toContain('修改');
@@ -166,7 +166,7 @@ describe('list command', () => {
 
     const output = await runWithCapture({ tag: 't1', category: 'c1' });
     expect(process.exit).toHaveBeenCalledWith(0);
-    expect(output).toContain('Tagged');
+    expect(output).toContain('tagged');
     expect(output).not.toContain('Other');
   });
 
@@ -180,8 +180,8 @@ describe('list command', () => {
 
     const output = await runWithCapture({ status: true });
     expect(process.exit).toHaveBeenCalledWith(0);
-    expect(output).toContain('Modified');
-    expect(output).not.toContain('Committed');
+    expect(output).toContain('modified');
+    expect(output).not.toContain('committed');
   });
 
   test('should error when not in a repository', async () => {

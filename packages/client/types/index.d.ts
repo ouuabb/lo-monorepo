@@ -178,7 +178,7 @@ export interface NotesApi {
       data: Buffer | Uint8Array | ArrayBuffer;
       contentType?: string;
     }>,
-    options?: { title?: string; tags?: string[] },
+    options?: { name?: string; tags?: string[] },
   ): Promise<LoBody>;
 }
 

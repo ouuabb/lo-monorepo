@@ -143,7 +143,7 @@ async function note(args, ctx) {
   }
 
   // 创建笔记 Resource（2.md §5.2 阅读笔记；内容走 metadata，与 HTTP reader 一致）
-  const bookTitle = (epubResource.metadata && epubResource.metadata.title) || epubResource.title || epubResource.name || rid;
+  const bookTitle = (epubResource.metadata && epubResource.metadata.title) || epubResource.name || rid;
   const noteResource = await ctx.resources.create({
     type: 'note',
     name: `笔记: ${bookTitle}`,
@@ -192,7 +192,7 @@ async function notes(args, ctx) {
     const noteRid = rel.to_rid;
     const note = await ctx.resources.getByRid(noteRid);
     const meta = note && note.metadata ? note.metadata : {};
-    logger.info(`  ${noteRid}  ${note ? (note.title || note.name || '') : '(已删除)'}`);
+    logger.info(`  ${noteRid}  ${note ? (note.name || '') : '(已删除)'}`);
     if (meta.quote) logger.info(`    引用: ${meta.quote.substring(0, 50)}...`);
     if (meta.location) logger.info(`    位置: ${meta.location}`);
     if (note && note.updatedAt) logger.info(`    时间: ${note.updatedAt}`);
@@ -345,7 +345,7 @@ async function open(args, ctx) {
     if (err) {
       logger.info(`无法自动打开浏览器，请手动访问:\n  ${url}`);
     } else {
-      logger.info(`已在浏览器中打开: ${resource.title || resource.name || rid}`);
+      logger.info(`已在浏览器中打开: ${resource.name || rid}`);
     }
   });
 }

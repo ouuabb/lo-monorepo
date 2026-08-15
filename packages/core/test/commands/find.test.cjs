@@ -22,7 +22,7 @@ describe('find command', () => {
     await find({ _: ['lo', 'find'], query: 'alpha', limit: 10 });
 
     expect(process.exit).toHaveBeenCalledWith(0);
-    expect(logSpy.mock.calls.some(args => String(args[0]).includes('Alpha'))).toBe(true);
+    expect(logSpy.mock.calls.some(args => String(args[0]).includes('alpha'))).toBe(true);
     logSpy.mockRestore();
   });
 

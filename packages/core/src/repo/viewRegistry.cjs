@@ -993,7 +993,8 @@ class ViewRegistry {
       case "name":
         return row.name;
       case "title":
-        return (row.metadata && row.metadata.title) || row.name;
+        // 018：title 字段解析为 Resource name（view 列名兼容，语义=name）
+        return row.name;
       case "type":
         return row.type;
       case "location":

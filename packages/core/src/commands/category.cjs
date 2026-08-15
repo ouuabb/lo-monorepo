@@ -139,7 +139,7 @@ module.exports = async function category(argv) {
         break;
 
       case "list":
-        Logger.title(`资源 "${resource.metadata.title || "未命名"}" 的分类`);
+        Logger.title(`资源 "${resource.name || "未命名"}" 的分类`);
         console.log(resource.metadata.category || "(未设置)");
         const pendingMeta = (stagingStatus.metadata || []).find(
           (m) => m.rid === resource.rid,

@@ -227,7 +227,7 @@ class LoCoreService {
   /**
    * 创建笔记（统一走 client.notes.create → POST /api/notes → repo.createResource；
    * Core 内部自动登记 resource.create operation，可经 undo 撤销）
-   * @param {object} body — { type?, content?, title?, metadata?, tags?, category?, filename? }
+   * @param {object} body — { type?, content?, name?, metadata?, tags?, category?, filename? }
    */
   async createNote(body = {}) {
     try {
@@ -260,7 +260,7 @@ class LoCoreService {
   /**
    * 导入文件（multipart 构造已封装在 @lo/client 内部）
    * @param {Array<{ name: string, data: Buffer, contentType?: string }>} files
-   * @param {object} [options] — { title?, tags? }
+   * @param {object} [options] — { name?, tags? }
    */
   async uploadNotes(files, options = {}) {
     try {
@@ -316,7 +316,7 @@ class LoCoreService {
   }
 
   /**
-   * 更新资源(content/metadata/title/tags/category)
+   * 更新资源(content/metadata/name/tags/category)
    *
    * 写路径已收敛到 Operation 语义(010 Phase1/Phase2):
    *   client.operations.execute("resource.update", { rid, updates })

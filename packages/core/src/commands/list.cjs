@@ -161,7 +161,6 @@ module.exports = async function list(argv) {
             path: absPath,
             name: path.basename(relPath, path.extname(relPath)),
             metadata: {
-              title: path.basename(relPath, path.extname(relPath)),
               tags: [],
               category: null,
             },
@@ -177,7 +176,6 @@ module.exports = async function list(argv) {
             path: absPath,
             name: path.basename(relPath, path.extname(relPath)),
             metadata: {
-              title: path.basename(relPath, path.extname(relPath)),
               tags: [],
               category: null,
             },
@@ -244,7 +242,7 @@ module.exports = async function list(argv) {
     };
 
     display.forEach((resource) => {
-      const title = resource.metadata.title || resource.name || "未命名";
+      const title = resource.name || "未命名";
       const date = new Date(resource.created).toLocaleDateString();
       const statusLabel = getStatusLabel(resource._status);
       const kindIcon = getKindIcon(resource._kind);

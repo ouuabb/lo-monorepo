@@ -141,10 +141,7 @@ module.exports = async function find(argv) {
     Logger.title(`搜索结果: "${query}" (共 ${filtered.length} 个)`);
 
     filtered.forEach((resource, index) => {
-      const title =
-        (resource.metadata && resource.metadata.title) ||
-        resource.name ||
-        "未命名";
+      const title = resource.name || "未命名";
       const typeColor = chalk.blue(resource.type || "unknown");
       const created = resource.created
         ? new Date(resource.created).toLocaleDateString()

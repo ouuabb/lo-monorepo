@@ -81,7 +81,7 @@ module.exports = async function encryptResource(argv) {
       await repo.db.run('UPDATE resources SET encrypted = 1 WHERE rid = ?', [resource.rid]);
 
       Logger.success(`文件已加密: ${resource.rid}`);
-      Logger.info(`  名称: ${resource.metadata.title || resource.name}`);
+      Logger.info(`  名称: ${resource.name}`);
       Logger.info(`  路径: ${absPath}`);
     }
 

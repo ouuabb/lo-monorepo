@@ -25,7 +25,7 @@ module.exports = async function link(argv) {
     await repo.linkResources(resourceA.rid, resourceB.rid, type);
 
     Logger.success(
-      `已建立链接: ${resourceA.metadata.title} ↔ ${resourceB.metadata.title}`,
+      `已建立链接: ${resourceA.name} ↔ ${resourceB.name}`,
     );
     Logger.info(`链接类型: ${type}`);
 

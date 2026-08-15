@@ -198,7 +198,7 @@ const [repoCtx, setRepoCtx] = useState(null);
         const data = res.data;
         const readOnly = n.type !== 'note' || readOnlyOverrides.has(n.rid);
         const meta = data.metadata || {};
-        const tabTitle = meta.title || n.name || n.rid;
+        const tabTitle = n.name || n.rid;
         const tabTags = Array.isArray(data.tags) ? data.tags.join(', ') : '';
         const tab = {
           key: n.rid,
@@ -265,6 +265,7 @@ const [repoCtx, setRepoCtx] = useState(null);
     [tabs, isDirty, closeTab],
   );
 
+  // 标题框 = Resource name（018：rename 入口）；tab.title 为 UI 变量，落库走 body.name
   const setActiveTitle = useCallback(
     (title) => {
       setTabs((prev) => prev.map((t) => (t.key === activeKey ? { ...t, title } : t)));
@@ -291,7 +292,7 @@ const [repoCtx, setRepoCtx] = useState(null);
       if (!api || !activeTab || activeTab.readOnly) return;
       if (!silent) notify('');
       const body = { content: activeTab.text };
-      if (activeTab.title !== activeTab.savedTitle) body.title = activeTab.title;
+      if (activeTab.title !== activeTab.savedTitle) body.name = activeTab.title;
       if (activeTab.tagsText !== activeTab.savedTagsText) {
         body.tags = activeTab.tagsText
           .split(/[,，]/)
@@ -351,7 +352,7 @@ const [repoCtx, setRepoCtx] = useState(null);
     setBusy(true);
     notify('');
     try {
-      const res = await api.createNote({ content: '', title: '未命名笔记' });
+      const res = await api.createNote({ content: '', name: '未命名笔记' });
       if (res.ok && res.data && res.data.rid) {
         notify('已创建');
         handleRefresh();
@@ -1911,7 +1912,7 @@ function RelationPanel(props) {
   // 从 notes 列表解析对端资源名(名称或标题)
   const resolveName = (rid2) => {
     const found = (notes || []).find((n) => n.rid === rid2);
-    if (found) return (found.metadata && found.metadata.title) || found.name || rid2;
+    if (found) return found.name || rid2;
     return rid2;
   };
 
@@ -2158,7 +2159,7 @@ function WorkspacePanel(props) {
             <tbody>
               {notes.map((n) => (
                 <tr key={n.rid}>
-                  <td>{(n.metadata && n.metadata.title) || n.name || ''}</td>
+                  <td>{n.name || ''}</td>
                   <td>
                     <span className="name-badge">{n.type}</span>
                   </td>
@@ -2318,7 +2319,7 @@ function ResourceExplorer(props) {
                     title={n.rid}
                   >
                     <span className="explore-name">
-                      {(n.metadata && n.metadata.title) || n.name || n.rid}
+                      {n.name || n.rid}
                     </span>
                   </button>
                 ))}

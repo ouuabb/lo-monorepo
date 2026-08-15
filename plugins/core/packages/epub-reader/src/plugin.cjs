@@ -132,7 +132,8 @@ class EpubReaderPlugin extends Plugin {
     const candidate = {
       type: 'epub',
       path: filePath,
-      title: book.title,
+      // 018：name 候选 = 书名（统一 normalize）；metadata.title 为 EPUB 业务元数据
+      name: book.title,
       metadata: {
         title: book.title,
         author: book.author,

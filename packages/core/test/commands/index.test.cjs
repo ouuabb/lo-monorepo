@@ -45,21 +45,21 @@ describe('index command', () => {
     expect(spy).toHaveBeenCalledWith(expect.stringContaining('索引已生成'));
 
     const content = await fs.readFile(path.join(ctx.dir, 'README.md'), 'utf-8');
-    expect(content).toContain('- [Alpha Note]');
-    expect(content).toContain('- [Beta Note]');
+    expect(content).toContain('- [alpha]');
+    expect(content).toContain('- [beta]');
     expect(content).toContain('### note (2个)');
     expect(content).toContain('总资源数: 3');
     expect(process.exit).toHaveBeenCalledWith(0);
     spy.mockRestore();
   });
 
-  test('falls back to unnamed placeholder for resources without a title', async () => {
+  test('falls back to name for resources without metadata', async () => {
     await repo.createResource('note', '# Untitled', { filename: 'plain.md' });
 
     const spy = jest.spyOn(console, 'log');
     await index({});
     const content = await fs.readFile(path.join(ctx.dir, 'README.md'), 'utf-8');
-    expect(content).toContain('- [未命名]');
+    expect(content).toContain('- [plain]');
     expect(process.exit).toHaveBeenCalledWith(0);
     spy.mockRestore();
   });

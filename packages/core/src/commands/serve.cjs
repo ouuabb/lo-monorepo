@@ -459,7 +459,7 @@ route("POST", "/api/notes/upload", async (req, res, { repo }) => {
   const results = [];
   for (const file of files) {
     // 018 §3：上传候选 name = multipart title 字段（外部输入）；无则回退 filename 推导
-    const titleCandidate = fields.title || null;
+    const nameCandidate = fields.name || null;
     let tags = [];
     if (fields.tags) {
       tags = fields.tags
@@ -473,7 +473,7 @@ route("POST", "/api/notes/upload", async (req, res, { repo }) => {
     try {
       const result = await repo.createResource(null, file.data, {
         filename: file.filename,
-        name: titleCandidate,
+        name: nameCandidate,
         metadata: {
           tags,
           mimetype: file.contentType,
@@ -505,13 +505,12 @@ route("POST", "/api/notes", async (req, res, { repo }) => {
     return badRequest(res, e.message);
   }
 
-  const { type, content, metadata = {}, filename } = body;
-  if (!content && !body.title)
-    return badRequest(res, 'Missing "content" or "title" field');
+  const { type, content, metadata = {}, filename, name } = body;
+  if (!content && !name)
+    return badRequest(res, 'Missing "content" or "name" field');
 
-  const actualContent = content || body.title || "";
+  const actualContent = content || "";
   const mergedMetadata = { ...metadata };
-  if (body.title && !mergedMetadata.title) mergedMetadata.title = body.title;
   if (body.tags && !mergedMetadata.tags) mergedMetadata.tags = body.tags;
   if (body.category && !mergedMetadata.category)
     mergedMetadata.category = body.category;
@@ -520,6 +519,7 @@ route("POST", "/api/notes", async (req, res, { repo }) => {
     const result = await repo.createResource(type, actualContent, {
       filename,
       metadata: mergedMetadata,
+      ...(name !== undefined ? { name } : {}),
     });
     jsonOk(res, toApiResource(result), 201);
   } catch (e) {
@@ -553,18 +553,15 @@ route("PUT", "/api/notes/:rid", async (req, res, { repo, url }) => {
       updates.content = content;
     }
 
-    // 用户显式传入的 metadata/title/tags/category 覆盖 refresh 结果
+    // 用户显式传入的 metadata/tags/category 覆盖 refresh 结果；name 单独收敛
     if (body.metadata !== undefined) {
       updates.metadata = {
         ...(updates.metadata || resource.metadata || {}),
         ...body.metadata,
       };
     }
-    if (body.title !== undefined) {
-      updates.metadata = {
-        ...(updates.metadata || resource.metadata || {}),
-        title: body.title,
-      };
+    if (body.name !== undefined) {
+      updates.name = body.name;
     }
     if (body.tags !== undefined) {
       updates.metadata = {
@@ -1555,8 +1552,8 @@ route("GET", "/api/admin/resources", async (req, res, { repo, url }) => {
     if (q) {
       const lowerQ = q.toLowerCase();
       resources = resources.filter((r) => {
-        const title = (r.metadata && r.metadata.title) || r.name || "";
-        return title.toLowerCase().includes(lowerQ);
+        const label = r.name || "";
+        return label.toLowerCase().includes(lowerQ);
       });
     }
 
@@ -1637,7 +1634,7 @@ route("GET", "/api/admin/graph", async (req, res, { repo, url }) => {
       label: (() => {
         try {
           const m = JSON.parse(r.metadata || "{}");
-          return m.title || r.name || r.rid;
+          return r.name || r.rid;
         } catch {
           return r.name || r.rid;
         }

@@ -421,13 +421,13 @@ function createNotesApi(client) {
     },
     /**
      * 创建资源
-     * @param {object} body — { type?, content?, metadata?, filename?, title? }
+     * @param {object} body — { type?, content?, metadata?, filename?, name? }
      */
     create(body) {
       return client.post('/api/notes', body).then((r) => r.body);
     },
     /**
-     * 更新资源(content/metadata/title/tags/category)
+     * 更新资源(content/metadata/name/tags/category)
      */
     update(rid, body) {
       return client.put(`/api/notes/${encodeURIComponent(rid)}`, body).then((r) => r.body);
@@ -439,11 +439,11 @@ function createNotesApi(client) {
     /**
      * 导入文件(multipart/form-data,构造细节内部封装)
      * @param {Array<{ name: string, data: Buffer|Uint8Array|ArrayBuffer, contentType?: string }>} files
-     * @param {object} [options] — { title?, tags? } 应用到所有文件
+     * @param {object} [options] — { name?, tags? } 应用到所有文件
      */
     upload(files, options = {}) {
       const parts = buildMultipartBody(files, {
-        title: options.title,
+        name: options.name,
         tags: options.tags,
       });
       return client

@@ -22,7 +22,7 @@ function cellValue(row, col) {
 function rowTitle(row, columns) {
   const titleCol = (columns || []).find((c) => c.name === 'title');
   if (titleCol) return cellValue(row, titleCol.name);
-  return row.title || row.name || row.rid || '';
+  return row.name || row.rid || '';
 }
 
 function RowRenderer({ row, columns, onOpen }) {
@@ -30,7 +30,7 @@ function RowRenderer({ row, columns, onOpen }) {
   const cls = rid ? 'view-row clickable' : 'view-row';
   const open = () => {
     if (!rid || !onOpen) return;
-    onOpen({ rid, type: row.type, name: row.name || row.title || rid });
+    onOpen({ rid, type: row.type, name: row.name || rid });
   };
   return (
     <div className={cls} onClick={open} title={rid || undefined}>
@@ -59,7 +59,7 @@ function renderTable(result, onOpen) {
           <tr
             key={i}
             className={row.rid ? 'clickable' : ''}
-            onClick={() => row.rid && onOpen && onOpen({ rid: row.rid, type: row.type, name: row.name || row.title || row.rid })}
+            onClick={() => row.rid && onOpen && onOpen({ rid: row.rid, type: row.type, name: row.name || row.rid })}
           >
             {columns.map((c) => (
               <td key={c.name}>{cellValue(row, c.name)}</td>
@@ -91,7 +91,7 @@ function renderCards(result, onOpen) {
         <div
           key={i}
           className={`view-card ${row.rid ? 'clickable' : ''}`}
-          onClick={() => row.rid && onOpen && onOpen({ rid: row.rid, type: row.type, name: row.name || row.title || row.rid })}
+          onClick={() => row.rid && onOpen && onOpen({ rid: row.rid, type: row.type, name: row.name || row.rid })}
         >
           <div className="view-card-title">{rowTitle(row, columns)}</div>
           {shown.map((c) => (

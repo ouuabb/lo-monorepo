@@ -43,7 +43,7 @@ module.exports = async function show(argv) {
       return;
     }
 
-    Logger.title(resource.metadata.title || "未命名资源");
+    Logger.title(resource.name || "未命名资源");
     console.log(chalk.gray(`RID: ${resource.rid}`));
     console.log(chalk.gray(`名称: ${resource.name || "-"}`));
     console.log(chalk.gray(`类型: ${resource.type}`));

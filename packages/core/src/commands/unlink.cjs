@@ -25,7 +25,7 @@ module.exports = async function unlink(argv) {
     await repo.unlinkResources(resourceA.rid, resourceB.rid, type);
 
     Logger.success(
-      `已解除链接: ${resourceA.metadata.title} ↔ ${resourceB.metadata.title}`,
+      `已解除链接: ${resourceA.name} ↔ ${resourceB.name}`,
     );
     Logger.info(`链接类型: ${type}`);
 

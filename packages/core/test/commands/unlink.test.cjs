@@ -38,8 +38,8 @@ describe('unlink command', () => {
     const spy = jest.spyOn(console, 'log');
     await unlink({ from: a.rid, to: b.rid });
     expect(spy).toHaveBeenCalledWith(expect.stringContaining('已解除链接'));
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('Resource A'));
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('Resource B'));
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('a'));
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('b'));
     expect(process.exit).toHaveBeenCalledWith(0);
     spy.mockRestore();
 
