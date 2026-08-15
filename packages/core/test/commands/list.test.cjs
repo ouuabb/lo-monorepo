@@ -109,7 +109,7 @@ describe('list command', () => {
     await repo.staging.add(stagedAddPath);
 
     const stagedNewPath = path.join(ctx.tempDir, 'resources', 'stagedNew.md');
-    await repo.db.run('UPDATE resources SET hash = ? WHERE path = ?', ['', stagedNewPath]);
+    await repo.db.run('UPDATE resources SET hash = ? WHERE location_kind = ? AND location = ?', ['', 'local', path.relative(ctx.tempDir, stagedNewPath)]);
     await repo.staging.add(stagedNewPath);
 
     const stagedDelPath = path.join(ctx.tempDir, 'resources', 'stagedDel.md');

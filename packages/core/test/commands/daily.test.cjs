@@ -32,7 +32,10 @@ describe('daily command', () => {
     await repo.open({ skipAuth: true });
     const all = await repo.getAllResources();
     await repo.close();
-    return all.filter(r => r.path === targetPath).length;
+    const rel = path.relative(ctx.tempDir, targetPath);
+    return all.filter(
+      (r) => r.location_kind === 'local' && r.location === rel,
+    ).length;
   }
 
   test('首次执行创建当日日记（DB 记录 + 磁盘文件）', async () => {
@@ -50,7 +53,8 @@ describe('daily command', () => {
 
     expect(resource).not.toBeNull();
     expect(resource.type).toBe('note');
-    expect(resource.path).toBe(dailyPath);
+    expect(resource.location_kind).toBe('local');
+    expect(resource.location).toBe(path.relative(ctx.tempDir, dailyPath));
     expect(byRid.metadata.category).toBe('日记');
     expect(byRid.tags).toContain('daily');
   });

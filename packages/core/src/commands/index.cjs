@@ -25,7 +25,8 @@ module.exports = async function index(argv) {
     const recent = resources.slice(0, 20);
     recent.forEach((resource) => {
       const title = resource.metadata.title || "未命名";
-      content.push(`- [${title}](${resource.path})`);
+      const link = resource.location_kind === 'local' ? resource.location : resource.rid;
+      content.push(`- [${title}](${link})`);
     });
     content.push("");
 
@@ -37,7 +38,8 @@ module.exports = async function index(argv) {
       const typedResources = resources.filter((r) => r.type === item.type);
       typedResources.forEach((resource) => {
         const title = resource.metadata.title || "未命名";
-        content.push(`- [${title}](${resource.path})`);
+        const link = resource.location_kind === 'local' ? resource.location : resource.rid;
+        content.push(`- [${title}](${link})`);
       });
       content.push("");
     });

@@ -28,7 +28,7 @@ describe('find command', () => {
 
   test('should print path for resources with a path', async () => {
     jest.spyOn(Repository.prototype, 'search').mockResolvedValue([
-      { rid: 'res_1', name: 'alpha', type: 'note', metadata: { title: 'Alpha' }, path: '/notes/alpha.md' }
+      { rid: 'res_1', name: 'alpha', type: 'note', metadata: { title: 'Alpha' }, location_kind: 'external', location: '/notes/alpha.md' }
     ]);
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 

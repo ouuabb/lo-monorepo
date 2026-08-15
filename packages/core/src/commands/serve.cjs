@@ -411,7 +411,11 @@ route("GET", "/api/notes/:rid", async (req, res, { repo, url }) => {
   if (resource.deleted) return notFound(res, "Resource has been deleted");
 
   try {
-    const content = await readResourceContent(resource.path, repo.cryptoKey);
+    const absPath = repo.resourceService.resolveLocation({
+      kind: resource.location_kind,
+      value: resource.location,
+    });
+    const content = await readResourceContent(absPath, repo.cryptoKey);
     jsonOk(res, { ...resource, content });
   } catch (e) {
     serverError(res, `Failed to read file: ${e.message}`);
@@ -1555,8 +1559,12 @@ route("GET", "/api/admin/resources/:rid", async (req, res, { repo, url }) => {
     // 读取内容（加密资源用占位文本）
     let content = null;
     try {
-      if (resource.path && (await fs.pathExists(resource.path))) {
-        content = await readResourceContent(resource.path, repo.cryptoKey);
+      const absPath = repo.resourceService.resolveLocation({
+        kind: resource.location_kind,
+        value: resource.location,
+      });
+      if (absPath && (await fs.pathExists(absPath))) {
+        content = await readResourceContent(absPath, repo.cryptoKey);
       }
     } catch {
       content = "[加密内容]";
@@ -2205,14 +2213,19 @@ route("PUT", "/api/admin/resources/:rid", async (req, res, { repo, url }) => {
     const resource = await repo.getResource(rid);
     if (!resource) return notFound(res, "Resource not found");
 
-    // 更新文件内容
-    if (content !== undefined && resource.path) {
-      const filePath = path.join(repo.repoPath, resource.path);
-      await fs.writeFile(filePath, content, "utf-8");
-      if (repo.cryptoKey) {
-        await repo.encryptFile(filePath);
+    // 更新文件内容（仅 local/external 有本地文件；路径经 Resolver 解析）
+    if (content !== undefined) {
+      const absPath = repo.resourceService.resolveLocation({
+        kind: resource.location_kind,
+        value: resource.location,
+      });
+      if (absPath) {
+        await fs.writeFile(absPath, content, "utf-8");
+        if (repo.cryptoKey) {
+          await repo.encryptFile(absPath);
+        }
+        await repo.resourceService.refresh(rid);
       }
-      await repo.resourceService.refresh(rid);
     }
 
     // 更新元数据

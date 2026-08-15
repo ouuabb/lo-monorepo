@@ -24,10 +24,20 @@ module.exports = async function edit(argv) {
 
     const useEditor = editorArg || config.editor || "notepad";
     const cryptoKey = repo.cryptoKey;
-    let editPath = resource.path;
+    // 资源本地路径经 Core Resolver 解析（不直接读 resource.path）
+    const editPath0 = repo.resourceService.resolveLocation({
+      kind: resource.location_kind,
+      value: resource.location,
+    });
+    if (!editPath0) {
+      await repo.close();
+      Logger.error("该资源无本地文件，无法编辑");
+      process.exit(1);
+    }
+    let editPath = editPath0;
 
     let tempFilePath = null;
-    const raw = await fs.readFile(resource.path);
+    const raw = await fs.readFile(editPath0);
     if (raw.length >= 4 && raw.subarray(0, 4).equals(CryptoUtils.MAGIC)) {
       if (!cryptoKey) {
         await repo.close();
@@ -38,7 +48,7 @@ module.exports = async function edit(argv) {
       const plaintext = CryptoUtils.decryptFile(raw, cryptoKey);
       tempFilePath = path.join(
         os.tmpdir(),
-        `lo-edit-${path.basename(resource.path)}`,
+        `lo-edit-${path.basename(editPath0)}`,
       );
       await fs.writeFile(tempFilePath, plaintext);
       editPath = tempFilePath;
@@ -67,12 +77,12 @@ module.exports = async function edit(argv) {
           const editedContent = await fs.readFile(tempFilePath);
           if (cryptoKey) {
             await CryptoUtils.writeEncryptedFile(
-              resource.path,
+              editPath0,
               editedContent,
               cryptoKey,
             );
           } else {
-            await fs.writeFile(resource.path, editedContent);
+            await fs.writeFile(editPath0, editedContent);
           }
           Logger.success("文件已保存并重新加密");
         } catch (e) {
@@ -101,7 +111,8 @@ module.exports = async function edit(argv) {
             require("../repo/syncOps.cjs").OP_TYPES.RESOURCE_UPDATED,
             resource.rid,
             {
-              path: path.relative(repo2.repoPath, resource.path),
+              path:
+                resource.location_kind === 'local' ? resource.location : '',
               old_hash: resource.hash,
               new_hash: refreshed.hash,
               metadata: refreshed.metadata,

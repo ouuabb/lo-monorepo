@@ -49,17 +49,20 @@ module.exports = async function list(argv) {
       if (tag && (!resource.tags || !resource.tags.includes(tag))) continue;
       if (category && resource.metadata.category !== category) continue;
 
-      const isManagedFile =
-        resource.path && resource.path.startsWith(resourcesDir);
+      const abs =
+        resource.location_kind === 'local'
+          ? path.join(repoPath, resource.location)
+          : resource.location_kind === 'external'
+            ? resource.location
+            : null;
+      const isManagedFile = abs != null && abs.startsWith(resourcesDir);
       const isContainer =
         resource.capabilities && resource.capabilities.includes("container");
 
       if (isManagedFile) {
         // ── File Resource ──
-        const exists = await fs.pathExists(resource.path);
-        const relPath = path
-          .relative(repoPath, resource.path)
-          .replace(/\\/g, "/");
+        const exists = await fs.pathExists(abs);
+        const relPath = resource.location;
 
         // 检查暂存区
         const isStagedAdd = stagingStatus.added.includes(relPath);
@@ -67,11 +70,11 @@ module.exports = async function list(argv) {
 
         if (exists && !isStagedDel) {
           // 文件存在，检查是否被修改
-          const stats = await fs.stat(resource.path);
+          const stats = await fs.stat(abs);
           let currentHash;
           try {
             currentHash = await HashUtils.fromFile(
-              resource.path,
+              abs,
               repo.cryptoKey,
             );
           } catch {
@@ -90,7 +93,7 @@ module.exports = async function list(argv) {
           allResources.push({
             rid: `${resource.rid.substring(0, 12)}...`,
             type: resource.type,
-            path: resource.path,
+            location: resource.location,
             name: resource.name,
             metadata: resource.metadata,
             capabilities: resource.capabilities,
@@ -105,7 +108,7 @@ module.exports = async function list(argv) {
           allResources.push({
             rid: `${resource.rid.substring(0, 12)}...`,
             type: resource.type,
-            path: resource.path,
+            location: resource.location,
             name: resource.name,
             metadata: resource.metadata,
             capabilities: resource.capabilities,
@@ -116,13 +119,13 @@ module.exports = async function list(argv) {
           });
         }
 
-        addedPaths.add(resource.path);
+        addedPaths.add(abs);
       } else {
         // ── 非文件 Resource（Container / URL / Virtual 等）──
         allResources.push({
           rid: `${resource.rid.substring(0, 12)}...`,
           type: resource.type,
-          path: resource.path || "",
+            location: resource.location || "",
           name: resource.name,
           metadata: resource.metadata,
           capabilities: resource.capabilities,
@@ -132,7 +135,7 @@ module.exports = async function list(argv) {
           _kind: isContainer ? "container" : "virtual",
         });
 
-        addedPaths.add(resource.path || resource.rid);
+        addedPaths.add(abs || resource.rid);
       }
     }
 

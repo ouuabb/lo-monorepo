@@ -134,7 +134,12 @@ async function status(argv) {
 
   // ====== 工作区 ======
   const dbResources = await repo.resourceService.getAll();
-  const dbPaths = new Map(dbResources.map((r) => [r.path, r]));
+  // 工作区检测只覆盖仓库内（local）资源；key = 解析后的绝对路径
+  const dbPaths = new Map(
+    dbResources
+      .filter((r) => r.location_kind === 'local' && r.location)
+      .map((r) => [path.join(repoPath, r.location), r]),
+  );
 
   const excludeDirs = [".repo", "node_modules", ".git"];
   let files = [];

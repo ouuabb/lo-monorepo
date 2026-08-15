@@ -64,7 +64,7 @@ describe('edit command', () => {
     await waitForExit(0);
     expect(exec).toHaveBeenCalled();
     const cmd = exec.mock.calls[0][0];
-    expect(cmd).toContain(resource.path);
+    expect(cmd).toContain(path.join(ctx.tempDir, resource.location));
     logSpy.mockRestore();
   });
 
@@ -112,12 +112,13 @@ describe('edit command', () => {
       await repo.open({ skipAuth: true });
       const resource = await repo.importFile(filePath);
       const key = repo.cryptoKey;
-      await CryptoUtils.writeEncryptedFile(resource.path, Buffer.from('# Secret'), key);
+      const resourceAbs = path.join(ctx.tempDir, resource.location);
+      await CryptoUtils.writeEncryptedFile(resourceAbs, Buffer.from('# Secret'), key);
       await repo.close();
 
       const fresh = new Repository(ctx.tempDir);
       await fresh.open({ skipAuth: true });
-      const raw = await require('fs-extra').readFile(resource.path);
+      const raw = await require('fs-extra').readFile(resourceAbs);
       expect(raw.subarray(0, 4).equals(CryptoUtils.MAGIC)).toBe(true);
       await fresh.close();
 
@@ -127,7 +128,7 @@ describe('edit command', () => {
       await edit({ _: ['lo', 'edit'], rid: resource.rid });
 
       await waitForExit(0);
-      const after = await require('fs-extra').readFile(resource.path);
+      const after = await require('fs-extra').readFile(resourceAbs);
       expect(after.subarray(0, 4).equals(CryptoUtils.MAGIC)).toBe(true);
       logSpy.mockRestore();
     });
@@ -142,7 +143,11 @@ describe('edit command', () => {
       await repo.open({ skipAuth: true });
       const resource = await repo.importFile(filePath);
       const fakeKey = Buffer.alloc(32, 7);
-      await CryptoUtils.writeEncryptedFile(resource.path, Buffer.from('# Secret'), fakeKey);
+      await CryptoUtils.writeEncryptedFile(
+        path.join(ctx.tempDir, resource.location),
+        Buffer.from('# Secret'),
+        fakeKey,
+      );
       await repo.close();
 
       const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});

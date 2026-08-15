@@ -65,7 +65,13 @@ module.exports = async function daily(argv) {
     });
 
     Logger.success(`今日日记已创建: ${resource.rid}`);
-    Logger.info("位置:", resource.path);
+    Logger.info(
+      "位置:",
+      repo.resourceService.resolveLocation({
+        kind: resource.location_kind,
+        value: resource.location,
+      }),
+    );
     Logger.info(`编辑: lo edit ${resource.rid}`);
 
     await repo.close();

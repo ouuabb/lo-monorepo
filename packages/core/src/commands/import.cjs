@@ -60,7 +60,12 @@ async function coreImportFile(repo, targetPath, type, category, defaultNote, def
   }
   Logger.success(`成功导入资源: ${resource.rid}`);
   Logger.info(`类型: ${resource.type}`);
-  Logger.info(`路径: ${resource.path}`);
+  Logger.info(
+    `路径: ${repo.resourceService.resolveLocation({
+      kind: resource.location_kind,
+      value: resource.location,
+    })}`,
+  );
   return resource;
 }
 

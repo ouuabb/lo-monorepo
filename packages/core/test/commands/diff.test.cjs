@@ -116,7 +116,7 @@ describe('diff command', () => {
 
   test('should skip staged modify when file is not tracked', async () => {
     const repo = await openRepo(ctx.tempDir);
-    await repo.db.run("INSERT INTO staging_changes (type, location_kind, location, created_at) VALUES ('modify', 'ghost.md', ?)", [Date.now()]);
+    await repo.db.run("INSERT INTO staging_changes (type, path, created_at) VALUES ('modify', 'ghost.md', ?)", [Date.now()]);
     await repo.close();
 
     const output = await runDiff({ _: ['lo'] });
@@ -246,7 +246,7 @@ describe('diff command', () => {
     await repo.db.run(
       `INSERT INTO resources (rid, name, layer, type, location_kind, location, hash, metadata, encrypted, created, updated)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ['res_locked2',  'locked2',  0,  'note', 'local',  filePath,  'different-hash',  '{}',  1,  Date.now(),  Date.now()]
+      ['res_locked2',  'locked2',  0,  'note', 'local',  path.relative(ctx.tempDir, filePath),  'different-hash',  '{}',  1,  Date.now(),  Date.now()]
     );
     await repo.close();
 
@@ -293,7 +293,12 @@ describe('diff command with crypto', () => {
     CryptoUtils.writeEncryptedFile(filePath, Buffer.from('# E\n\nv1\n', 'utf-8'), key);
 
     const repo = await openRepoWithCrypto();
-    await repo.resourceService.create({ type: 'note', path: filePath, name: 'enc-note' });
+    await repo.resourceService.create({
+      type: 'note',
+      location_kind: 'local',
+      location: path.relative(ctx.tempDir, filePath),
+      name: 'enc-note',
+    });
     await repo.close();
 
     CryptoUtils.writeEncryptedFile(filePath, Buffer.from('# E\n\nv2 changed\n', 'utf-8'), key);

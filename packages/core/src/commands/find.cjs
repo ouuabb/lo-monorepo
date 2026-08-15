@@ -156,8 +156,13 @@ module.exports = async function find(argv) {
       console.log(
         `${index + 1}. ${title} ${typeColor} ${chalk.gray(created)}${sourceTag}`,
       );
-      if (resource.path) {
-        console.log(`   ${resource.path}`);
+      const loc = resource.location_kind === 'local'
+        ? resource.location
+        : resource.location_kind === 'external'
+          ? resource.location
+          : null;
+      if (loc) {
+        console.log(`   ${loc}`);
       }
     });
 

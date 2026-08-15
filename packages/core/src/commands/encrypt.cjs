@@ -30,8 +30,8 @@ module.exports = async function encryptResource(argv) {
           continue;
         }
         try {
-          const plaintext = await fs.readFile(res.path);
-          await CryptoUtils.writeEncryptedFile(res.path, plaintext, cryptoKey);
+          const plaintext = await fs.readFile(repo.resourceService.resolveLocation({ kind: res.location_kind, value: res.location }));
+          await CryptoUtils.writeEncryptedFile(repo.resourceService.resolveLocation({ kind: res.location_kind, value: res.location }), plaintext, cryptoKey);
           await repo.resourceService.update(res.rid, { metadata: res.metadata });
           // 通过直接 SQL 更新 encrypted 标记
           await repo.db.run('UPDATE resources SET encrypted = 1 WHERE rid = ?', [res.rid]);
@@ -65,13 +65,27 @@ module.exports = async function encryptResource(argv) {
         return;
       }
 
-      const plaintext = await fs.readFile(resource.path);
-      await CryptoUtils.writeEncryptedFile(resource.path, plaintext, cryptoKey);
+      const plaintext = await fs.readFile(
+        repo.resourceService.resolveLocation({
+          kind: resource.location_kind,
+          value: resource.location,
+        }),
+      );
+      await CryptoUtils.writeEncryptedFile(
+        repo.resourceService.resolveLocation({
+          kind: resource.location_kind,
+          value: resource.location,
+        }),
+        plaintext,
+        cryptoKey,
+      );
       await repo.db.run('UPDATE resources SET encrypted = 1 WHERE rid = ?', [resource.rid]);
 
       Logger.success(`文件已加密: ${resource.rid}`);
       Logger.info(`  名称: ${resource.metadata.title || resource.name}`);
-      Logger.info(`  路径: ${resource.path}`);
+      Logger.info(
+        `  路径: ${repo.resourceService.resolveLocation({ kind: resource.location_kind, value: resource.location })}`,
+      );
     }
 
     await repo.close();

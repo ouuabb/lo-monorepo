@@ -20,7 +20,11 @@ module.exports = async function show(argv) {
     }
 
     // 读取文件内容（自动解密）
-    const content = await readResourceContent(resource.path, repo.cryptoKey);
+    const absPath = repo.resourceService.resolveLocation({
+      kind: resource.location_kind,
+      value: resource.location,
+    });
+    const content = await readResourceContent(absPath, repo.cryptoKey);
 
     if (raw) {
       console.log(content);
@@ -33,7 +37,7 @@ module.exports = async function show(argv) {
     console.log(chalk.gray(`RID: ${resource.rid}`));
     console.log(chalk.gray(`名称: ${resource.name || "-"}`));
     console.log(chalk.gray(`类型: ${resource.type}`));
-    console.log(chalk.gray(`路径: ${resource.path}`));
+    console.log(chalk.gray(`路径: ${absPath}`));
     console.log(
       chalk.gray(`创建时间: ${new Date(resource.created).toLocaleString()}`),
     );

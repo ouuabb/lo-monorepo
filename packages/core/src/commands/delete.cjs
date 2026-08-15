@@ -42,7 +42,11 @@ module.exports = async function deleteResource(argv) {
     await repo.deleteResource(resource.rid, hard);
 
     if (hard) {
-      await fs.remove(resource.path);
+      const absPath = repo.resourceService.resolveLocation({
+        kind: resource.location_kind,
+        value: resource.location,
+      });
+      if (absPath) await fs.remove(absPath);
       Logger.success(`已永久删除资源: ${resource.rid}`);
     } else {
       Logger.success(`已标记删除资源: ${resource.rid}`);

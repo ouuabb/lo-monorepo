@@ -39,7 +39,7 @@ describe('encrypt command', () => {
       const repo = await openRepo();
       const resource = await repo.resourceService.create({
         type: 'note',
-        path: filePath,
+        location_kind: 'local', location: path.relative(ctx.tempDir, filePath),
         name: 'test-note'
       });
       await repo.close();
@@ -73,7 +73,7 @@ describe('encrypt command', () => {
 
       const resource = await repo.resourceService.create({
         type: 'note',
-        path: filePath,
+        location_kind: 'local', location: path.relative(ctx.tempDir, filePath),
         name: 'encrypted-note'
       });
       await repo.close();
@@ -97,8 +97,8 @@ describe('encrypt command', () => {
       await fs.writeFile(fp1, '# Note 1');
       await fs.writeFile(fp2, '# Note 2');
 
-      const r1 = await repo.resourceService.create({ type: 'note', path: fp1, name: 'note1' });
-      const r2 = await repo.resourceService.create({ type: 'note', path: fp2, name: 'note2' });
+      const r1 = await repo.resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(ctx.tempDir, fp1), name: 'note1' });
+      const r2 = await repo.resourceService.create({ type: 'note', location_kind: 'local', location: path.relative(ctx.tempDir, fp2), name: 'note2' });
       await repo.close();
 
       expect(r1.encrypted).toBe(false);

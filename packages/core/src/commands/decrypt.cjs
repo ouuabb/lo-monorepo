@@ -30,9 +30,9 @@ module.exports = async function decryptResource(argv) {
           continue;
         }
         try {
-          const encrypted = await fs.readFile(res.path);
+          const encrypted = await fs.readFile(repo.resourceService.resolveLocation({ kind: res.location_kind, value: res.location }));
           const plaintext = CryptoUtils.decryptFile(encrypted, cryptoKey);
-          await fs.writeFile(res.path, plaintext);
+          await fs.writeFile(repo.resourceService.resolveLocation({ kind: res.location_kind, value: res.location }), plaintext);
           await repo.db.run('UPDATE resources SET encrypted = 0 WHERE rid = ?', [res.rid]);
           count++;
         } catch (e) {
@@ -64,14 +64,27 @@ module.exports = async function decryptResource(argv) {
         return;
       }
 
-      const encrypted = await fs.readFile(resource.path);
+      const encrypted = await fs.readFile(
+        repo.resourceService.resolveLocation({
+          kind: resource.location_kind,
+          value: resource.location,
+        }),
+      );
       const plaintext = CryptoUtils.decryptFile(encrypted, cryptoKey);
-      await fs.writeFile(resource.path, plaintext);
+      await fs.writeFile(
+        repo.resourceService.resolveLocation({
+          kind: resource.location_kind,
+          value: resource.location,
+        }),
+        plaintext,
+      );
       await repo.db.run('UPDATE resources SET encrypted = 0 WHERE rid = ?', [resource.rid]);
 
       Logger.success(`文件已解密: ${resource.rid}`);
       Logger.info(`  名称: ${resource.metadata.title || resource.name}`);
-      Logger.info(`  路径: ${resource.path}`);
+      Logger.info(
+        `  路径: ${repo.resourceService.resolveLocation({ kind: resource.location_kind, value: resource.location })}`,
+      );
     }
 
     await repo.close();
