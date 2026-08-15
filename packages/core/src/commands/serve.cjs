@@ -399,7 +399,7 @@ route("GET", "/api/notes", async (req, res, { repo, url }) => {
   const limit = parseInt(url.searchParams.get("limit")) || 50;
   const offset = parseInt(url.searchParams.get("offset")) || 0;
   const resources = await repo.getAllResources({ type, schema, limit, offset });
-  jsonOk(res, { total: resources.length, limit, offset, data: resources });
+  jsonOk(res, { total: resources.length, limit, offset, data: toApiResourceList(resources) });
 });
 
 route("GET", "/api/notes/:rid", async (req, res, { repo, url }) => {
@@ -416,7 +416,7 @@ route("GET", "/api/notes/:rid", async (req, res, { repo, url }) => {
       return notFound(res, "Resource file unavailable");
     }
     const content = await readResourceContent(resolved.absolutePath, repo.cryptoKey);
-    jsonOk(res, { ...resource, content });
+    jsonOk(res, toApiResource({ ...resource, content }));
   } catch (e) {
     serverError(res, `Failed to read file: ${e.message}`);
   }
@@ -426,7 +426,7 @@ route("GET", "/api/search", async (req, res, { repo, url }) => {
   const q = url.searchParams.get("q");
   if (!q) return badRequest(res, 'Missing query parameter "q"');
   const results = await repo.search(q);
-  jsonOk(res, { query: q, total: results.length, data: results });
+  jsonOk(res, { query: q, total: results.length, data: toApiResourceList(results) });
 });
 
 route("POST", "/api/notes/upload", async (req, res, { repo }) => {
@@ -520,7 +520,7 @@ route("POST", "/api/notes", async (req, res, { repo }) => {
       filename,
       metadata: mergedMetadata,
     });
-    jsonOk(res, result, 201);
+    jsonOk(res, toApiResource(result), 201);
   } catch (e) {
     if (e.code === "RESOURCE_EXISTS") return conflict(res, e.message);
     serverError(res, e.message);
@@ -584,9 +584,9 @@ route("PUT", "/api/notes/:rid", async (req, res, { repo, url }) => {
 
     if (Object.keys(updates).length > 0) {
       const result = await repo.updateResource(rid, updates);
-      jsonOk(res, result);
+      jsonOk(res, toApiResource(result));
     } else {
-      jsonOk(res, resource);
+      jsonOk(res, toApiResource(resource));
     }
   } catch (e) {
     serverError(res, e.message);
@@ -2877,6 +2877,21 @@ function extractAdminRid(urlPath) {
 function extractResourceRid(urlPath) {
   const match = urlPath.match(/^\/api\/resources\/(res_[a-zA-Z0-9_]+)\/location/);
   return match ? match[1] : null;
+}
+
+/**
+ * 内部资源行 → 对外协议资源（D6）：扁平 location_kind/location 两列映射为
+ * location: { kind, value }；不保留扁平字段（无兼容字段）。Core 内部数据模型不变。
+ */
+function toApiResource(row) {
+  if (!row) return row;
+  const { location_kind, location, ...rest } = row;
+  return { ...rest, location: { kind: location_kind, value: location } };
+}
+
+/** 资源列表批量映射 */
+function toApiResourceList(rows) {
+  return (rows || []).map(toApiResource);
 }
 
 // ---------------------------------------------------------------------------

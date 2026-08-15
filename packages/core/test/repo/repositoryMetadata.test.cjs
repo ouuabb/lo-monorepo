@@ -49,6 +49,16 @@ describe('RepositoryMetadata（.repo/metadata.json）', () => {
     ).toBe(true);
   });
 
+  test('validateMetadata 拒绝未知 schemaVersion（版本不符，不做兼容）', () => {
+    expect(
+      validateMetadata({ repositoryId: 'x', schemaVersion: SCHEMA_VERSION + 1 }).ok,
+    ).toBe(false);
+    expect(
+      validateMetadata({ repositoryId: 'x', schemaVersion: 999 }).ok,
+    ).toBe(false);
+    expect(validateMetadata({ repositoryId: 'x', schemaVersion: 0.5 }).ok).toBe(false);
+  });
+
   test('readMetadata 对缺失/损坏文件返回 null', async () => {
     expect(await readMetadata(dir)).toBeNull();
     await writeMetadata(dir, '{broken');

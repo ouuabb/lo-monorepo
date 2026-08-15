@@ -51,8 +51,11 @@ function validateMetadata(meta) {
   if (typeof meta.repositoryId !== 'string' || meta.repositoryId.length === 0) {
     return { ok: false, message: 'Repository metadata 缺少合法 repositoryId' };
   }
-  if (typeof meta.schemaVersion !== 'number' || meta.schemaVersion < 1) {
-    return { ok: false, message: 'Repository metadata 缺少合法 schemaVersion' };
+  if (meta.schemaVersion !== SCHEMA_VERSION) {
+    return {
+      ok: false,
+      message: `Repository metadata schemaVersion=${meta.schemaVersion} 与当前支持版本 ${SCHEMA_VERSION} 不符（拒绝打开，不做版本兼容）`,
+    };
   }
   return { ok: true };
 }

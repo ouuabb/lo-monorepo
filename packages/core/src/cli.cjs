@@ -28,6 +28,7 @@ const runtimeCmd = require('./commands/runtime.cjs');
 const automationCmd = require('./commands/automation.cjs');
 const move = require('./commands/move.cjs');
 const backup = require('./commands/backup.cjs');
+const repoCmd = require('./commands/repo.cjs');
 const daily = require('./commands/daily.cjs');
 const configCmd = require('./commands/config.cjs');
 const help = require('./commands/help.cjs');
@@ -501,6 +502,18 @@ cli
         default: false
       });
   }, backup)
+
+  .command('repo', '仓库管理（Repository Identity）', (yargs) => {
+    yargs
+      .command('reinitialize', '重新初始化仓库身份（副本独立化唯一途径）', (y) => {
+        y.option('yes', {
+          type: 'boolean',
+          description: '跳过确认',
+          default: false,
+        });
+      }, repoCmd.repoReinitialize)
+      .demandCommand(1, '请指定仓库子命令。可用: reinitialize');
+  })
 
   .command('daily', '创建今日日记', {}, daily)
 

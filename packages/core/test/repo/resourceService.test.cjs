@@ -256,6 +256,42 @@ describe('ResourceService', () => {
       expect(bad).toEqual({ kind: 'external', resolved: false, reason: 'external-unavailable' });
     });
 
+    test('external 同一文件可被多个 Resource 引用（唯一性仅限 local）', async () => {
+      const extPath = path.join(tempDir, 'shared-ext.md');
+      await fs.writeFile(extPath, '# S');
+      const a = await resourceService.create({
+        type: 'note',
+        location_kind: 'external',
+        location: extPath,
+        name: 'shared-a',
+      });
+      const b = await resourceService.create({
+        type: 'note',
+        location_kind: 'external',
+        location: extPath,
+        name: 'shared-b',
+      });
+      expect(a.rid).not.toBe(b.rid);
+      // local 同路径仍唯一（同文件仅一条活跃 layer-0 记录）
+      const localPath = path.join(tempDir, 'resources', 'dup.md');
+      await fs.ensureDir(path.dirname(localPath));
+      await fs.writeFile(localPath, '# L');
+      await resourceService.create({
+        type: 'note',
+        location_kind: 'local',
+        location: path.relative(tempDir, localPath),
+        name: 'dup-a',
+      });
+      await expect(
+        resourceService.create({
+          type: 'note',
+          location_kind: 'local',
+          location: path.relative(tempDir, localPath),
+          name: 'dup-b',
+        }),
+      ).rejects.toThrow();
+    });
+
     test('virtual → virtual 态（无本地路径）', async () => {
       const created = await resourceService.create({
         type: 'vocabulary',

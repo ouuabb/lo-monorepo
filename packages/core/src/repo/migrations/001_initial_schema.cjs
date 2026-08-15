@@ -26,8 +26,12 @@ module.exports = {
       CREATE INDEX IF NOT EXISTS idx_resources_type ON resources(type);
       CREATE INDEX IF NOT EXISTS idx_resources_location ON resources(location);
       CREATE UNIQUE INDEX IF NOT EXISTS idx_resources_name_layer ON resources(name, layer);
-      -- 同文件仅一条活跃 layer-0 记录（name-stack 的 layer>0 版本共享 location；location='' 虚拟资源不受约束）
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_resources_location_active ON resources(location) WHERE deleted = 0 AND layer = 0 AND location <> '';
+      -- 同文件仅一条活跃 layer-0 记录（name-stack 的 layer>0 版本共享 location；
+      -- 唯一性限定 local：external 同一文件可被多个 Resource 引用（016 D4 无全局唯一要求）；
+      -- location='' 虚拟资源不受约束）
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_resources_location_active
+        ON resources(location)
+        WHERE deleted = 0 AND layer = 0 AND location <> '' AND location_kind = 'local';
     `);
 
     // ======================== 标签 / 能力 / 容器忽略模式 ========================

@@ -254,6 +254,31 @@ describe("Protocol HTTP API (relations/operations/events)", () => {
     expect(missing.status).toBe(404);
   });
 
+  // ─── Notes API Location（D6：{ kind, value } 包装，无扁平兼容字段）─────
+
+  test("Notes API: location 统一为 { kind, value }，无 location_kind/location 扁平字段", async () => {
+    const r = await request(port, "POST", "/api/notes", {
+      title: "LocWrap",
+      content: "x",
+    });
+    expect(r.status).toBe(201);
+    expect(r.data.rid).toBeDefined();
+    expect(r.data.location).toEqual({ kind: "local", value: expect.any(String) });
+    expect(r.data.location_kind).toBeUndefined();
+    expect(r.data.location).not.toHaveProperty("path");
+
+    const g = await request(port, "GET", `/api/notes/${r.data.rid}`);
+    expect(g.status).toBe(200);
+    expect(g.data.location.kind).toBe("local");
+    expect(g.data.location_kind).toBeUndefined();
+
+    const list = await request(port, "GET", "/api/notes");
+    expect(list.status).toBe(200);
+    const found = list.data.data.find((x) => x.rid === r.data.rid);
+    expect(found.location).toEqual({ kind: "local", value: expect.any(String) });
+    expect(found.location_kind).toBeUndefined();
+  });
+
   // ─── Event API ─────────────────────────────────────────────
 
   test("Event history: 资源创建后产生 resource.created 事件", async () => {
