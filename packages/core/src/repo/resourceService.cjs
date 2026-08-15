@@ -833,12 +833,11 @@ class ResourceService {
       }
       if (fName !== undefined) {
         // 018 §5：rename 统一经 normalizeResourceName + 活跃冲突检查（RENAME_CONFLICT）
+        // 冲突判定：目标 name 的活跃 layer0 已被占用（非自身）→ 拒绝
         const normalizedName = StringUtils.normalizeResourceName(fName);
-        const current = await this.getByRid(finalRid);
-        const ownLayer = current ? current.layer : 0;
         const clash = await this.db.get(
-          `SELECT rid FROM resources WHERE name = ? AND layer = ? AND deleted = 0 AND rid != ?`,
-          [normalizedName, ownLayer, finalRid],
+          `SELECT rid FROM resources WHERE name = ? AND layer = 0 AND deleted = 0 AND rid != ?`,
+          [normalizedName, finalRid],
         );
         if (clash) {
           const err = new Error(

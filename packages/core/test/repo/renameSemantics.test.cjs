@@ -103,5 +103,37 @@ describe('Repository 命名语义（018 P3）', () => {
     expect(promoted.layer).toBe(0);
     const stack2 = await repo.resourceService.getStack('same');
     expect(stack2.map((r) => r.layer).sort()).toEqual([0, 1]);
+
+    // stack remove：移除 layer>0 层副本（硬删，不触 name/活跃层）
+    const layer1 = stack2.find((r) => r.layer === 1);
+    await repo.resourceService.removeFromStack(layer1.rid);
+    const stack3 = await repo.resourceService.getStack('same');
+    expect(stack3.map((r) => r.layer)).toEqual([0]);
+    const active = await repo.resourceService.getByName('same');
+    expect(active.rid).toBe(b.rid);
+  });
+
+  test('layer>0 资源 rename 到已被占用的 layer0 名称 → RENAME_CONFLICT', async () => {
+    const a = await repo.createResource('note', '# 1', { filename: 'l1.md', name: 'target' });
+    const b = await repo.createResource('note', '# 2', { filename: 'l2.md', name: 'target' });
+    expect(b.layer).toBe(1);
+    // 目标名称 target 的活跃 layer0 已被 a 占用 → layer>0 的 b 也不能 rename 过去
+    await expect(repo.renameResource(b.rid, 'Target')).rejects.toMatchObject({
+      code: 'RENAME_CONFLICT',
+    });
+    expect((await repo.resourceService.getByRid(a.rid)).name).toBe('target');
+  });
+
+  test('rename 不改 rid 与 relations（relations 绑定 rid）', async () => {
+    const a = await repo.createResource('note', '# A', { filename: 'rel-a.md', name: 'before-a' });
+    const b = await repo.createResource('note', '# B', { filename: 'rel-b.md', name: 'before-b' });
+    await repo.createRelation(a.rid, b.rid, 'reference');
+
+    await repo.renameResource(a.rid, 'after-a');
+    const rels = await repo.relationService.getRelations(a.rid);
+    expect(rels.outgoing.some((r) => r.to_rid === b.rid && r.type === 'reference')).toBe(true);
+    const afterA = await repo.resourceService.getByRid(a.rid);
+    expect(afterA.rid).toBe(a.rid);
+    expect(afterA.name).toBe('after-a');
   });
 });
