@@ -24,6 +24,7 @@ function makeService() {
     getRepositoryInfo: jest.fn(async () => ({ ok: true, info: { repositoryId: 'repo_uuid', path: '/tmp/lo-demo' } })),
     resolveResourceLocation: jest.fn(async (rid) => ({ ok: true, resolved: { kind: 'local', resolved: true, absolutePath: '/tmp/lo-demo/resources/a.md' } })),
     revealResource: jest.fn(async (rid) => ({ ok: true })),
+    getGraph: jest.fn(async (query) => ({ ok: true, graph: { nodes: [], edges: [] } })),
   };
 }
 
@@ -55,7 +56,8 @@ describe('registerLoCoreIpc', () => {
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.REPOSITORY_INFO, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.RESOURCE_LOCATION, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.REVEAL_RESOURCE, expect.any(Function));
-    expect(ipcMain.handle.mock.calls.length).toBe(22);
+    expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.GRAPH, expect.any(Function));
+    expect(ipcMain.handle.mock.calls.length).toBe(23);
   });
 
   it('Repository 通道委托 service（info / resolveLocation）', async () => {
@@ -83,6 +85,17 @@ describe('registerLoCoreIpc', () => {
     expect(service.revealResource).toHaveBeenCalledWith('res_9');
     expect(service.revealResource).toHaveBeenCalledTimes(1);
     expect(res).toEqual({ ok: true });
+  });
+
+  it('Graph 通道透传 query 并委托 service', async () => {
+    const ipcMain = { handle: jest.fn() };
+    const service = makeService();
+    registerLoCoreIpc(ipcMain, service);
+    const byChannel = (ch) => ipcMain.handle.mock.calls.find(([c]) => c === ch)[1];
+
+    const res = await byChannel(CHANNELS.GRAPH)({}, { limit: 50 });
+    expect(service.getGraph).toHaveBeenCalledWith({ limit: 50 });
+    expect(res.graph).toEqual({ nodes: [], edges: [] });
   });
 
   it('handler 委托并传参', async () => {

@@ -4,6 +4,7 @@ import PluginUiMount from './plugin/PluginUiMount.jsx';
 import { hasUi } from './plugin/pluginUi.js';
 import { BarArea, Bar } from './layout/BarArea.jsx';
 import CoreViewPanel from './views/ViewPanel.jsx';
+import GraphView from './views/GraphView.jsx';
 import { revealFeedback } from './services/revealFeedback.mjs';
 import './App.css';
 
@@ -20,10 +21,11 @@ function formatTime(value) {
 }
 
 const SUB_NAV = [
-  { id: 'workspace', label: '工作台' },
+  { id: 'workspace', label: '控制台' },
   { id: 'history', label: '历史' },
   { id: 'settings', label: '文件设置' },
   { id: 'views', label: '视图' },
+  { id: 'graph', label: '图谱' },
 ];
 
 const MIN_SIDEBAR_WIDTH = 200;
@@ -927,6 +929,8 @@ useEffect(() => {
                   )}
 
                   {view === 'views' && <CoreViewPanel onOpen={openResource} onNotify={notify} />}
+
+                  {view === 'graph' && <GraphView onOpen={openResource} onNotify={notify} />}
                 </div>
               </div>
             </Bar>

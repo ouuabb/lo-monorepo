@@ -139,6 +139,24 @@ class LoCoreService {
   }
 
   /**
+   * 获取资源关系图谱（G 功能：知识图谱视图）
+   *
+   * 直接消费 SDK admin.graph（GET /api/admin/graph → { nodes, edges }）；
+   * Agent 只透传，不解析/不拼接任何路径。
+   * @param {object} [query] — { limit }
+   * @returns {Promise<{ ok: true, graph: { nodes, edges } }|{ error, message }>}
+   */
+  async getGraph(query = {}) {
+    try {
+      this._ensureClient();
+      const graph = await this.client.admin.graph(query);
+      return { ok: true, graph };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
+  /**
    * 在系统资源管理器中定位资源文件（A 功能）
    *
    * 只收 rid；经 Core Resolver 三态获取最终路径；仅 resolved 且存在有效

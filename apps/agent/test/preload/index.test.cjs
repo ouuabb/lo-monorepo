@@ -62,6 +62,7 @@ describe('src/preload/index.cjs', () => {
     expect(api.loCore.repository.info).toBeDefined();
     expect(api.loCore.repository.resolveLocation).toBeDefined();
     expect(api.loCore.revealResource).toBeDefined();
+    expect(api.loCore.graph).toBeDefined();
     expect(api.plugins).toBeDefined();
     expect(api.plugins.list).toBeDefined();
     expect(api.plugins.execute).toBeDefined();
@@ -105,6 +106,17 @@ describe('src/preload/index.cjs', () => {
 
     await api.loCore.repository.resolveLocation('res_2');
     expect(mockInvoke).toHaveBeenLastCalledWith('lo-core:resource-location', 'res_2');
+  });
+
+  it('loCore.graph 经白名单通道透传 query', async () => {
+    require('../../src/preload/index.cjs');
+    const { mockExposeInMainWorld, mockInvoke } = require('electron').__mocks;
+    const api = mockExposeInMainWorld.mock.calls[0][1];
+    mockInvoke.mockResolvedValue({ ok: true, graph: { nodes: [], edges: [] } });
+
+    const res = await api.loCore.graph({ limit: 100 });
+    expect(mockInvoke).toHaveBeenCalledWith('lo-core:graph', { limit: 100 });
+    expect(res.graph).toEqual({ nodes: [], edges: [] });
   });
 
   it('pluginUi 桥暴露 mount/render/dispose（isolated world）', () => {

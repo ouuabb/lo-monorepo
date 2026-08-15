@@ -78,11 +78,22 @@ renderer ─login({ privateKeyPath })→ main ──@lo/client──► serve
 
 - 设置栏「视图」页签列出 lo Core 的 active views（`views.list`，经 IPC `lo-core:views-list`）。
 - 点击视图 → `views.run(id, { limit, offset })`（IPC `lo-core:views-run`）→ 按 Core 返回的
-  `presentation.type` 渲染结果：`table` / `list` / `card` 完整展示，
+  `presentation.type` 渲染结果：`table` / `list` / `card` 完整展示；
   `kanban` / `calendar` / `timeline` 按 Core 返回的 `groups` 基础分组渲染。
 - 结果行含 `rid` 时点击复用现有资源打开机制（多栏并存）。
 - View 的 query / fields / presentation 语义完全由 lo Core 决定，Agent 只消费结构化结果；
   renderer 统一经 `ViewService` 访问（`src/renderer/src/services/ViewService.js`），不直接调用 preload 接口。
+
+## 知识图谱（设置栏「图谱」）
+
+- 设置栏「图谱」页签展示仓库资源与关系的**静态环形图谱**：节点=资源（按 type 着色），
+  边=关系（wikilink 蓝 / reference 灰）。
+- 数据来源：`loCore.graph({ limit })`（IPC `lo-core:graph` → `client.admin.graph` →
+  `GET /api/admin/graph`），Agent 只透传，不解析路径。
+- 交互：hover 节点显示资源标题；**点击节点打开该资源**（复用现有打开机制）；
+  左上角显示节点/边统计与「刷新」按钮；空仓库显示空态引导。
+- 第一版为静态布局（无自动力导向），适用于中小规模图谱；数据量为 serve 端 `limit`
+  上限（默认 200 节点/边）。
 
 ## 安全基线
 

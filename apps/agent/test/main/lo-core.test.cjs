@@ -12,6 +12,7 @@ function makeMockClient(overrides = {}) {
     relations: { list: jest.fn() },
     events: { subscribe: jest.fn(), history: jest.fn() },
     repository: { info: jest.fn(), resolveLocation: jest.fn() },
+    admin: { graph: jest.fn(), graphPath: jest.fn() },
     ...overrides,
   };
   return client;
@@ -188,6 +189,32 @@ describe('LoCoreService', () => {
     const locRes = await service.resolveResourceLocation('res_1');
     expect(locRes.ok).toBe(false);
     expect(locRes.message).toContain('configure');
+  });
+
+  it('getGraph 透传 SDK admin.graph（nodes/edges 原样返回）', async () => {
+    const client = makeMockClient();
+    client.admin.graph.mockResolvedValue({
+      nodes: [{ id: 'res_1', label: 'A' }],
+      edges: [{ id: 1, from: 'res_1', to: 'res_2', type: 'reference' }],
+    });
+    const service = new LoCoreService({ LoClient: class {} });
+    service.client = client;
+    const res = await service.getGraph({ limit: 50 });
+    expect(res).toEqual({
+      ok: true,
+      graph: {
+        nodes: [{ id: 'res_1', label: 'A' }],
+        edges: [{ id: 1, from: 'res_1', to: 'res_2', type: 'reference' }],
+      },
+    });
+    expect(client.admin.graph).toHaveBeenCalledWith({ limit: 50 });
+  });
+
+  it('未配置时 getGraph 报错提示先 configure', async () => {
+    const service = new LoCoreService({});
+    const res = await service.getGraph();
+    expect(res.ok).toBe(false);
+    expect(res.message).toContain('configure');
   });
 
   describe('revealResource（A：系统资源管理器定位）', () => {
