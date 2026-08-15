@@ -64,27 +64,25 @@ module.exports = async function decryptResource(argv) {
         return;
       }
 
-      const encrypted = await fs.readFile(
-        repo.resourceService.resolveLocation({
-          kind: resource.location_kind,
-          value: resource.location,
-        }),
+      // 资源本地路径经 Core Resolver 三态解析（唯一入口，只收 rid）
+      const resolved = await repo.resourceService.resolveResourceLocation(
+        resource.rid,
       );
+      if (!resolved.resolved) {
+        await repo.close();
+        Logger.error(`资源本地文件不可用（${resolved.reason}）`);
+        process.exit(1);
+        return;
+      }
+      const absPath = resolved.absolutePath;
+      const encrypted = await fs.readFile(absPath);
       const plaintext = CryptoUtils.decryptFile(encrypted, cryptoKey);
-      await fs.writeFile(
-        repo.resourceService.resolveLocation({
-          kind: resource.location_kind,
-          value: resource.location,
-        }),
-        plaintext,
-      );
+      await fs.writeFile(absPath, plaintext);
       await repo.db.run('UPDATE resources SET encrypted = 0 WHERE rid = ?', [resource.rid]);
 
       Logger.success(`文件已解密: ${resource.rid}`);
       Logger.info(`  名称: ${resource.metadata.title || resource.name}`);
-      Logger.info(
-        `  路径: ${repo.resourceService.resolveLocation({ kind: resource.location_kind, value: resource.location })}`,
-      );
+      Logger.info(`  路径: ${absPath}`);
     }
 
     await repo.close();

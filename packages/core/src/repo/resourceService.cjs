@@ -720,6 +720,52 @@ class ResourceService {
     return this.refresh(rid);
   }
 
+  /**
+   * 解析资源当前本地位置（Resource Location 唯一公开入口；只接受 rid）
+   *
+   * 三态返回（016 §9 / D5）：
+   *   resolved   { kind, resolved: true,  absolutePath }
+   *   unresolved { kind, resolved: false, reason }   —— reason: file-missing | source-missing | external-unavailable
+   *   virtual    { kind: 'virtual', resolved: true, absolutePath: null }
+   *
+   * 不保证任何时刻存在有效路径；解析规则唯一在 Core。
+   * @param {string} rid
+   */
+  async resolveResourceLocation(rid) {
+    const resource = await this.getByRid(rid);
+    if (!resource) {
+      return { kind: 'unknown', resolved: false, reason: 'file-missing' };
+    }
+    const kind = resource.location_kind || 'virtual';
+    if (kind === 'virtual') {
+      return { kind: 'virtual', resolved: true, absolutePath: null };
+    }
+    const absPath = this.resolveLocation({ kind, value: resource.location });
+    if (!absPath) {
+      return {
+        kind,
+        resolved: false,
+        reason: kind === 'external' ? 'external-unavailable' : 'file-missing',
+      };
+    }
+    let exists = false;
+    try {
+      exists = await fs.pathExists(absPath);
+    } catch {
+      exists = false;
+    }
+    if (!exists) {
+      if (kind === 'external') {
+        return { kind, resolved: false, reason: 'external-unavailable' };
+      }
+      if (resource.capabilities && resource.capabilities.includes('container')) {
+        return { kind, resolved: false, reason: 'source-missing' };
+      }
+      return { kind, resolved: false, reason: 'file-missing' };
+    }
+    return { kind, resolved: true, absolutePath: absPath };
+  }
+
   async update(rid, updates) {
     const { path, hash, metadata, capabilities, container_schema, type } =
       updates;

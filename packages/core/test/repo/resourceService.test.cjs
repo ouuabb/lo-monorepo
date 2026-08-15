@@ -201,6 +201,94 @@ describe('ResourceService', () => {
     ).rejects.toThrow(/res_/);
   });
 
+  describe('resolveResourceLocation 三态（D5）', () => {
+    test('local 文件存在 → resolved（绝对路径）', async () => {
+      const filePath = path.join(tempDir, 'resources', 'rl.md');
+      await fs.ensureDir(path.dirname(filePath));
+      await fs.writeFile(filePath, '# R');
+      const created = await resourceService.create({
+        type: 'note',
+        location_kind: 'local',
+        location: path.relative(tempDir, filePath),
+        name: 'rl',
+      });
+      const r = await resourceService.resolveResourceLocation(created.rid);
+      expect(r).toEqual({ kind: 'local', resolved: true, absolutePath: filePath });
+    });
+
+    test('local 文件缺失 → unresolved(file-missing)', async () => {
+      const filePath = path.join(tempDir, 'resources', 'rl-gone.md');
+      await fs.ensureDir(path.dirname(filePath));
+      await fs.writeFile(filePath, '# G');
+      const created = await resourceService.create({
+        type: 'note',
+        location_kind: 'local',
+        location: path.relative(tempDir, filePath),
+        name: 'rl-gone',
+      });
+      await fs.remove(filePath);
+      const r = await resourceService.resolveResourceLocation(created.rid);
+      expect(r).toEqual({ kind: 'local', resolved: false, reason: 'file-missing' });
+    });
+
+    test('external 存在 → resolved；缺失 → unresolved(external-unavailable)', async () => {
+      const extPath = path.join(tempDir, 'ext.md');
+      await fs.writeFile(extPath, '# E');
+      const created = await resourceService.create({
+        type: 'note',
+        location_kind: 'external',
+        location: extPath,
+        name: 'rl-ext',
+      });
+      const ok = await resourceService.resolveResourceLocation(created.rid);
+      expect(ok).toEqual({ kind: 'external', resolved: true, absolutePath: extPath });
+
+      const missingPath = path.join(tempDir, 'ext-gone.md');
+      await fs.writeFile(missingPath, '# G');
+      const missing = await resourceService.create({
+        type: 'note',
+        location_kind: 'external',
+        location: missingPath,
+        name: 'rl-ext-gone',
+      });
+      await fs.remove(missingPath);
+      const bad = await resourceService.resolveResourceLocation(missing.rid);
+      expect(bad).toEqual({ kind: 'external', resolved: false, reason: 'external-unavailable' });
+    });
+
+    test('virtual → virtual 态（无本地路径）', async () => {
+      const created = await resourceService.create({
+        type: 'vocabulary',
+        location_kind: 'virtual',
+        location: '',
+        name: 'rl-virtual',
+      });
+      const r = await resourceService.resolveResourceLocation(created.rid);
+      expect(r).toEqual({ kind: 'virtual', resolved: true, absolutePath: null });
+    });
+
+    test('container source 缺失 → unresolved(source-missing)', async () => {
+      const srcDir = path.join(tempDir, 'demo-src');
+      await fs.ensureDir(srcDir);
+      const created = await resourceService.create({
+        type: 'project',
+        location_kind: 'local',
+        location: 'demo-src',
+        name: 'rl-container',
+        capabilities: ['container'],
+      });
+      await fs.remove(srcDir);
+      const r = await resourceService.resolveResourceLocation(created.rid);
+      expect(r).toEqual({ kind: 'local', resolved: false, reason: 'source-missing' });
+    });
+
+    test('未知 rid → unresolved(file-missing)', async () => {
+      const r = await resourceService.resolveResourceLocation('res_no_such_rid');
+      expect(r.resolved).toBe(false);
+      expect(r.reason).toBe('file-missing');
+    });
+  });
+
   test('create derives name from type when no path or name given', async () => {
     const resource = await resourceService.create({ type: 'note', path: '' });
     expect(resource.name).toMatch(/^note-\d+$/);

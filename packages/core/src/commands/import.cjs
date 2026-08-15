@@ -60,12 +60,10 @@ async function coreImportFile(repo, targetPath, type, category, defaultNote, def
   }
   Logger.success(`成功导入资源: ${resource.rid}`);
   Logger.info(`类型: ${resource.type}`);
-  Logger.info(
-    `路径: ${repo.resourceService.resolveLocation({
-      kind: resource.location_kind,
-      value: resource.location,
-    })}`,
+  const importResolved = await repo.resourceService.resolveResourceLocation(
+    resource.rid,
   );
+  Logger.info(`路径: ${importResolved.resolved ? importResolved.absolutePath : "(不可用)"}`);
   return resource;
 }
 

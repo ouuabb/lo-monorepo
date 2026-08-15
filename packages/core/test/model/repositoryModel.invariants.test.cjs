@@ -73,8 +73,30 @@ describe('Repository Model Invariants (016 §12)', () => {
 
   it.todo('I8 · Backup/Restore 后 Identity 不变（Phase 4）');
 
-  it.todo('I9 · Core 唯一解析规则；Resolver 明确返回 resolved/unresolved/virtual 三态'
-    + '（不保证任何时刻存在有效路径）（Phase 3）');
+  it('I9 · Core 唯一解析规则；Resolver 明确返回 resolved/unresolved/virtual 三态'
+    + '（不保证任何时刻存在有效路径）（Phase 3）', async () => {
+    const repo = await Repository.create(dir);
+    // local 文件存在 → resolved
+    const note = await repo.createResource('note', '# A', { filename: 'i9.md' });
+    const ok = await repo.resourceService.resolveResourceLocation(note.rid);
+    expect(ok.resolved).toBe(true);
+    expect(ok.absolutePath).toBe(path.join(dir, 'resources', 'i9.md'));
+    // 文件缺失 → unresolved（不保证存在有效路径）
+    await fs.remove(path.join(dir, 'resources', 'i9.md'));
+    const missing = await repo.resourceService.resolveResourceLocation(note.rid);
+    expect(missing.resolved).toBe(false);
+    expect(missing.reason).toBe('file-missing');
+    // virtual → virtual 态
+    const virt = await repo.resourceService.create({
+      type: 'vocabulary',
+      location_kind: 'virtual',
+      location: '',
+      name: 'i9-v',
+    });
+    const v = await repo.resourceService.resolveResourceLocation(virt.rid);
+    expect(v).toEqual({ kind: 'virtual', resolved: true, absolutePath: null });
+    await repo.close();
+  });
 
   it.todo('I10 · Agent/SDK 不自行解析路径（唯一解析在 Core）（Phase 5）');
 });

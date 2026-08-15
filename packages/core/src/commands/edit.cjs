@@ -24,16 +24,20 @@ module.exports = async function edit(argv) {
 
     const useEditor = editorArg || config.editor || "notepad";
     const cryptoKey = repo.cryptoKey;
-    // 资源本地路径经 Core Resolver 解析（不直接读 resource.path）
-    const editPath0 = repo.resourceService.resolveLocation({
-      kind: resource.location_kind,
-      value: resource.location,
-    });
-    if (!editPath0) {
+    // 资源本地路径经 Core Resolver 三态解析（唯一入口，只收 rid）
+    const resolved = await repo.resourceService.resolveResourceLocation(
+      resource.rid,
+    );
+    if (!resolved.resolved) {
       await repo.close();
-      Logger.error("该资源无本地文件，无法编辑");
+      Logger.error(
+        resolved.kind === 'virtual'
+          ? '该资源无本地文件，无法编辑'
+          : `资源本地文件不可用（${resolved.reason}）`,
+      );
       process.exit(1);
     }
+    const editPath0 = resolved.absolutePath;
     let editPath = editPath0;
 
     let tempFilePath = null;

@@ -411,11 +411,11 @@ route("GET", "/api/notes/:rid", async (req, res, { repo, url }) => {
   if (resource.deleted) return notFound(res, "Resource has been deleted");
 
   try {
-    const absPath = repo.resourceService.resolveLocation({
-      kind: resource.location_kind,
-      value: resource.location,
-    });
-    const content = await readResourceContent(absPath, repo.cryptoKey);
+    const resolved = await repo.resourceService.resolveResourceLocation(rid);
+    if (!resolved.resolved) {
+      return notFound(res, "Resource file unavailable");
+    }
+    const content = await readResourceContent(resolved.absolutePath, repo.cryptoKey);
     jsonOk(res, { ...resource, content });
   } catch (e) {
     serverError(res, `Failed to read file: ${e.message}`);
@@ -1559,12 +1559,9 @@ route("GET", "/api/admin/resources/:rid", async (req, res, { repo, url }) => {
     // 读取内容（加密资源用占位文本）
     let content = null;
     try {
-      const absPath = repo.resourceService.resolveLocation({
-        kind: resource.location_kind,
-        value: resource.location,
-      });
-      if (absPath && (await fs.pathExists(absPath))) {
-        content = await readResourceContent(absPath, repo.cryptoKey);
+      const resolved = await repo.resourceService.resolveResourceLocation(rid);
+      if (resolved.resolved && resolved.absolutePath) {
+        content = await readResourceContent(resolved.absolutePath, repo.cryptoKey);
       }
     } catch {
       content = "[加密内容]";
@@ -2213,16 +2210,13 @@ route("PUT", "/api/admin/resources/:rid", async (req, res, { repo, url }) => {
     const resource = await repo.getResource(rid);
     if (!resource) return notFound(res, "Resource not found");
 
-    // 更新文件内容（仅 local/external 有本地文件；路径经 Resolver 解析）
+    // 更新文件内容（仅 local/external 有本地文件；路径经 Core Resolver 三态解析）
     if (content !== undefined) {
-      const absPath = repo.resourceService.resolveLocation({
-        kind: resource.location_kind,
-        value: resource.location,
-      });
-      if (absPath) {
-        await fs.writeFile(absPath, content, "utf-8");
+      const resolved = await repo.resourceService.resolveResourceLocation(rid);
+      if (resolved.resolved && resolved.absolutePath) {
+        await fs.writeFile(resolved.absolutePath, content, "utf-8");
         if (repo.cryptoKey) {
-          await repo.encryptFile(absPath);
+          await repo.encryptFile(resolved.absolutePath);
         }
         await repo.resourceService.refresh(rid);
       }

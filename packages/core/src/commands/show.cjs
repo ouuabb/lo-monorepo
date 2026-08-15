@@ -19,11 +19,21 @@ module.exports = async function show(argv) {
       process.exit(1);
     }
 
-    // 读取文件内容（自动解密）
-    const absPath = repo.resourceService.resolveLocation({
-      kind: resource.location_kind,
-      value: resource.location,
-    });
+    // 资源本地路径经 Core Resolver 三态解析（唯一入口，只收 rid）
+    const resolved = await repo.resourceService.resolveResourceLocation(
+      resource.rid,
+    );
+    if (!resolved.resolved) {
+      await repo.close();
+      Logger.error(
+        resolved.kind === 'virtual'
+          ? '该资源无本地文件'
+          : `资源本地文件不可用（${resolved.reason}）`,
+      );
+      process.exit(1);
+      return;
+    }
+    const absPath = resolved.absolutePath;
     const content = await readResourceContent(absPath, repo.cryptoKey);
 
     if (raw) {
