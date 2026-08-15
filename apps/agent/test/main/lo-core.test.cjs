@@ -190,6 +190,88 @@ describe('LoCoreService', () => {
     expect(locRes.message).toContain('configure');
   });
 
+  describe('revealResource（A：系统资源管理器定位）', () => {
+    function makeShell() {
+      return { showItemInFolder: jest.fn() };
+    }
+
+    test('resolved → 调用 shell.showItemInFolder(absolutePath)', async () => {
+      const shell = makeShell();
+      const client = makeMockClient();
+      client.repository.resolveLocation.mockResolvedValue({
+        kind: 'local',
+        resolved: true,
+        absolutePath: '/tmp/lo-demo/resources/a.md',
+      });
+      const service = new LoCoreService({ LoClient: class {}, shell });
+      service.client = client;
+
+      const res = await service.revealResource('res_1');
+      expect(res).toEqual({ ok: true });
+      expect(shell.showItemInFolder).toHaveBeenCalledWith('/tmp/lo-demo/resources/a.md');
+      expect(client.repository.resolveLocation).toHaveBeenCalledWith('res_1');
+    });
+
+    test('virtual（resolved 但无路径）→ ok:false + reason=virtual，不调 shell', async () => {
+      const shell = makeShell();
+      const client = makeMockClient();
+      client.repository.resolveLocation.mockResolvedValue({
+        kind: 'virtual',
+        resolved: true,
+        absolutePath: null,
+      });
+      const service = new LoCoreService({ LoClient: class {}, shell });
+      service.client = client;
+
+      const res = await service.revealResource('res_v');
+      expect(res).toEqual({ ok: false, reason: 'virtual', message: expect.any(String) });
+      expect(shell.showItemInFolder).not.toHaveBeenCalled();
+    });
+
+    test('unresolved（file-missing）→ ok:false + reason 透传，不调 shell', async () => {
+      const shell = makeShell();
+      const client = makeMockClient();
+      client.repository.resolveLocation.mockResolvedValue({
+        kind: 'local',
+        resolved: false,
+        reason: 'file-missing',
+        absolutePath: null,
+      });
+      const service = new LoCoreService({ LoClient: class {}, shell });
+      service.client = client;
+
+      const res = await service.revealResource('res_1');
+      expect(res).toEqual({ ok: false, reason: 'file-missing', message: expect.any(String) });
+      expect(shell.showItemInFolder).not.toHaveBeenCalled();
+    });
+
+    test('external-unavailable → ok:false + reason 透传，不调 shell', async () => {
+      const shell = makeShell();
+      const client = makeMockClient();
+      client.repository.resolveLocation.mockResolvedValue({
+        kind: 'external',
+        resolved: false,
+        reason: 'external-unavailable',
+        absolutePath: null,
+      });
+      const service = new LoCoreService({ LoClient: class {}, shell });
+      service.client = client;
+
+      const res = await service.revealResource('res_e');
+      expect(res).toEqual({ ok: false, reason: 'external-unavailable', message: expect.any(String) });
+      expect(shell.showItemInFolder).not.toHaveBeenCalled();
+    });
+
+    test('未配置 → 报错提示先 configure，不调 shell', async () => {
+      const shell = makeShell();
+      const service = new LoCoreService({ shell });
+      const res = await service.revealResource('res_1');
+      expect(res.ok).toBe(false);
+      expect(res.message).toContain('configure');
+      expect(shell.showItemInFolder).not.toHaveBeenCalled();
+    });
+  });
+
   it('未配置时 getNote/updateNote 报错提示先 configure', async () => {
     const service = new LoCoreService({});
     const getRes = await service.getNote('r1');

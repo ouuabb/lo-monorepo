@@ -26,6 +26,9 @@
 | `EVENTS_SUBSCRIBE` | `lo-core:events-subscribe` | `apps/agent/src/main/ipc.cjs` |
 | `EVENTS_UNSUBSCRIBE` | `lo-core:events-unsubscribe` | `apps/agent/src/main/ipc.cjs` |
 | `EVENTS_PUSH` | `lo-core:event` | `apps/agent/src/main/ipc.cjs` |
+| `REPOSITORY_INFO` | `lo-core:repository-info` | `apps/agent/src/main/ipc.cjs` |
+| `RESOURCE_LOCATION` | `lo-core:resource-location` | `apps/agent/src/main/ipc.cjs` |
+| `REVEAL_RESOURCE` | `lo-core:reveal-resource` | `apps/agent/src/main/ipc.cjs` |
 
 ## agent-plugins:*（插件能力白名单）
 

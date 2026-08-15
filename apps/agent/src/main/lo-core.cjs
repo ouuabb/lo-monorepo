@@ -27,6 +27,7 @@ class LoCoreService {
     this._Client = deps.LoClient || LoClient;
     this._loadConfig = deps.loadConfig || (() => ({}));
     this._saveConfig = deps.saveConfig || (() => {});
+    this._shell = deps.shell || null;
     this.client = null;
     this.config = {};
     /** 当前 SSE 事件订阅(单例,登录后激活,登出关闭) */
@@ -132,6 +133,46 @@ class LoCoreService {
       this._ensureClient();
       const resolved = await this.client.repository.resolveLocation(rid);
       return { ok: true, resolved };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
+  /**
+   * 在系统资源管理器中定位资源文件（A 功能）
+   *
+   * 只收 rid；经 Core Resolver 三态获取最终路径；仅 resolved 且存在有效
+   * absolutePath 时调用 shell.showItemInFolder；virtual / unresolved 返回
+   * 明确的 reason（复用 Resolver reason 枚举，不新增）。Agent 不自行拼接路径。
+   * @param {string} rid
+   * @returns {Promise<{ ok: true } | { ok: false, reason: string, message: string }>}
+   */
+  async revealResource(rid) {
+    try {
+      this._ensureClient();
+      const resolved = await this.client.repository.resolveLocation(rid);
+      if (!resolved) {
+        return { ok: false, reason: 'not-found', message: '资源不存在' };
+      }
+      if (!resolved.resolved) {
+        const reason = resolved.reason || 'unresolved';
+        return {
+          ok: false,
+          reason,
+          message: `资源本地文件不可用（${reason}）`,
+        };
+      }
+      if (resolved.absolutePath == null) {
+        // virtual 态（resolved: true 但无本地路径）
+        return {
+          ok: false,
+          reason: 'virtual',
+          message: '虚拟资源无本地文件，无法在资源管理器中打开',
+        };
+      }
+      const shell = this._shell || require('electron').shell;
+      shell.showItemInFolder(resolved.absolutePath);
+      return { ok: true };
     } catch (e) {
       return this._toError(e);
     }

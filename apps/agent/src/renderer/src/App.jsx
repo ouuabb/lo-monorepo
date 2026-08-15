@@ -4,6 +4,7 @@ import PluginUiMount from './plugin/PluginUiMount.jsx';
 import { hasUi } from './plugin/pluginUi.js';
 import { BarArea, Bar } from './layout/BarArea.jsx';
 import CoreViewPanel from './views/ViewPanel.jsx';
+import { revealFeedback } from './services/revealFeedback.cjs';
 import './App.css';
 
 const api = window.loAgent && window.loAgent.loCore;
@@ -444,6 +445,23 @@ const [repoCtx, setRepoCtx] = useState(null);
     }
   }, [api, closeTab, handleRefresh]);
 
+  // 在系统资源管理器中打开（A 功能）：只传 rid；结果经 revealFeedback 映射提示文案
+  const handleReveal = useCallback(
+    async (rid) => {
+      if (!api) {
+        notify('preload 未就绪，无法连接 lo 核心');
+        return;
+      }
+      try {
+        const res = await api.revealResource(rid);
+        notify(revealFeedback(res));
+      } catch (e) {
+        notify(`打开失败: ${(e && e.message) || e}`);
+      }
+    },
+    [notify],
+  );
+
   const undoLast = useCallback(async () => {
     if (!api || !api.operations) return;
     setBusy(true);
@@ -455,8 +473,7 @@ const [repoCtx, setRepoCtx] = useState(null);
         return;
       }
       const op = list.data[0];
-      const opId = op.operation_id || op.operationId;
-      const res = await api.operations.undo(opId);
+      const opId = op.operation_id || op.operationId;      const res = await api.operations.undo(opId);
       if (res.ok) {
         notify('已撤销最近操作');
         handleRefresh();
@@ -924,6 +941,7 @@ useEffect(() => {
         <NoteContextMenu
           menu={ctxMenu}
           onClose={() => setCtxMenu(null)}
+          onReveal={handleReveal}
           onUndo={undoLast}
           onDelete={requestDeleteNote}
           onToggleReadOnly={toggleReadOnly}
@@ -2294,7 +2312,7 @@ function ResourceExplorer(props) {
 }
 
 function NoteContextMenu(props) {
-  const { menu, onClose, onUndo, onDelete, onToggleReadOnly } = props;
+  const { menu, onClose, onUndo, onDelete, onToggleReadOnly, onReveal } = props;
   if (!menu) return null;
   return (
     <>
@@ -2307,6 +2325,9 @@ function NoteContextMenu(props) {
         }}
       />
       <div className="ctx-menu" style={{ left: menu.x, top: menu.y }}>
+        <button type="button" onClick={() => { onReveal(menu.rid); onClose(); }}>
+          在系统资源管理器中打开
+        </button>
         <button type="button" onClick={() => { onUndo(); onClose(); }}>
           撤销最近操作
         </button>

@@ -30,6 +30,7 @@ const CHANNELS = {
   EVENTS_PUSH: 'lo-core:event',
   REPOSITORY_INFO: 'lo-core:repository-info',
   RESOURCE_LOCATION: 'lo-core:resource-location',
+  REVEAL_RESOURCE: 'lo-core:reveal-resource',
 };
 
 /**
@@ -44,6 +45,9 @@ function registerLoCoreIpc(ipcMain, service) {
   ipcMain.handle(CHANNELS.REPOSITORY_INFO, () => service.getRepositoryInfo());
   ipcMain.handle(CHANNELS.RESOURCE_LOCATION, (_event, rid) =>
     service.resolveResourceLocation(rid),
+  );
+  ipcMain.handle(CHANNELS.REVEAL_RESOURCE, (_event, rid) =>
+    service.revealResource(rid),
   );
   ipcMain.handle(CHANNELS.LIST_NOTES, (_event, query) => service.listNotes(query || {}));
   ipcMain.handle(CHANNELS.GET_NOTE, (_event, rid) => service.getNote(rid));

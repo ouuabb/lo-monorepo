@@ -59,6 +59,21 @@ renderer ─login({ privateKeyPath })→ main ──@lo/client──► serve
 - 新建/删除后侧边栏列表自动刷新；删除可在「功能面板 → 历史」中撤销恢复。
 - 导入文件为独立链路：renderer 读取 `ArrayBuffer`（结构化克隆传主进程），不接触 Node Buffer。
 
+## 右键菜单（侧边栏「资源」）
+
+- 侧边栏资源项右键菜单提供：**在系统资源管理器中打开** / 撤销最近操作 / 删除 / 设为只读。
+- 「在系统资源管理器中打开」：`loCore.revealResource(rid)` → IPC `lo-core:reveal-resource` →
+  主进程经 Core Resolver（`client.repository.resolveLocation(rid)`）三态解析 →
+  仅 `resolved` 且存在有效绝对路径时调用 `shell.showItemInFolder()` 定位文件；
+  renderer 只传 rid，不接触路径（Agent 不自行拼接路径）。
+- 失败反馈（按 Resolver 语义分类提示）：
+  - `virtual` → 虚拟资源无本地文件
+  - `file-missing` → 文件缺失
+  - `source-missing` → 内容源缺失
+  - `external-unavailable` → 外部文件不可用
+  - 其他失败 → 通用失败提示
+- Container Resource 按 Resource 本身定位（内容源目录），不进入 member 文件。
+
 ## Core 视图（设置栏「视图」）
 
 - 设置栏「视图」页签列出 lo Core 的 active views（`views.list`，经 IPC `lo-core:views-list`）。

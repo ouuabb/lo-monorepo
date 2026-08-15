@@ -61,6 +61,7 @@ describe('src/preload/index.cjs', () => {
     expect(api.loCore.repository).toBeDefined();
     expect(api.loCore.repository.info).toBeDefined();
     expect(api.loCore.repository.resolveLocation).toBeDefined();
+    expect(api.loCore.revealResource).toBeDefined();
     expect(api.plugins).toBeDefined();
     expect(api.plugins.list).toBeDefined();
     expect(api.plugins.execute).toBeDefined();
@@ -80,6 +81,30 @@ describe('src/preload/index.cjs', () => {
     expect(api.plugins.manage.uninstall).toBeDefined();
     expect(api.plugins.manage.getConfig).toBeDefined();
     expect(api.plugins.manage.setConfig).toBeDefined();
+  });
+
+  it('loCore.revealResource 经白名单通道透传 rid（不暴露路径）', async () => {
+    require('../../src/preload/index.cjs');
+    const { mockExposeInMainWorld, mockInvoke } = require('electron').__mocks;
+    const api = mockExposeInMainWorld.mock.calls[0][1];
+    mockInvoke.mockResolvedValue({ ok: true });
+
+    const res = await api.loCore.revealResource('res_1');
+    expect(mockInvoke).toHaveBeenCalledWith('lo-core:reveal-resource', 'res_1');
+    expect(res).toEqual({ ok: true });
+  });
+
+  it('loCore.repository 通道名正确（info / resolveLocation）', async () => {
+    require('../../src/preload/index.cjs');
+    const { mockExposeInMainWorld, mockInvoke } = require('electron').__mocks;
+    const api = mockExposeInMainWorld.mock.calls[0][1];
+    mockInvoke.mockResolvedValue({ ok: true, info: {} });
+
+    await api.loCore.repository.info();
+    expect(mockInvoke).toHaveBeenLastCalledWith('lo-core:repository-info');
+
+    await api.loCore.repository.resolveLocation('res_2');
+    expect(mockInvoke).toHaveBeenLastCalledWith('lo-core:resource-location', 'res_2');
   });
 
   it('pluginUi 桥暴露 mount/render/dispose（isolated world）', () => {
