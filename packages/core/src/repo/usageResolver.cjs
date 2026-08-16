@@ -54,7 +54,6 @@ function resolveModes(resource, pluginModes = []) {
     const applicableTo = mode.applicableTo || {};
     const types = applicableTo.types || [];
     const reqCaps = applicableTo.capabilities || [];
-    const isPreview = !types.length && !reqCaps.length;
     const typeHit = types.includes(resource.type);
     const capHit = reqCaps.length > 0 && reqCaps.some((c) => capabilities.includes(c));
     if (typeHit || capHit) {
