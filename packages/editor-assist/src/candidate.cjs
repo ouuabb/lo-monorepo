@@ -11,6 +11,7 @@
  *   - token 为空 → listRecent
  *   - token 非空 → search(token)
  *   - 去重：按 rid 精确去重（保留首次出现）
+ *   - 排除：excludeRid（当前编辑资源，禁止自引用候选）+ type='system'（系统资源）
  *   - 排序：保持数据源返回顺序（listRecent 已 created DESC；search 已按评分）
  *   - 候选保留 rid（Wikilink identity 是 rid）；UI 展示 name（label）
  *   - 插入文本：`[[rid]]`（无 alias；alias 由用户后续手填 [[rid|alias]]）
@@ -26,10 +27,11 @@
  * @param {number} opts.cursorOffset — 光标偏移
  * @param {import('../types').CandidateSource} opts.source — 注入的数据源
  * @param {number} [opts.limit] — 候选数量上限（默认 20）
+ * @param {string} [opts.excludeRid] — 当前编辑资源 rid（候选排除自身，防自引用）
  * @returns {Promise<null | { range: { start: number, end: number }, token: string, suggestions: Array<{ rid, label, detail?, insertText }> }>}
  *   未处于触发上下文返回 null
  */
-async function buildCandidates({ text, cursorOffset, source, limit = 20 }) {
+async function buildCandidates({ text, cursorOffset, source, limit = 20, excludeRid = null }) {
   const trigger = require('./trigger.cjs').detectWikilinkTrigger(text, cursorOffset);
   if (!trigger) return null;
   if (!source || typeof source.listRecent !== 'function' || typeof source.search !== 'function') {
@@ -47,6 +49,10 @@ async function buildCandidates({ text, cursorOffset, source, limit = 20 }) {
   for (const item of raw || []) {
     if (!item || typeof item.rid !== 'string' || !item.rid) continue;
     if (typeof item.name !== 'string' || !item.name) continue;
+    // 排除当前编辑资源自身（自引用不提供候选）
+    if (excludeRid && item.rid === excludeRid) continue;
+    // 排除系统资源（如 __system__）
+    if (item.type === 'system') continue;
     if (seen.has(item.rid)) continue;
     seen.add(item.rid);
     suggestions.push({

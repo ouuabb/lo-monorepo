@@ -11,7 +11,7 @@ import 'monaco-editor/languages/definitions/markdown/register';
 // editor.api 不含 suggest contrib：显式引入 suggestController（word-based 随 editorWorkerService 已加载）
 import 'monaco-editor/editor/contrib/suggest/browser/suggestController.js';
 import editorWorker from 'monaco-editor/editor/editor.worker?worker';
-import { registerWikilinkCompletion } from './wikilinkCompletion.js';
+import { registerWikilinkCompletion, setWikilinkCurrentRid } from './wikilinkCompletion.js';
 
 if (!self.MonacoEnvironment) {
   self.MonacoEnvironment = {
@@ -23,9 +23,15 @@ if (!self.MonacoEnvironment) {
 const loCore = (typeof window !== 'undefined' && window.loAgent && window.loAgent.loCore) || null;
 registerWikilinkCompletion(loCore);
 
-export default function NoteEditor({ value, onChange, readOnly = false }) {
+export default function NoteEditor({ value, onChange, readOnly = false, rid = null }) {
   const containerRef = useRef(null);
   const editorRef = useRef(null);
+
+  // 同步当前编辑资源 rid（wikilink 补全候选排除自身）；卸载时清空
+  useEffect(() => {
+    setWikilinkCurrentRid(rid);
+    return () => setWikilinkCurrentRid(null);
+  }, [rid]);
 
   useEffect(() => {
     const el = containerRef.current;

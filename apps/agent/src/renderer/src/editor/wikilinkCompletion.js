@@ -19,6 +19,17 @@ import { detectWikilinkTrigger, buildCandidates } from '@lo/editor-assist';
 
 let registered = false;
 
+// 当前编辑资源 rid（由 NoteEditor 挂载/切换时同步；候选排除自身）
+let currentRidRef = null;
+
+/**
+ * 同步当前编辑资源 rid（编辑器实例挂载/切换时调用）
+ * @param {string|null} rid — 当前文档 rid；卸载/失焦传 null
+ */
+export function setWikilinkCurrentRid(rid) {
+  currentRidRef = rid || null;
+}
+
 /**
  * 注册 markdown wikilink completion provider（幂等，只注册一次）
  * @param {object} loCore — window.loAgent.loCore（注入数据源）
@@ -49,7 +60,7 @@ export function registerWikilinkCompletion(loCore) {
       const trigger = detectWikilinkTrigger(text, cursorOffset);
       if (!trigger) return { suggestions: [] };
 
-      return buildCandidates({ text, cursorOffset, source })
+      return buildCandidates({ text, cursorOffset, source, excludeRid: currentRidRef })
         .then((result) => {
           if (!result) return { suggestions: [] };
           const startPos = model.getPositionAt(result.range.start);

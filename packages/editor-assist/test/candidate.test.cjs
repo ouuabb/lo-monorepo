@@ -122,4 +122,61 @@ describe('buildCandidates（rid-based）', () => {
     expect(r.range).toEqual({ start: 2, end: 4 });
     expect(r.trailingClose).toBe(0);
   });
+
+  test('excludeRid：排除当前编辑资源自身（防自引用候选）', async () => {
+    const source = makeSource({
+      listRecent: jest.fn(async () => [
+        { rid: 'res_11111111_0011223344556677', name: '自己', type: 'note' },
+        { rid: 'res_22222222_8899aabbccddeeff', name: '笔记二', type: 'note' },
+      ]),
+    });
+    const r = await buildCandidates({
+      text: '[[',
+      cursorOffset: 2,
+      source,
+      excludeRid: 'res_11111111_0011223344556677',
+    });
+    expect(r.suggestions.map((s) => s.rid)).toEqual(['res_22222222_8899aabbccddeeff']);
+  });
+
+  test('type=system：排除系统资源（如 __system__）', async () => {
+    const source = makeSource({
+      listRecent: jest.fn(async () => [
+        { rid: '__system__', name: '__system__', type: 'system' },
+        { rid: 'res_11111111_0011223344556677', name: '正常笔记', type: 'note' },
+      ]),
+    });
+    const r = await buildCandidates({ text: '[[', cursorOffset: 2, source });
+    expect(r.suggestions.map((s) => s.rid)).toEqual(['res_11111111_0011223344556677']);
+  });
+
+  test('excludeRid + system 同时生效，且 limit 语义保持', async () => {
+    const source = makeSource({
+      listRecent: jest.fn(async () => [
+        { rid: '__system__', name: '__system__', type: 'system' },
+        { rid: 'res_11111111_0011223344556677', name: '自己', type: 'note' },
+        { rid: 'res_22222222_8899aabbccddeeff', name: '候选一', type: 'note' },
+        { rid: 'res_33333333_0011223344556677', name: '候选二', type: 'note' },
+      ]),
+    });
+    const r = await buildCandidates({
+      text: '[[',
+      cursorOffset: 2,
+      source,
+      excludeRid: 'res_11111111_0011223344556677',
+      limit: 1,
+    });
+    expect(r.suggestions.map((s) => s.rid)).toEqual(['res_22222222_8899aabbccddeeff']);
+  });
+
+  test('excludeRid 为空时不影响正常候选', async () => {
+    const source = makeSource({
+      listRecent: jest.fn(async () => [
+        { rid: 'res_11111111_0011223344556677', name: '笔记一', type: 'note' },
+        { rid: 'res_22222222_8899aabbccddeeff', name: '笔记二', type: 'note' },
+      ]),
+    });
+    const r = await buildCandidates({ text: '[[', cursorOffset: 2, source });
+    expect(r.suggestions).toHaveLength(2);
+  });
 });

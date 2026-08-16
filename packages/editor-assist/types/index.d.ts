@@ -55,4 +55,6 @@ export function buildCandidates(opts: {
   cursorOffset: number;
   source: CandidateSource;
   limit?: number;
+  /** 当前编辑资源 rid：候选排除自身（防自引用）；system 类型资源恒排除 */
+  excludeRid?: string;
 }): Promise<CandidateResult | null>;

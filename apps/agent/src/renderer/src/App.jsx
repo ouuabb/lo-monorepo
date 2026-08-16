@@ -1296,6 +1296,7 @@ function EditorRenderer({ tab, onChange, pluginViewers }) {
   return (
     <ViewerComponent
       key={tab.id}
+      rid={tab.rid}
       value={tab.text}
       onChange={onChange}
       readOnly={tab.session.state.readOnly || !!viewer.readOnly}
