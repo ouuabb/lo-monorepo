@@ -59,7 +59,8 @@ lo list
 **迁移后的注意事项：**
 
 - Obsidian 特有的插件语法（如 Dataview 查询）在 lo 中不会生效，但会作为纯文本保留。
-- Obsidian 的 `[[笔记名]]` 语法会被 lo 识别并建立 wikilink，但如果标题有重复，**建议逐步将链接改为 RID 格式 `[[res_xxx]]`**，以获得精确无歧义的链接。
+- Obsidian 的 `[[笔记名]]` 语法**不会**被 lo 识别（lo 仅支持 rid-based `[[res_xxx]]`）——
+  迁移时需将 wikilink 改写为 RID 格式（`lo list --rid` 可查看资源 RID）。
 - Obsidian 的 YAML front matter 会被保留在笔记内容中，但 lo 不会自动解析它。
 - Obsidian 附件（图片、PDF 等）可以被识别为资源并入库，但不会自动提取内容。
 

@@ -98,7 +98,7 @@ describe('import 写入口 → resource.create operation（P2）', () => {
   test('syncMarkdownRelations 保持：note 导入后自动调用关系同步', async () => {
     const spy = jest.spyOn(repo, 'syncMarkdownRelations');
     const filePath = path.join(dir, 'resources', 'link.md');
-    await fs.writeFile(filePath, '# L\n\n[[目标]]');
+    await fs.writeFile(filePath, '# L\n\n[[res_aaa_0011223344556677]]');
     await repo.importFile(filePath);
     // 调用保持（wikilink 解析结果由 embedRelations.test 覆盖）
     expect(spy).toHaveBeenCalledWith(expect.stringMatching(/^res_/));

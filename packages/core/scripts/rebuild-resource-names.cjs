@@ -10,7 +10,7 @@
  * 原则（018 P5）：
  *   - 不使用 metadata.title 覆盖 name（title 不属于 Resource name）
  *   - 不修改 rid / relations / content / hash / location / metadata
- *   - 不处理 [[name]] 文本重写
+ *   - wikilink 基于 rid，改名无需重写 [[rid]] 引用
  *   - 不重新分配 layer；仅当实际发生 normalize collision 时，按现有
  *     (name, layer) 机制为冲突组重新分配连续层（rid 不变）
  *

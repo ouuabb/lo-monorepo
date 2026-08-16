@@ -1769,7 +1769,7 @@ class Repository {
    *
    * - 统一经 normalizeResourceName；冲突（目标 (name, layer) 活跃占用）→ RENAME_CONFLICT
    * - 走 resource.update operation（可撤销）；rid/location/layer/content/metadata 不变
-   * - 不自动入栈、不自动重写 [[name]]
+   * - 不自动入栈；wikilink 基于 rid，改名无需重写任何 [[rid]] 引用
    * @param {string} rid
    * @param {string} newName
    * @returns {Promise<object>} 更新后的 Resource
@@ -4198,11 +4198,14 @@ class Repository {
           "markdown_parser",
         );
 
-        // 创建新的 wikilink 关系
+        // 创建新的 wikilink 关系（rid-based：targetRid 即关系目标，无 name→rid 解析）
         let wikilinkCount = 0;
         for (const wl of wikilinks) {
-          const targetRid = await this._resolveWikiLinkTarget(wl.target);
+          const targetRid = wl.targetRid;
           if (targetRid && targetRid !== rid) {
+            // 验证目标资源存在；不存在 → 跳过（dangling，不建关系）
+            const target = await this.resourceService.getByRid(targetRid);
+            if (!target) continue;
             try {
               await this.relationService.create(rid, targetRid, "wikilink", {
                 origin: "markdown_parser",
@@ -4252,17 +4255,6 @@ class Repository {
     } catch (e) {
       return { wikilinks: 0, embeds: 0, broken: 0, error: e.message };
     }
-  }
-
-  /**
-   * 将 wikilink target 解析为 RID
-   * 复用 resolveResource 的 rid > name 查找逻辑
-   * @param {string} target - 可能是 RID、name 或用户输入
-   * @returns {Promise<string|null>}
-   */
-  async _resolveWikiLinkTarget(target) {
-    const resource = await this.resolveResource(target);
-    return resource ? resource.rid : null;
   }
 
   /**

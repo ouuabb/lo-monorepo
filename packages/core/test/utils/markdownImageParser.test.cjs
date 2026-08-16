@@ -128,7 +128,7 @@ describe('MarkdownImageParser', () => {
     });
 
     test('should not confuse wiki-links with images', () => {
-      const content = '[[wikilink]] and ![image](pic.png)';
+      const content = '[[res_aaa_0011223344556677]] and ![image](pic.png)';
       const refs = MarkdownImageParser.parse(content);
       expect(refs.length).toBe(1);
       expect(refs[0].target_path).toBe('pic.png');

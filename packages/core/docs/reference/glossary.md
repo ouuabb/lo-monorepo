@@ -185,7 +185,8 @@ Markdown 笔记中通过 `![alt](path)` 或 `<img>` 标签建立的单向引用�
 资源间的关系记录，存储在 relations 表中（`type: 'wikilink'`、`'embed'` 或 `'reference'`）。基于 RID 建立，文件重命名不影响链接。
 
 **双向链接**
-lo 自动维护的反向链接机制。当 A → B 的 wikilink 创建时，同时自动创建 B → A 的反向链接。
+lo 维护的反向链接机制：A → B 的 wikilink 只单向存储（relations 表 type='wikilink'），
+反向链接经图查询（`graphEngine.incoming`）动态得到——即"谁链接了我"始终可查。
 
 ---
 

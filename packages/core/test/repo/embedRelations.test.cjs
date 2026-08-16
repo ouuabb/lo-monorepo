@@ -155,8 +155,8 @@ describe('syncMarkdownRelations', () => {
     await fs.writeFile(path.join(tempDir, 'resources', 'notes', 'photo.png'), 'fake');
     const imgResource = await repo.importFile(path.join(tempDir, 'resources', 'notes', 'photo.png'));
 
-    // 包含 wikilink + embed 的 Markdown
-    const mdContent = '# Test\n\n[[target]]\n\n![photo](photo.png)';
+    // 包含 wikilink + embed 的 Markdown（rid-based）
+    const mdContent = `# Test\n\n[[${targetResource.rid}]]\n\n![photo](photo.png)`;
     await fs.writeFile(path.join(tempDir, 'resources', 'notes', 'test.md'), mdContent);
     const mdResource = await repo.importFile(path.join(tempDir, 'resources', 'notes', 'test.md'));
 
@@ -175,12 +175,12 @@ describe('syncMarkdownRelations', () => {
     await fs.ensureDir(path.join(tempDir, 'resources', 'notes'));
 
     await fs.writeFile(path.join(tempDir, 'resources', 'notes', 'target.md'), '# Target');
-    await repo.importFile(path.join(tempDir, 'resources', 'notes', 'target.md'));
+    const targetResource = await repo.importFile(path.join(tempDir, 'resources', 'notes', 'target.md'));
 
     await fs.writeFile(path.join(tempDir, 'resources', 'notes', 'img.png'), 'fake');
     await repo.importFile(path.join(tempDir, 'resources', 'notes', 'img.png'));
 
-    const mdContent = '# Test\n\n[[target]]\n\n[[target]]\n\n![img](img.png)';
+    const mdContent = `# Test\n\n[[${targetResource.rid}]]\n\n[[${targetResource.rid}]]\n\n![img](img.png)`;
     await fs.writeFile(path.join(tempDir, 'resources', 'notes', 'test.md'), mdContent);
     const mdResource = await repo.importFile(path.join(tempDir, 'resources', 'notes', 'test.md'));
 

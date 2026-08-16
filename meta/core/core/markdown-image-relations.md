@@ -621,9 +621,9 @@ Tests:       231 passed, 231 total
 ```javascript
 const MarkdownParser = require('./src/utils/markdownParser.cjs');
 
-const { wikilinks, embeds } = MarkdownParser.parse('![photo](img.png)\n\n[[target]]');
+const { wikilinks, embeds } = MarkdownParser.parse('![photo](img.png)\n\n[[res_abc_0011223344556677]]');
 // embeds → [{ type: 'embed', target_path: 'img.png', alt: 'photo', raw: '![photo](img.png)' }]
-// wikilinks → [{ target: 'target', alias: null, raw: '[[target]]' }]
+// wikilinks → [{ targetRid: 'res_abc_0011223344556677', alias: null, raw: '[[res_abc_0011223344556677]]' }]
 
 // 快捷 API
 const paths = MarkdownParser.parseImagePaths('![a](x.png) ![b](y.png)'); // → ['x.png', 'y.png']

@@ -632,13 +632,13 @@ describe('Repository', () => {
     const repo = new Repository(tempDir);
     await repo.open({ skipAuth: true });
 
-    await repo.createResource('note', '# Second', { filename: 'second.md' });
+    const second = await repo.createResource('note', '# Second', { filename: 'second.md' });
     const assets = path.join(tempDir, 'assets');
     await fs.ensureDir(assets);
     await fs.writeFile(path.join(assets, 'pic.png'), 'PNG-DATA');
     await repo.importFile(path.join(assets, 'pic.png'));
 
-    const n1 = await repo.createResource('note', '# Main\n\nsee [[second]] and ![alt](assets/pic.png) and [broken](../nope.png)', { filename: 'main.md' });
+    const n1 = await repo.createResource('note', `# Main\n\nsee [[${second.rid}]] and ![alt](assets/pic.png) and [broken](../nope.png)`, { filename: 'main.md' });
 
     const result = await repo.syncMarkdownRelations(n1.rid);
     expect(result.wikilinks).toBe(1);

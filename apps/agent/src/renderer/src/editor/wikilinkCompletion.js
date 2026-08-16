@@ -8,9 +8,9 @@
  * 行为：
  *   [[        → 最近笔记候选（notes.list，created DESC）
  *   [[J       → search("J") 模糊候选
- *   选择候选   → 用 `[[name]]` 替换「已输入的 [[ 到光标」——range 起点即 `[[`
+ *   选择候选   → 用 `[[rid]]` 替换「已输入的 [[ 到光标」——range 起点即 `[[`
  *               起点，Monaco 校验通过（range 与光标同行）；NoteEditor 关闭
- *               auto-closing（输入 [[ 不自动补 ]]），替换结果恒为完整 [[name]]
+ *               auto-closing（输入 [[ 不自动补 ]]），替换结果恒为完整 [[rid]]
  *
  * 前置条件（NoteEditor 配置）：autoClosingBrackets: 'never'
  */

@@ -1,11 +1,14 @@
 const MarkdownParser = require('../../src/utils/markdownParser.cjs');
 
-describe('MarkdownParser', () => {
+const RID_A = 'res_aaa_0011223344556677';
+const RID_B = 'res_bbb_8899aabbccddeeff';
+
+describe('MarkdownParser（rid-based）', () => {
   test('parse should combine wikilinks and embeds', () => {
-    const content = 'See [[Note A]] and ![pic](img.png)';
+    const content = `See [[${RID_A}]] and ![pic](img.png)`;
     const result = MarkdownParser.parse(content);
     expect(result.wikilinks).toEqual([
-      { target: 'Note A', alias: null }
+      { targetRid: RID_A, alias: null }
     ]);
     expect(result.embeds).toEqual([
       expect.objectContaining({ target_path: 'img.png' })
@@ -19,9 +22,10 @@ describe('MarkdownParser', () => {
   });
 
   test('parse should handle content with only wikilinks', () => {
-    const result = MarkdownParser.parse('[[A]] and [[B|bee]]');
+    const result = MarkdownParser.parse(`[[${RID_A}]] and [[${RID_B}|bee]]`);
     expect(result.wikilinks).toHaveLength(2);
     expect(result.embeds).toHaveLength(0);
+    expect(result.wikilinks[1].alias).toBe('bee');
   });
 
   test('parse should handle content with only embeds', () => {
@@ -30,9 +34,14 @@ describe('MarkdownParser', () => {
     expect(result.wikilinks).toHaveLength(0);
   });
 
-  test('parseWikiTargets should return unique target list', () => {
-    const targets = MarkdownParser.parseWikiTargets('[[A]] [[A]] [[B|alias]]');
-    expect(targets).toEqual(['A', 'B']);
+  test('parse should reject legacy name-based wikilinks', () => {
+    const result = MarkdownParser.parse('[[My Note]] and [[未命名笔记|显示]]');
+    expect(result.wikilinks).toEqual([]);
+  });
+
+  test('parseWikiTargets should return unique targetRid list', () => {
+    const targets = MarkdownParser.parseWikiTargets(`[[${RID_A}]] [[${RID_A}]] [[${RID_B}|alias]]`);
+    expect(targets).toEqual([RID_A, RID_B]);
   });
 
   test('parseWikiTargets should handle empty content', () => {

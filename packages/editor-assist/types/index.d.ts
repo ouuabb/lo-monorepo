@@ -32,8 +32,12 @@ export interface WikilinkTrigger {
 
 /** 补全候选条目 */
 export interface CompletionCandidate {
+  /** 资源唯一身份（Wikilink identity） */
+  rid: string;
+  /** 展示名（resource.name；用于 UI 显示） */
   label: string;
   detail?: string;
+  /** 插入文本：`[[rid]]`（rid-based；不插入 name） */
   insertText: string;
 }
 

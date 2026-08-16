@@ -7,12 +7,13 @@
  *   search(query, limit)           → Promise<ResourceMeta[]>（Fuse.js 模糊搜索）
  *   ResourceMeta = { rid: string, name: string, type?: string }
  *
- * 编排规则：
+ * 编排规则（rid-based 模型）：
  *   - token 为空 → listRecent
  *   - token 非空 → search(token)
- *   - 去重：按 name 精确去重（保留首次出现）
+ *   - 去重：按 rid 精确去重（保留首次出现）
  *   - 排序：保持数据源返回顺序（listRecent 已 created DESC；search 已按评分）
- *   - 插入文本：`[[name]]`（完整闭合）
+ *   - 候选保留 rid（Wikilink identity 是 rid）；UI 展示 name（label）
+ *   - 插入文本：`[[rid]]`（无 alias；alias 由用户后续手填 [[rid|alias]]）
  *   - range：start = `[[` 起点；end = 光标（替换已输入的 `[[` 与 token）
  *   - trailingClose：光标后 Monaco auto-closing 自动补出的连续 `]` 数量
  *     （宿主以 additionalTextEdits 删除，保证结果无残留括号）
@@ -25,7 +26,7 @@
  * @param {number} opts.cursorOffset — 光标偏移
  * @param {import('../types').CandidateSource} opts.source — 注入的数据源
  * @param {number} [opts.limit] — 候选数量上限（默认 20）
- * @returns {Promise<null | { range: { start: number, end: number }, token: string, suggestions: Array<{ label, detail?, insertText }> }>}
+ * @returns {Promise<null | { range: { start: number, end: number }, token: string, suggestions: Array<{ rid, label, detail?, insertText }> }>}
  *   未处于触发上下文返回 null
  */
 async function buildCandidates({ text, cursorOffset, source, limit = 20 }) {
@@ -44,13 +45,15 @@ async function buildCandidates({ text, cursorOffset, source, limit = 20 }) {
   const seen = new Set();
   const suggestions = [];
   for (const item of raw || []) {
-    if (!item || typeof item.name !== 'string' || !item.name) continue;
-    if (seen.has(item.name)) continue;
-    seen.add(item.name);
+    if (!item || typeof item.rid !== 'string' || !item.rid) continue;
+    if (typeof item.name !== 'string' || !item.name) continue;
+    if (seen.has(item.rid)) continue;
+    seen.add(item.rid);
     suggestions.push({
+      rid: item.rid,
       label: item.name,
       detail: item.type ? `type: ${item.type}` : undefined,
-      insertText: `[[${item.name}]]`,
+      insertText: `[[${item.rid}]]`,
     });
     if (suggestions.length >= limit) break;
   }
