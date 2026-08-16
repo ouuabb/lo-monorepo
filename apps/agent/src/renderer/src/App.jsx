@@ -6,6 +6,8 @@ import { BarArea, Bar } from './layout/BarArea.jsx';
 import CoreViewPanel from './views/ViewPanel.jsx';
 import GraphView from './views/GraphView.jsx';
 import { revealFeedback } from './services/revealFeedback.mjs';
+import { createSession, toggleReadOnly as toggleSessionReadOnly, resolveReadOnly } from './services/SessionService.mjs';
+import { resolveViewerComponent } from './services/viewerRegistry.js';
 import './App.css';
 
 const api = window.loAgent && window.loAgent.loCore;
@@ -57,7 +59,7 @@ const [repoCtx, setRepoCtx] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [ctxMenu, setCtxMenu] = useState(null);
-  const [readOnlyOverrides, setReadOnlyOverrides] = useState(() => new Set());
+  const readOnlyOverridesRef = useRef(new Set());
   const [autoSave, setAutoSave] = useState(false);
   const discardKeyRef = useRef(null);
   const deleteRidRef = useRef(null);
@@ -77,7 +79,7 @@ const [repoCtx, setRepoCtx] = useState(null);
   const activeTab = tabs.find((t) => t.key === activeKey) || null;
   const isDirty = (tab) =>
     !!tab &&
-    (tab.readOnly
+    (tab.session.state.readOnly
       ? false
       : tab.text !== tab.savedText ||
         tab.title !== tab.savedTitle ||
@@ -191,40 +193,45 @@ const [repoCtx, setRepoCtx] = useState(null);
       }
       setBusy(true);
       notify('');
-      const res = await api.getNote(n.rid);
-      setBusy(false);
-      if (res.ok && res.data) {
-        setRelationsOpen(true);
-        const data = res.data;
-        const readOnly = n.type !== 'note' || readOnlyOverrides.has(n.rid);
-        const meta = data.metadata || {};
-        const tabTitle = n.name || n.rid;
-        const tabTags = Array.isArray(data.tags) ? data.tags.join(', ') : '';
-        const tab = {
-          key: n.rid,
-          rid: n.rid,
-          type: n.type || data.type || 'resource',
-          title: tabTitle,
-          tagsText: tabTags,
-          category: meta.category || '',
-          text: data.content || '',
-          savedText: data.content || '',
-          savedTitle: tabTitle,
-          savedTagsText: tabTags,
-          savedCategory: meta.category || '',
-          readOnly,
-          meta: {
+      try {
+        const session = await createSession(n, api, readOnlyOverridesRef.current);
+        const res = await api.getNote(n.rid);
+        if (res.ok && res.data) {
+          setRelationsOpen(true);
+          const data = res.data;
+          const meta = data.metadata || {};
+          const tabTitle = n.name || n.rid;
+          const tabTags = Array.isArray(data.tags) ? data.tags.join(', ') : '';
+          const tab = {
+            key: n.rid,
             rid: n.rid,
             type: n.type || data.type || 'resource',
-            updatedAt: data.updatedAt || data.lastModified || null,
-            size: data.size != null ? data.size : (data.content || '').length,
-            schema: data.schema || null,
-          },
-        };
-        setTabs((prev) => [...prev, tab]);
-        setActiveKey(tab.key);
-      } else {
-        notify(`打开资源失败: ${res.message}`);
+            title: tabTitle,
+            tagsText: tabTags,
+            category: meta.category || '',
+            text: data.content || '',
+            savedText: data.content || '',
+            savedTitle: tabTitle,
+            savedTagsText: tabTags,
+            savedCategory: meta.category || '',
+            session,
+            meta: {
+              rid: n.rid,
+              type: n.type || data.type || 'resource',
+              updatedAt: data.updatedAt || data.lastModified || null,
+              size: data.size != null ? data.size : (data.content || '').length,
+              schema: data.schema || null,
+            },
+          };
+          setTabs((prev) => [...prev, tab]);
+          setActiveKey(tab.key);
+        } else {
+          notify(`打开资源失败: ${res.message}`);
+        }
+      } catch (e) {
+        notify(`打开资源失败: ${e.message}`);
+      } finally {
+        setBusy(false);
       }
     },
     [api, tabs],
@@ -289,7 +296,7 @@ const [repoCtx, setRepoCtx] = useState(null);
 
   const saveActiveTab = useCallback(
     async (silent = false) => {
-      if (!api || !activeTab || activeTab.readOnly) return;
+      if (!api || !activeTab || activeTab.session.state.readOnly) return;
       if (!silent) notify('');
       const body = { content: activeTab.text };
       if (activeTab.title !== activeTab.savedTitle) body.name = activeTab.title;
@@ -329,7 +336,7 @@ const [repoCtx, setRepoCtx] = useState(null);
   useEffect(() => {
     if (!autoSave) return undefined;
     const tab = tabs.find((t) => t.key === activeKey);
-    if (!tab || tab.readOnly || !isDirty(tab)) return undefined;
+    if (!tab || tab.session.state.readOnly || !isDirty(tab)) return undefined;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
       autoSaveTimerRef.current = null;
@@ -408,18 +415,21 @@ const [repoCtx, setRepoCtx] = useState(null);
   }, [activeTab]);
 
   const toggleReadOnly = useCallback((rid) => {
-    setReadOnlyOverrides((prev) => {
-      const next = new Set(prev);
-      if (next.has(rid)) {
-        next.delete(rid);
-      } else {
-        next.add(rid);
-      }
-      return next;
+    setTabs((prev) => {
+      let nextOverrides = readOnlyOverridesRef.current;
+      const updated = prev.map((t) => {
+        if (t.rid !== rid) return t;
+        const { nextSession, nextOverrides: ov } = toggleSessionReadOnly(
+          t.session,
+          rid,
+          nextOverrides,
+        );
+        nextOverrides = ov;
+        return { ...t, session: nextSession };
+      });
+      readOnlyOverridesRef.current = nextOverrides;
+      return updated;
     });
-    setTabs((prev) =>
-      prev.map((t) => (t.rid === rid ? { ...t, readOnly: !t.readOnly } : t)),
-    );
   }, []);
 
   const confirmDeleteNote = useCallback(async () => {
@@ -575,14 +585,24 @@ useEffect(() => {
     [sidebarWidth, collapsed],
   );
 
-  const openCtxMenu = useCallback((n, x, y) => {
-    setCtxMenu({
-      x: Math.max(4, Math.min(x, window.innerWidth - 190)),
-      y: Math.max(4, Math.min(y, window.innerHeight - 140)),
-      rid: n.rid,
-      readOnly: n.type !== 'note' || readOnlyOverrides.has(n.rid),
-    });
-  }, [readOnlyOverrides]);
+  const openCtxMenu = useCallback(
+    async (n, x, y) => {
+      const existingTab = tabs.find((t) => t.rid === n.rid);
+      const readOnly = await resolveReadOnly(
+        n,
+        api,
+        readOnlyOverridesRef.current,
+        existingTab ? existingTab.session : null,
+      );
+      setCtxMenu({
+        x: Math.max(4, Math.min(x, window.innerWidth - 190)),
+        y: Math.max(4, Math.min(y, window.innerHeight - 140)),
+        rid: n.rid,
+        readOnly,
+      });
+    },
+    [tabs, api],
+  );
 
   const toggleSidebar = useCallback(() => {
     if (collapsed) {
@@ -825,7 +845,7 @@ useEffect(() => {
                     <input
                       className="editor-doc-name-input"
                       value={activeTab.title}
-                      disabled={activeTab.readOnly}
+                      disabled={activeTab.session.state.readOnly}
                       onChange={(e) => setActiveTitle(e.target.value)}
                       aria-label="笔记标题"
                     />
@@ -834,7 +854,7 @@ useEffect(() => {
                       className="editor-meta-input"
                       placeholder="标签（逗号分隔）"
                       value={activeTab.tagsText}
-                      disabled={activeTab.readOnly}
+                      disabled={activeTab.session.state.readOnly}
                       onChange={(e) => setActiveTagsText(e.target.value)}
                       aria-label="标签"
                     />
@@ -842,7 +862,7 @@ useEffect(() => {
                       className="editor-meta-input editor-meta-input-sm"
                       placeholder="分类"
                       value={activeTab.category}
-                      disabled={activeTab.readOnly}
+                      disabled={activeTab.session.state.readOnly}
                       onChange={(e) => setActiveCategory(e.target.value)}
                       aria-label="分类"
                     />
@@ -851,17 +871,18 @@ useEffect(() => {
                 </div>
 
                 <div className="editor-body">
-                  <NoteEditor
-                    key={activeTab.key}
-                    value={activeTab.text}
-                    onChange={setActiveText}
-                    readOnly={activeTab.readOnly}
-                  />
+                  <EditorRenderer tab={activeTab} onChange={setActiveText} />
                 </div>
 
                 <div className="editor-statusbar">
                   <span className="status-meta">{activeTab.rid}</span>
                   <span className="status-meta">类型 {activeTab.meta.type}</span>
+                  <span className="status-meta">
+                    Mode {activeTab.session.modeId}
+                  </span>
+                  <span className="status-meta">
+                    Viewer {activeTab.session.viewerId}
+                  </span>
                   {activeTab.meta.schema && (
                     <span className="status-meta">schema {activeTab.meta.schema}</span>
                   )}
@@ -872,7 +893,7 @@ useEffect(() => {
                   )}
                   <span className="status-meta">
                     {activeTab.text.length} 字符
-                    {activeTab.readOnly ? ' · 只读' : ''}
+                    {activeTab.session.state.readOnly ? ' · 只读' : ''}
                   </span>
                   <span className="status-hint">Ctrl/Cmd+S 保存</span>
                 </div>
@@ -1026,6 +1047,31 @@ const PLUGIN_STATE_LABEL = {
   deactivated: '已停用',
   loaded: '已加载',
 };
+
+/**
+ * EditorRenderer —— 按 session.viewerId 选择 renderer（U2）
+ * session.state.readOnly 是只读状态唯一运行态来源；
+ * viewer 自身的只读限制（如 generic-preview）与其取并集。
+ */
+function EditorRenderer({ tab, onChange }) {
+  const viewer = resolveViewerComponent(tab.session.viewerId);
+  if (!viewer) {
+    return (
+      <div className="editor-body-empty">
+        无可用的 Viewer：{tab.session.viewerId}（插件贡献的 Viewer 未安装）
+      </div>
+    );
+  }
+  const ViewerComponent = viewer.component;
+  return (
+    <ViewerComponent
+      key={tab.key}
+      value={tab.text}
+      onChange={onChange}
+      readOnly={tab.session.state.readOnly || !!viewer.readOnly}
+    />
+  );
+}
 
 function PluginPanel(props) {
   const { onNotify } = props;
