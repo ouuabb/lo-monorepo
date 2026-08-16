@@ -21,12 +21,16 @@ export const PANEL_DEFAULTS = {
   plugin: false,
 };
 
+/** 编辑器分屏组上限（Monaco 多实例内存约束） */
+export const MAX_GROUPS = 3;
+
 /** 默认布局 */
 export function defaultLayout() {
   return {
     version: LAYOUT_VERSION,
     sidebar: { visible: true, size: DEFAULT_SIDEBAR_WIDTH },
     panels: { ...PANEL_DEFAULTS },
+    editor: null,
   };
 }
 
@@ -38,6 +42,32 @@ export function clampSidebarWidth(width) {
   const n = Number(width);
   if (!Number.isFinite(n)) return DEFAULT_SIDEBAR_WIDTH;
   return Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, Math.round(n)));
+}
+
+/**
+ * 编辑器分屏组：仅保存布局结构与 rid 列表，不保存 draft。
+ * @typedef {Object} EditorGroupState
+ * @property {string} id — 组 id
+ * @property {string[]} tabs — 组内 tab 的资源 rid 列表（按打开顺序）
+ * @property {string|null} active — 活动 tab 的 rid（null/缺省 = 组内第一个）
+ */
+export function normalizeEditorGroups(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const groups = [];
+  for (const g of raw) {
+    if (!g || typeof g !== 'object' || typeof g.id !== 'string') continue;
+    const tabs = Array.isArray(g.tabs)
+      ? g.tabs.filter((r) => typeof r === 'string' && r.length > 0).slice(0, 20)
+      : [];
+    if (tabs.length === 0) continue;
+    groups.push({
+      id: g.id,
+      tabs,
+      active: typeof g.active === 'string' && tabs.includes(g.active) ? g.active : tabs[0],
+    });
+    if (groups.length >= MAX_GROUPS) break;
+  }
+  return groups.length === 0 ? null : groups;
 }
 
 /** 非法/缺失输入 → 合并默认值，返回干净布局对象 */
@@ -58,12 +88,17 @@ export function normalizeLayout(raw) {
     if (typeof panelsRaw[id] === 'boolean') panels[id] = panelsRaw[id];
   }
 
-  return { version: LAYOUT_VERSION, sidebar, panels };
+  return {
+    version: LAYOUT_VERSION,
+    sidebar,
+    panels,
+    editor: normalizeEditorGroups(raw.editor && raw.editor.groups),
+  };
 }
 
 /** 序列化：App 当前状态 → 可持久化布局对象 */
-export function buildLayout({ sidebarVisible, sidebarWidth, panels }) {
-  return normalizeLayout({
+export function buildLayout({ sidebarVisible, sidebarWidth, panels, groups = null }) {
+  const layout = normalizeLayout({
     version: LAYOUT_VERSION,
     sidebar: {
       visible: !!sidebarVisible,
@@ -71,6 +106,12 @@ export function buildLayout({ sidebarVisible, sidebarWidth, panels }) {
     },
     panels,
   });
+  if (Array.isArray(groups) && groups.length > 0) {
+    layout.editor = { groups: normalizeEditorGroups(groups) };
+  } else {
+    layout.editor = null;
+  }
+  return layout;
 }
 
 /** 还原：持久化布局 → App 初始化状态（panel 显隐缺失时用默认） */
@@ -79,5 +120,47 @@ export function applyLayout(layout) {
   return {
     sidebar: { ...normalized.sidebar },
     panels: { ...normalized.panels },
+    editor: normalized.editor,
   };
+}
+
+// ── 编辑器分屏组运行时纯逻辑（关闭合并；不依赖 React/Electron） ──
+
+/**
+ * 关闭 group 内一个 tab：返回关闭后的 group（空组 → null）。
+ * 关闭的是活动 tab 时，焦点移到前一个 tab（无前一个则第一个）。
+ * @param {object} group — { id, tabs, activeTabId }
+ * @param {string} tabId
+ * @returns {{ group: object|null, removed: boolean }}
+ */
+export function closeTabInGroup(group, tabId) {
+  const tIdx = group.tabs.findIndex((t) => t.id === tabId);
+  if (tIdx === -1) return { group: null, removed: false };
+  const tabs = group.tabs.filter((t) => t.id !== tabId);
+  if (tabs.length === 0) return { group: null, removed: true };
+  let activeTabId = group.activeTabId;
+  if (activeTabId === tabId) {
+    activeTabId = tabs[Math.max(0, tIdx - 1)].id;
+  }
+  return { group: { ...group, tabs, activeTabId }, removed: true };
+}
+
+/**
+ * 移除一个 group（组内 tab 全部关闭后）：返回新 groups 与焦点组。
+ * 移除的是焦点组时，焦点移到右侧相邻组（无则左侧，再无则 null）。
+ * @param {Array} groups
+ * @param {string} groupId
+ * @param {string|null} activeGroupId
+ * @returns {{ groups: Array, activeGroupId: string|null }}
+ */
+export function removeGroup(groups, groupId, activeGroupId) {
+  const idx = groups.findIndex((g) => g.id === groupId);
+  if (idx === -1) return { groups, activeGroupId };
+  const next = groups.filter((g) => g.id !== groupId);
+  let nextActive = activeGroupId;
+  if (activeGroupId === groupId) {
+    const fallback = next[Math.min(idx, next.length - 1)];
+    nextActive = fallback ? fallback.id : null;
+  }
+  return { groups: next, activeGroupId: nextActive };
 }

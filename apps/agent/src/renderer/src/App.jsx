@@ -2,10 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PluginUiMount from './plugin/PluginUiMount.jsx';
 import { hasUi } from './plugin/pluginUi.js';
 import { BarArea, Bar, MainArea } from './layout/BarArea.jsx';
+import { EditorArea } from './layout/EditorArea.jsx';
 import {
   applyLayout,
   buildLayout,
   DEFAULT_SIDEBAR_WIDTH,
+  closeTabInGroup,
+  removeGroup,
 } from './layout/paneLayout.mjs';
 import CoreViewPanel from './views/ViewPanel.jsx';
 import GraphView from './views/GraphView.jsx';
@@ -51,8 +54,8 @@ const [repoCtx, setRepoCtx] = useState(null);
   const [notes, setNotes] = useState([]);
   const [authenticated, setAuthenticated] = useState(false);
   const [message, setMessage] = useState('');
-  const [tabs, setTabs] = useState([]);
-  const [activeKey, setActiveKey] = useState(null);
+  const [groups, setGroups] = useState([]);
+  const [activeGroupId, setActiveGroupId] = useState(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -60,12 +63,18 @@ const [repoCtx, setRepoCtx] = useState(null);
   const readOnlyOverridesRef = useRef(new Set());
   const [autoSave, setAutoSave] = useState(false);
   const [pluginViewers, setPluginViewers] = useState([]);
-  const discardKeyRef = useRef(null);
+  const discardTabIdRef = useRef(null);
   const deleteRidRef = useRef(null);
   const toastTimerRef = useRef(null);
   const autoSaveTimerRef = useRef(null);
   const layoutTimerRef = useRef(null);
   const [toastCopied, setToastCopied] = useState(false);
+
+  // tab/group 实例 id（同 rid 可在多个 group 双开，实例独立）
+  let tabSeq = 0;
+  const makeTabId = () => `t_${Date.now().toString(36)}_${(tabSeq++).toString(36)}`;
+  let groupSeq = 0;
+  const makeGroupId = () => `g_${Date.now().toString(36)}_${(groupSeq++).toString(36)}`;
 
   const notify = useCallback((text) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -76,7 +85,11 @@ const [repoCtx, setRepoCtx] = useState(null);
     }
   }, []);
 
-  const activeTab = tabs.find((t) => t.key === activeKey) || null;
+  const activeGroup = groups.find((g) => g.id === activeGroupId) || null;
+  const activeTab =
+    (activeGroup &&
+      activeGroup.tabs.find((t) => t.id === activeGroup.activeTabId)) ||
+    null;
   const isDirty = (tab) =>
     !!tab &&
     (tab.session.state.readOnly
@@ -178,32 +191,48 @@ const [repoCtx, setRepoCtx] = useState(null);
     setStatus(null);
     setRepoCtx(null);
     setNotes([]);
-    setTabs([]);
-    setActiveKey(null);
+    setGroups([]);
+    setActiveGroupId(null);
     notify('已登出');
   }, []);
 
-  const openResource = useCallback(
-    async (n) => {
-      if (!api || !n) return;
-      const existing = tabs.find((t) => t.rid === n.rid);
+  const openIntoGroup = useCallback(
+    async (n, groupId, opts = {}) => {
+      if (!api || !n) return null;
+      const { makeActive = false } = opts;
+      // 目标 group 查重（group 内唯一；不同 group 可双开同一 rid）
+      const group = groups.find((g) => g.id === groupId);
+      if (!group) return null;
+      const existing = group.tabs.find((t) => t.rid === n.rid);
       if (existing) {
-        setActiveKey(existing.key);
-        return;
+        if (makeActive || group.activeTabId !== existing.id) {
+          setGroups((prev) =>
+            prev.map((g) =>
+              g.id === groupId ? { ...g, activeTabId: existing.id } : g,
+            ),
+          );
+        }
+        setActiveGroupId(groupId);
+        return existing;
       }
       setBusy(true);
       notify('');
       try {
-        const session = await createSession(n, api, readOnlyOverridesRef.current);
+        const session = await createSession(
+          n,
+          api,
+          readOnlyOverridesRef.current,
+        );
         const res = await api.getNote(n.rid);
         if (res.ok && res.data) {
-          setRelationsOpen(true);
           const data = res.data;
           const meta = data.metadata || {};
           const tabTitle = n.name || n.rid;
-          const tabTags = Array.isArray(data.tags) ? data.tags.join(', ') : '';
+          const tabTags = Array.isArray(data.tags)
+            ? data.tags.join(', ')
+            : '';
           const tab = {
-            key: n.rid,
+            id: makeTabId(),
             rid: n.rid,
             type: n.type || data.type || 'resource',
             title: tabTitle,
@@ -219,79 +248,197 @@ const [repoCtx, setRepoCtx] = useState(null);
               rid: n.rid,
               type: n.type || data.type || 'resource',
               updatedAt: data.updatedAt || data.lastModified || null,
-              size: data.size != null ? data.size : (data.content || '').length,
+              size:
+                data.size != null
+                  ? data.size
+                  : (data.content || '').length,
               schema: data.schema || null,
             },
           };
-          setTabs((prev) => [...prev, tab]);
-          setActiveKey(tab.key);
-        } else {
-          notify(`打开资源失败: ${res.message}`);
+          setGroups((prev) =>
+            prev.map((g) =>
+              g.id === groupId
+                ? {
+                    ...g,
+                    tabs: [...g.tabs, tab],
+                    activeTabId: makeActive || g.tabs.length === 0 ? tab.id : g.activeTabId,
+                  }
+                : g,
+            ),
+          );
+          setActiveGroupId(groupId);
+          setRelationsOpen(true);
+          return tab;
         }
+        notify(`打开资源失败: ${res.message}`);
+        return null;
       } catch (e) {
         notify(`打开资源失败: ${e.message}`);
+        return null;
       } finally {
         setBusy(false);
       }
     },
-    [api, tabs],
+    [api, groups],
   );
 
-  const setActiveText = useCallback(
-    (text) => {
-      setTabs((prev) => prev.map((t) => (t.key === activeKey ? { ...t, text } : t)));
+  /** 打开到当前焦点 group（无 group 时创建默认组） */
+  const openResource = useCallback(
+    async (n) => {
+      if (!api || !n) return;
+      let gid = activeGroupId;
+      if (!gid) {
+        gid = makeGroupId();
+        setGroups((prev) => [...prev, { id: gid, tabs: [], activeTabId: null }]);
+        setActiveGroupId(gid);
+      }
+      await openIntoGroup(n, gid, { makeActive: true });
     },
-    [activeKey],
+    [api, activeGroupId, openIntoGroup],
   );
+
+  /** 分屏：在新 group 打开资源（右键「在分屏中打开」） */
+  const openInNewGroup = useCallback(
+    async (n) => {
+      if (!api || !n) return;
+      const gid = makeGroupId();
+      setGroups((prev) => [...prev, { id: gid, tabs: [], activeTabId: null }]);
+      await openIntoGroup(n, gid, { makeActive: true });
+    },
+    [api, openIntoGroup],
+  );
+
+  /** 分屏：复制活动 tab 到新 group（实例独立：新 id + 新 session + 复制草稿） */
+  const splitActiveTab = useCallback(async () => {
+    const src = activeTab;
+    if (!src || !api) return;
+    const n = { rid: src.rid, type: src.type, name: src.title };
+    try {
+      const session = await createSession(
+        n,
+        api,
+        readOnlyOverridesRef.current,
+      );
+      const gid = makeGroupId();
+      const tab = { ...src, id: makeTabId(), session };
+      setGroups((prev) => [...prev, { id: gid, tabs: [tab], activeTabId: tab.id }]);
+      setActiveGroupId(gid);
+    } catch (e) {
+      notify(`分屏失败: ${e.message}`);
+    }
+  }, [activeTab, api, notify]);
+
+  const activateTab = useCallback((groupId, tabId) => {
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.id === groupId && g.tabs.some((t) => t.id === tabId)
+          ? { ...g, activeTabId: tabId }
+          : g,
+      ),
+    );
+    setActiveGroupId(groupId);
+  }, []);
 
   const closeTab = useCallback(
-    (key) => {
-      setTabs((prev) => {
-        const idx = prev.findIndex((t) => t.key === key);
-        const next = prev.filter((t) => t.key !== key);
-        if (activeKey === key) {
-          const fallback = next[Math.max(0, idx - 1)];
-          setActiveKey(fallback ? fallback.key : null);
-        }
-        return next;
-      });
+    (tabId) => {
+      const gIdx = groups.findIndex((g) =>
+        g.tabs.some((t) => t.id === tabId),
+      );
+      if (gIdx === -1) return;
+      const { group: nextGroup } = closeTabInGroup(groups[gIdx], tabId);
+      if (!nextGroup) {
+        const { groups: next, activeGroupId: nextActive } = removeGroup(
+          groups,
+          groups[gIdx].id,
+          activeGroupId,
+        );
+        setGroups(next);
+        if (nextActive !== activeGroupId) setActiveGroupId(nextActive);
+      } else {
+        const next = [...groups];
+        next[gIdx] = nextGroup;
+        setGroups(next);
+      }
     },
-    [activeKey],
+    [groups, activeGroupId],
+  );
+
+  /** 删除资源场景：一次性计算关闭所有 group 中该 rid 的 tab（避免连续 setState 竞争） */
+  const closeTabsByRid = useCallback(
+    (rid) => {
+      let work = groups;
+      let activeId = activeGroupId;
+      for (const g of groups) {
+        for (const t of g.tabs) {
+          if (t.rid !== rid) continue;
+          const { group: ng } = closeTabInGroup(
+            work.find((x) => x.id === g.id),
+            t.id,
+          );
+          if (!ng) {
+            const r = removeGroup(work, g.id, activeId);
+            work = r.groups;
+            activeId = r.activeGroupId;
+          } else {
+            work = work.map((x) => (x.id === g.id ? ng : x));
+          }
+        }
+      }
+      setGroups(work);
+      if (activeId !== activeGroupId) setActiveGroupId(activeId);
+    },
+    [groups, activeGroupId],
+  );
+
+  /** 更新任意 group 的指定 tab 字段（分屏下编辑用；输入前已点击激活该组） */
+  const patchActiveGroupTab = useCallback((groupId, tabId, patch) => {
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.id !== groupId
+          ? g
+          : {
+              ...g,
+              tabs: g.tabs.map((t) =>
+                t.id === tabId ? { ...t, ...patch } : t,
+              ),
+            },
+      ),
+    );
+  }, []);
+
+  /** 关闭整个分屏组：有未保存修改则拒绝（提示先保存/逐个关闭），否则整组移除 */
+  const closeGroup = useCallback(
+    (groupId) => {
+      const group = groups.find((g) => g.id === groupId);
+      if (!group) return;
+      if (group.tabs.some((t) => isDirty(t))) {
+        notify('当前分屏组存在未保存修改，请先保存或逐个关闭标签页');
+        return;
+      }
+      const { groups: next, activeGroupId: nextActive } = removeGroup(
+        groups,
+        groupId,
+        activeGroupId,
+      );
+      setGroups(next);
+      if (nextActive !== activeGroupId) setActiveGroupId(nextActive);
+    },
+    [groups, activeGroupId, isDirty, notify],
   );
 
   const requestCloseTab = useCallback(
-    (key) => {
-      const tab = tabs.find((t) => t.key === key);
+    (tabId) => {
+      const tab = groups
+        .flatMap((g) => g.tabs)
+        .find((t) => t.id === tabId);
       if (tab && isDirty(tab)) {
-        discardKeyRef.current = key;
+        discardTabIdRef.current = tabId;
         setConfirmDiscard(true);
       } else {
-        closeTab(key);
+        closeTab(tabId);
       }
     },
-    [tabs, isDirty, closeTab],
-  );
-
-  // 标题框 = Resource name（018：rename 入口）；tab.title 为 UI 变量，落库走 body.name
-  const setActiveTitle = useCallback(
-    (title) => {
-      setTabs((prev) => prev.map((t) => (t.key === activeKey ? { ...t, title } : t)));
-    },
-    [activeKey],
-  );
-
-  const setActiveTagsText = useCallback(
-    (tagsText) => {
-      setTabs((prev) => prev.map((t) => (t.key === activeKey ? { ...t, tagsText } : t)));
-    },
-    [activeKey],
-  );
-
-  const setActiveCategory = useCallback(
-    (category) => {
-      setTabs((prev) => prev.map((t) => (t.key === activeKey ? { ...t, category } : t)));
-    },
-    [activeKey],
+    [groups,     isDirty, closeTab],
   );
 
   const saveActiveTab = useCallback(
@@ -311,18 +458,21 @@ const [repoCtx, setRepoCtx] = useState(null);
       }
       const res = await api.updateNote(activeTab.rid, body);
       if (res.ok) {
-        setTabs((prev) =>
-          prev.map((t) =>
-            t.key === activeTab.key
-              ? {
-                  ...t,
-                  savedText: t.text,
-                  savedTitle: t.title,
-                  savedTagsText: t.tagsText,
-                  savedCategory: t.category,
-                }
-              : t,
-          ),
+        setGroups((prev) =>
+          prev.map((g) => ({
+            ...g,
+            tabs: g.tabs.map((t) =>
+              t.id === activeTab.id
+                ? {
+                    ...t,
+                    savedText: t.text,
+                    savedTitle: t.title,
+                    savedTagsText: t.tagsText,
+                    savedCategory: t.category,
+                  }
+                : t,
+            ),
+          })),
         );
         if (!silent) notify('已保存');
         handleRefresh();
@@ -335,7 +485,7 @@ const [repoCtx, setRepoCtx] = useState(null);
 
   useEffect(() => {
     if (!autoSave) return undefined;
-    const tab = tabs.find((t) => t.key === activeKey);
+    const tab = activeTab;
     if (!tab || tab.session.state.readOnly || !isDirty(tab)) return undefined;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
@@ -348,7 +498,7 @@ const [repoCtx, setRepoCtx] = useState(null);
         autoSaveTimerRef.current = null;
       }
     };
-  }, [tabs, activeKey, autoSave, saveActiveTab, isDirty]);
+  }, [activeTab, autoSave, saveActiveTab, isDirty]);
 
   const createNote = useCallback(async () => {
     if (!api) return;
@@ -415,18 +565,21 @@ const [repoCtx, setRepoCtx] = useState(null);
   }, [activeTab]);
 
   const toggleReadOnly = useCallback((rid) => {
-    setTabs((prev) => {
+    setGroups((prev) => {
       let nextOverrides = readOnlyOverridesRef.current;
-      const updated = prev.map((t) => {
-        if (t.rid !== rid) return t;
-        const { nextSession, nextOverrides: ov } = toggleSessionReadOnly(
-          t.session,
-          rid,
-          nextOverrides,
-        );
-        nextOverrides = ov;
-        return { ...t, session: nextSession };
-      });
+      const updated = prev.map((g) => ({
+        ...g,
+        tabs: g.tabs.map((t) => {
+          if (t.rid !== rid) return t;
+          const { nextSession, nextOverrides: ov } = toggleSessionReadOnly(
+            t.session,
+            rid,
+            nextOverrides,
+          );
+          nextOverrides = ov;
+          return { ...t, session: nextSession };
+        }),
+      }));
       readOnlyOverridesRef.current = nextOverrides;
       return updated;
     });
@@ -447,7 +600,7 @@ const [repoCtx, setRepoCtx] = useState(null);
       const res = await api.removeNote(rid);
       if (res.ok) {
         notify('已删除');
-        closeTab(rid);
+        closeTabsByRid(rid);
         handleRefresh();
       } else {
         notify(`删除失败: ${res.message}`);
@@ -457,7 +610,7 @@ const [repoCtx, setRepoCtx] = useState(null);
     } finally {
       setBusy(false);
     }
-  }, [api, closeTab, handleRefresh]);
+  }, [api, closeTabsByRid, handleRefresh]);
 
   // 在系统资源管理器中打开（A 功能）：只传 rid；结果经 revealFeedback 映射提示文案
   const handleReveal = useCallback(
@@ -502,10 +655,10 @@ const [repoCtx, setRepoCtx] = useState(null);
   }, [api, handleRefresh]);
 
   const confirmDiscardAction = useCallback(() => {
-    const key = discardKeyRef.current;
-    discardKeyRef.current = null;
+    const tabId = discardTabIdRef.current;
+    discardTabIdRef.current = null;
     setConfirmDiscard(false);
-    if (key) closeTab(key);
+    if (tabId) closeTab(tabId);
   }, [closeTab]);
 
   useEffect(() => {
@@ -558,19 +711,41 @@ useEffect(() => {
 
   useEffect(() => {
     if (!api || !api.layout || typeof api.layout.load !== 'function') return;
+    let cancelled = false;
     api.layout
       .load()
-      .then((res) => {
-        if (!res || !res.ok || !res.layout) return;
+      .then(async (res) => {
+        if (cancelled || !res || !res.ok || !res.layout) return;
         const app = applyLayout(res.layout);
         setSidebarWidth(app.sidebar.size);
         setCollapsed(!app.sidebar.visible);
         setRelationsOpen(app.panels.relations);
         setSubOpen(app.panels.settings);
         setPluginView(app.panels.plugin);
+        // 恢复编辑器分屏布局（仅布局结构与 rid；draft 不持久化）
+        if (app.editor && app.editor.length > 0) {
+          setGroups(
+            app.editor.map((g) => ({ id: g.id, tabs: [], activeTabId: null })),
+          );
+          setActiveGroupId(app.editor[0].id);
+          for (const g of app.editor) {
+            for (const rid of g.tabs) {
+              await openIntoGroup(
+                { rid, type: 'note', name: rid },
+                g.id,
+                { makeActive: rid === g.active },
+              );
+            }
+          }
+          // 恢复完成后焦点回到第一个组（openIntoGroup 内部会切焦点）
+          setActiveGroupId(app.editor[0].id);
+        }
       })
       .catch(() => {});
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [openIntoGroup]);
 
   const persistLayout = useCallback(() => {
     if (!api || !api.layout || typeof api.layout.save !== 'function') return;
@@ -583,11 +758,18 @@ useEffect(() => {
             sidebarVisible: !collapsed,
             sidebarWidth,
             panels: layoutPanels,
+            groups: groups.map((g) => ({
+              id: g.id,
+              tabs: g.tabs.map((t) => t.rid),
+              active: g.activeTabId
+                ? g.tabs.find((t) => t.id === g.activeTabId)?.rid || null
+                : null,
+            })),
           }),
         )
         .catch(() => {});
     }, 500);
-  }, [collapsed, sidebarWidth, layoutPanels]);
+  }, [collapsed, sidebarWidth, layoutPanels, groups]);
 
   useEffect(() => {
     persistLayout();
@@ -601,7 +783,9 @@ useEffect(() => {
 
   const openCtxMenu = useCallback(
     async (n, x, y) => {
-      const existingTab = tabs.find((t) => t.rid === n.rid);
+      const existingTab = groups
+        .flatMap((g) => g.tabs)
+        .find((t) => t.rid === n.rid);
       const readOnly = await resolveReadOnly(
         n,
         api,
@@ -615,7 +799,7 @@ useEffect(() => {
         readOnly,
       });
     },
-    [tabs, api],
+    [groups, api],
   );
 
   const toggleSidebar = useCallback(() => {
@@ -830,99 +1014,109 @@ useEffect(() => {
 
             {activeTab && (
               <Bar id="editor">
-              <div className="editor-tabs" role="tablist">
-                {tabs.map((t) => (
-                  <div
-                    key={t.key}
-                    role="tab"
-                    aria-selected={t.key === activeKey}
-                    className={`editor-tab ${t.key === activeKey ? 'active' : ''} ${
-                      isDirty(t) ? 'dirty' : ''
-                    }`}
-                    onClick={() => setActiveKey(t.key)}
-                  >
-                    <span className="editor-tab-name">{t.title}</span>
-                    {isDirty(t) && <span className="editor-tab-dirty-dot" title="未保存" />}
-                    <button
-                      type="button"
-                      className="editor-tab-close"
-                      aria-label={`关闭 ${t.title}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        requestCloseTab(t.key);
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
+                <EditorArea
+                  groups={groups}
+                  activeGroupId={activeGroupId}
+                  onActivateGroup={setActiveGroupId}
+                  onActivateTab={activateTab}
+                  onCloseTab={requestCloseTab}
+                  onLayoutChange={persistLayout}
+                  renderBody={(tab, group) => (
+                    <div className="editor-panel">
+                      <div className="editor-toolbar">
+                        <div className="editor-toolbar-title">
+                          <input
+                            className="editor-doc-name-input"
+                            value={tab.title}
+                            disabled={tab.session.state.readOnly}
+                            onChange={(e) =>
+                              patchActiveGroupTab(group.id, tab.id, { title: e.target.value })
+                            }
+                            aria-label="笔记标题"
+                          />
+                          <span className="editor-doc-rid">{tab.rid}</span>
+                          <input
+                            className="editor-meta-input"
+                            placeholder="标签（逗号分隔）"
+                            value={tab.tagsText}
+                            disabled={tab.session.state.readOnly}
+                            onChange={(e) =>
+                              patchActiveGroupTab(group.id, tab.id, { tagsText: e.target.value })
+                            }
+                            aria-label="标签"
+                          />
+                          <input
+                            className="editor-meta-input editor-meta-input-sm"
+                            placeholder="分类"
+                            value={tab.category}
+                            disabled={tab.session.state.readOnly}
+                            onChange={(e) =>
+                              patchActiveGroupTab(group.id, tab.id, { category: e.target.value })
+                            }
+                            aria-label="分类"
+                          />
+                          {isDirty(tab) && <span className="chip chip-dirty">未保存</span>}
+                        </div>
+                        <div className="editor-toolbar-actions">
+                          <button
+                            type="button"
+                            className="btn ghost"
+                            title="分屏：在新组打开当前笔记"
+                            onClick={splitActiveTab}
+                          >
+                            分屏
+                          </button>
+                          {groups.length > 1 && (
+                            <button
+                              type="button"
+                              className="btn ghost"
+                              title="关闭当前分屏组（保留其余）"
+                              onClick={() => closeGroup(group.id)}
+                            >
+                              关闭分屏
+                            </button>
+                          )}
+                        </div>
+                      </div>
 
-              <div className="editor-panel">
-                <div className="editor-toolbar">
-                  <div className="editor-toolbar-title">
-                    <input
-                      className="editor-doc-name-input"
-                      value={activeTab.title}
-                      disabled={activeTab.session.state.readOnly}
-                      onChange={(e) => setActiveTitle(e.target.value)}
-                      aria-label="笔记标题"
-                    />
-                    <span className="editor-doc-rid">{activeTab.rid}</span>
-                    <input
-                      className="editor-meta-input"
-                      placeholder="标签（逗号分隔）"
-                      value={activeTab.tagsText}
-                      disabled={activeTab.session.state.readOnly}
-                      onChange={(e) => setActiveTagsText(e.target.value)}
-                      aria-label="标签"
-                    />
-                    <input
-                      className="editor-meta-input editor-meta-input-sm"
-                      placeholder="分类"
-                      value={activeTab.category}
-                      disabled={activeTab.session.state.readOnly}
-                      onChange={(e) => setActiveCategory(e.target.value)}
-                      aria-label="分类"
-                    />
-                    {isDirty(activeTab) && <span className="chip chip-dirty">未保存</span>}
-                  </div>
-                </div>
+                      <div className="editor-body">
+                        <EditorRenderer
+                          tab={tab}
+                          onChange={(text) =>
+                            patchActiveGroupTab(group.id, tab.id, { text })
+                          }
+                          pluginViewers={pluginViewers}
+                        />
+                      </div>
 
-                <div className="editor-body">
-                  <EditorRenderer
-                    tab={activeTab}
-                    onChange={setActiveText}
-                    pluginViewers={pluginViewers}
-                  />
-                </div>
-
-                <div className="editor-statusbar">
-                  <span className="status-meta">{activeTab.rid}</span>
-                  <span className="status-meta">类型 {activeTab.meta.type}</span>
-                  <span className="status-meta">
-                    Mode {activeTab.session.modeId}
-                  </span>
-                  <span className="status-meta">
-                    Viewer {activeTab.session.viewerId}
-                  </span>
-                  {activeTab.meta.schema && (
-                    <span className="status-meta">schema {activeTab.meta.schema}</span>
+                      <div className="editor-statusbar">
+                        <span className="status-meta">{tab.rid}</span>
+                        <span className="status-meta">类型 {tab.meta.type}</span>
+                        <span className="status-meta">
+                          Mode {tab.session.modeId}
+                        </span>
+                        <span className="status-meta">
+                          Viewer {tab.session.viewerId}
+                        </span>
+                        {tab.meta.schema && (
+                          <span className="status-meta">schema {tab.meta.schema}</span>
+                        )}
+                        {tab.meta.updatedAt && (
+                          <span className="status-meta">
+                            更新 {formatTime(tab.meta.updatedAt)}
+                          </span>
+                        )}
+                        <span className="status-meta">
+                          {tab.text.length} 字符
+                          {tab.session.state.readOnly ? ' · 只读' : ''}
+                        </span>
+                        <span className="status-hint">Ctrl/Cmd+S 保存</span>
+                      </div>
+                    </div>
                   )}
-                  {activeTab.meta.updatedAt && (
-                    <span className="status-meta">
-                      更新 {formatTime(activeTab.meta.updatedAt)}
-                    </span>
-                  )}
-                  <span className="status-meta">
-                    {activeTab.text.length} 字符
-                    {activeTab.session.state.readOnly ? ' · 只读' : ''}
-                  </span>
-                  <span className="status-hint">Ctrl/Cmd+S 保存</span>
-                </div>
-              </div>
-            </Bar>
-          )}
+                />
+              </Bar>
+            )}
 
           {activeTab && relationsOpen && (
             <Bar id="relations" title="关联关系" onClose={() => setRelationsOpen(false)}>
@@ -1013,6 +1207,12 @@ useEffect(() => {
           onUndo={undoLast}
           onDelete={requestDeleteNote}
           onToggleReadOnly={toggleReadOnly}
+          onSplitOpen={(rid) => {
+            const n =
+              notes.find((x) => x.rid === rid) ||
+              { rid, type: 'note', name: rid };
+            openInNewGroup(n);
+          }}
         />
 
         {loginOpen && (
@@ -1090,7 +1290,7 @@ function EditorRenderer({ tab, onChange, pluginViewers }) {
   if (viewer.plugin) {
     return (
       <PluginViewerHost
-        key={tab.key}
+        key={tab.id}
         viewerId={tab.session.viewerId}
         rid={tab.rid}
         modeId={tab.session.modeId}
@@ -1101,7 +1301,7 @@ function EditorRenderer({ tab, onChange, pluginViewers }) {
   const ViewerComponent = viewer.component;
   return (
     <ViewerComponent
-      key={tab.key}
+      key={tab.id}
       value={tab.text}
       onChange={onChange}
       readOnly={tab.session.state.readOnly || !!viewer.readOnly}
@@ -2464,7 +2664,7 @@ function ResourceExplorer(props) {
 }
 
 function NoteContextMenu(props) {
-  const { menu, onClose, onUndo, onDelete, onToggleReadOnly, onReveal } = props;
+  const { menu, onClose, onUndo, onDelete, onToggleReadOnly, onReveal, onSplitOpen } = props;
   if (!menu) return null;
   return (
     <>
@@ -2477,6 +2677,9 @@ function NoteContextMenu(props) {
         }}
       />
       <div className="ctx-menu" style={{ left: menu.x, top: menu.y }}>
+        <button type="button" onClick={() => { onSplitOpen(menu.rid); onClose(); }}>
+          在分屏中打开
+        </button>
         <button type="button" onClick={() => { onReveal(menu.rid); onClose(); }}>
           在系统资源管理器中打开
         </button>
