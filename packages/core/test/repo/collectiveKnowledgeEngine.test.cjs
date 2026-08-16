@@ -77,8 +77,8 @@ describe('CollectiveKnowledgeEngine', () => {
     }
   });
 
-  test('analyze should match names case-insensitively', async () => {
-    await seedLocal([{ rid: 'l1', name: 'Alpha' }]);
+  test('analyze should match canonical names across repos（018：name 已规范化，直接相等比较）', async () => {
+    await seedLocal([{ rid: 'l1', name: 'alpha' }]);
     const remoteDir = await createRemoteRepo([{ rid: 'r1', name: 'alpha' }]);
     try {
       fm.list.mockResolvedValue([{ namespace: 'ns2', path: remoteDir }]);

@@ -5,7 +5,7 @@ describe('RemoteResource', () => {
     const r = new RemoteResource();
     expect(r.globalId).toBe('');
     expect(r.namespace).toBe('');
-    expect(r.title).toBe('');
+    expect(r.name).toBe('');
     expect(r.type).toBe('note');
     expect(r.hash).toBe('');
     expect(r.source).toBe('');
@@ -16,7 +16,7 @@ describe('RemoteResource', () => {
     const r = new RemoteResource({
       globalId: 'docs:note-1',
       namespace: 'docs',
-      title: 'Note One',
+      name: 'Note One',
       type: 'wiki',
       hash: 'abc123',
       source: '/path/to/repo',
@@ -24,7 +24,7 @@ describe('RemoteResource', () => {
     });
     expect(r.globalId).toBe('docs:note-1');
     expect(r.namespace).toBe('docs');
-    expect(r.title).toBe('Note One');
+    expect(r.name).toBe('Note One');
     expect(r.type).toBe('wiki');
     expect(r.hash).toBe('abc123');
     expect(r.source).toBe('/path/to/repo');
@@ -35,14 +35,14 @@ describe('RemoteResource', () => {
     const r = RemoteResource.fromRow({
       global_id: 'docs:note-1',
       namespace: 'docs',
-      metadata: JSON.stringify({ title: 'Note One', type: 'wiki', source: '/remote' }),
+      metadata: JSON.stringify({ name: 'Note One', type: 'wiki', source: '/remote' }),
       hash: 'abc',
       updated: 99
     });
     expect(r).toBeInstanceOf(RemoteResource);
     expect(r.globalId).toBe('docs:note-1');
     expect(r.namespace).toBe('docs');
-    expect(r.title).toBe('Note One');
+    expect(r.name).toBe('Note One');
     expect(r.type).toBe('wiki');
     expect(r.source).toBe('/remote');
     expect(r.lastSync).toBe(99);
@@ -59,26 +59,26 @@ describe('RemoteResource', () => {
       metadata: 'not-json{{{',
       hash: 'def'
     });
-    expect(r.title).toBe('docs:note-2');
+    expect(r.name).toBe('docs:note-2');
     expect(r.type).toBe('note');
     expect(r.source).toBe('');
   });
 
-  test('fromRow should fall back to global_id as title', () => {
+  test('fromRow should fall back to global_id as name', () => {
     const r = RemoteResource.fromRow({
       global_id: 'docs:note-3',
       namespace: 'docs',
       metadata: '',
       hash: 'ghi'
     });
-    expect(r.title).toBe('docs:note-3');
+    expect(r.name).toBe('docs:note-3');
   });
 
   test('toRow should serialize for SQL insert', () => {
     const r = new RemoteResource({
       globalId: 'docs:note-4',
       namespace: 'docs',
-      title: 'Note Four',
+      name: 'Note Four',
       type: 'note',
       source: '/src',
       hash: 'jkl',
@@ -87,7 +87,7 @@ describe('RemoteResource', () => {
     expect(r.toRow()).toEqual({
       global_id: 'docs:note-4',
       namespace: 'docs',
-      metadata: JSON.stringify({ title: 'Note Four', type: 'note', source: '/src' }),
+      metadata: JSON.stringify({ name: 'Note Four', type: 'note', source: '/src' }),
       hash: 'jkl',
       updated: 42
     });
@@ -97,14 +97,14 @@ describe('RemoteResource', () => {
     const r = new RemoteResource({
       globalId: 'docs:note-5',
       namespace: 'docs',
-      title: 'Note Five',
+      name: 'Note Five',
       hash: 'mno',
       lastSync: 7
     });
     expect(r.toJSON()).toEqual({
       globalId: 'docs:note-5',
       namespace: 'docs',
-      title: 'Note Five',
+      name: 'Note Five',
       type: 'note',
       hash: 'mno',
       source: '',

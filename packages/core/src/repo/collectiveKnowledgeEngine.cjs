@@ -43,12 +43,12 @@ class CollectiveKnowledgeEngine {
    * 按 name 查找多个仓库中都存在的资源
    */
   async _findSharedConcepts(repos) {
-    // 获取本地资源名称
+    // 获取本地资源名称（018：name 已为 canonical（normalize 后小写），直接比较）
     const localNames = await this.db.all(
       "SELECT DISTINCT name FROM resources WHERE deleted = 0 AND name IS NOT NULL AND name != ?",
       ["__system__"],
     );
-    const localNameSet = new Set(localNames.map((r) => r.name.toLowerCase()));
+    const localNameSet = new Set(localNames.map((r) => r.name));
 
     // 查询每个远程仓库
     const shared = [];
@@ -75,7 +75,7 @@ class CollectiveKnowledgeEngine {
         await new Promise((resolve) => extDB.close(() => resolve()));
 
         for (const rn of remoteNames) {
-          if (rn.name && localNameSet.has(rn.name.toLowerCase())) {
+          if (rn.name && localNameSet.has(rn.name)) {
             shared.push({
               concept: rn.name,
               repository: repo.namespace,

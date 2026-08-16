@@ -146,8 +146,8 @@ describe('FederationManager', () => {
     });
   });
 
-  test('resolveResource should find a local resource by name', async () => {
-    await seedLocalResource({ rid: 'loc2', name: 'Find Me' });
+  test('resolveResource should find a local resource by name（名称查询统一 normalize）', async () => {
+    await seedLocalResource({ rid: 'loc2', name: 'find-me' });
     const results = await manager.resolveResource('Find Me');
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ source: 'local', rid: 'loc2' });
@@ -156,7 +156,7 @@ describe('FederationManager', () => {
   test('resolveResource should find remote resources by global_id and parse metadata', async () => {
     await db.run(
       'INSERT INTO remote_resources (global_id, namespace, metadata, hash, updated) VALUES (?, ?, ?, ?, ?)',
-      ['ns-a:r1', 'ns-a', JSON.stringify({ type: 'doc', title: 'Remote Doc' }), 'h1', 123]
+      ['ns-a:r1', 'ns-a', JSON.stringify({ type: 'doc', name: 'Remote Doc' }), 'h1', 123]
     );
     const results = await manager.resolveResource('ns-a:r1');
     expect(results).toHaveLength(1);
@@ -165,7 +165,7 @@ describe('FederationManager', () => {
       source: 'remote',
       namespace: 'ns-a',
       type: 'doc',
-      title: 'Remote Doc'
+      name: 'Remote Doc'
     });
   });
 
@@ -176,7 +176,7 @@ describe('FederationManager', () => {
     );
     const results = await manager.resolveResource('ns-b');
     expect(results).toHaveLength(1);
-    expect(results[0]).toMatchObject({ namespace: 'ns-b', type: 'note', title: 'ns-b:r2' });
+    expect(results[0]).toMatchObject({ namespace: 'ns-b', type: 'note', name: 'ns-b:r2' });
   });
 
   test('resolveResource should tolerate invalid remote metadata', async () => {

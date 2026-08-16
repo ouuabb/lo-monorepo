@@ -37,7 +37,7 @@ describe('KnowledgeAssistant', () => {
   test('_onResourceCreated should save concept and experience', async () => {
     const services = makeServices();
     const assistant = new KnowledgeAssistant(services);
-    await assistant._onResourceCreated({ title: 'Doc A', content: 'long content here', rid: 'r1' }, {});
+    await assistant._onResourceCreated({ name: 'Doc A', content: 'long content here', rid: 'r1' }, {});
     expect(services.logger.log).toHaveBeenCalledWith('[assistant] Resource created: Doc A');
     expect(services.conceptMemory.save).toHaveBeenCalledWith({ name: 'Doc A', meaning: 'long content here', confidence: 0.5 });
     expect(services.semanticMemory.save).toHaveBeenCalledWith({
@@ -48,14 +48,14 @@ describe('KnowledgeAssistant', () => {
     });
   });
 
-  test('_onResourceCreated should use rid when title missing', async () => {
+  test('_onResourceCreated should use rid when name missing', async () => {
     const services = makeServices();
     const assistant = new KnowledgeAssistant(services);
     await assistant._onResourceCreated({ rid: 'r1', content: 'c' }, {});
     expect(services.conceptMemory.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'r1' }));
   });
 
-  test('_onResourceCreated should not save concept for unknown title', async () => {
+  test('_onResourceCreated should not save concept for unknown name', async () => {
     const services = makeServices();
     const assistant = new KnowledgeAssistant(services);
     await assistant._onResourceCreated({}, {});
@@ -66,7 +66,7 @@ describe('KnowledgeAssistant', () => {
   test('_onResourceUpdated should save an experience', async () => {
     const services = makeServices();
     const assistant = new KnowledgeAssistant(services);
-    await assistant._onResourceUpdated({ title: 'Doc B' }, {});
+    await assistant._onResourceUpdated({ name: 'Doc B' }, {});
     expect(services.logger.log).toHaveBeenCalledWith('[assistant] Resource updated: Doc B');
     expect(services.semanticMemory.save).toHaveBeenCalledWith(expect.objectContaining({ concept: 'Doc B', confidence: 0.3 }));
   });

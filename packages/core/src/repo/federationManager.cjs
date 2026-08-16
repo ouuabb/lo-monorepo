@@ -14,6 +14,7 @@
 
 const path = require('path');
 const fs = require('fs-extra');
+const StringUtils = require('../utils/string.cjs');
 
 class FederationManager {
   /**
@@ -104,11 +105,13 @@ class FederationManager {
    */
   async resolveResource(ridOrName) {
     const results = [];
+    // 018：名称查询统一经 normalizeResourceName（与 resolveResource 同规则）
+    const nameKey = StringUtils.normalizeResourceName(ridOrName);
 
     // 1. 查找本地
     const local = await this.db.get(
       'SELECT rid, name, type FROM resources WHERE (rid = ? OR name = ?) AND deleted = 0',
-      [ridOrName, ridOrName]
+      [ridOrName, nameKey]
     );
     if (local) {
       results.push({
@@ -134,7 +137,7 @@ class FederationManager {
         source: 'remote',
         namespace: r.namespace,
         type: meta.type || 'note',
-        title: meta.title || r.global_id
+        name: meta.name || r.global_id
       });
     }
 

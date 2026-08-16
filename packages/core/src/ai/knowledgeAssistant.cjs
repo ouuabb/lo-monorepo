@@ -44,15 +44,16 @@ class KnowledgeAssistant {
    */
   async _onResourceCreated(payload, event) {
     const resource = payload || {};
-    const title = resource.title || resource.rid || 'unknown';
+    // 018：事件 payload 只有 name（无 title 字段），名称取 resource.name
+    const name = resource.name || resource.rid || 'unknown';
 
     // 观察
-    this.logger.log(`[assistant] Resource created: ${title}`);
+    this.logger.log(`[assistant] Resource created: ${name}`);
 
     // 保存概念
-    if (this.conceptMemory && title !== 'unknown') {
+    if (this.conceptMemory && name !== 'unknown') {
       await this.conceptMemory.save({
-        name: title,
+        name,
         meaning: resource.content ? resource.content.slice(0, 100) : '',
         confidence: 0.5
       });
@@ -62,8 +63,8 @@ class KnowledgeAssistant {
     if (this.semanticMemory) {
       await this.semanticMemory.save({
         type: 'experience',
-        concept: title,
-        value: `Resource created: ${title}`,
+        concept: name,
+        value: `Resource created: ${name}`,
         confidence: 0.5
       });
     }
@@ -74,12 +75,12 @@ class KnowledgeAssistant {
    */
   async _onResourceUpdated(payload) {
     const resource = payload || {};
-    this.logger.log(`[assistant] Resource updated: ${resource.title || resource.rid || 'unknown'}`);
+    this.logger.log(`[assistant] Resource updated: ${resource.name || resource.rid || 'unknown'}`);
 
     if (this.semanticMemory) {
       await this.semanticMemory.save({
         type: 'experience',
-        concept: resource.title,
+        concept: resource.name,
         value: `Resource updated`,
         confidence: 0.3
       });

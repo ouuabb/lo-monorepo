@@ -85,7 +85,7 @@ class SyncEngine {
         const remoteRes = new RemoteResource({
           globalId,
           namespace,
-          title: r.name || r.rid,
+          name: r.name || r.rid,
           type: r.type || 'note',
           hash: r.hash || '',
           source: sourcePath,
@@ -124,7 +124,7 @@ class SyncEngine {
           await this.db.run(
             `INSERT OR REPLACE INTO remote_resources (global_id, namespace, metadata, hash, updated)
              VALUES (?, ?, ?, ?, ?)`,
-            [globalId, namespace, JSON.stringify({ title: r.name, type: r.type, source: sourcePath }),
+            [globalId, namespace, JSON.stringify({ name: r.name, type: r.type, source: sourcePath }),
               r.hash || '', Date.now()]
           );
           result.imported.push(remoteRes.toJSON());
@@ -211,7 +211,7 @@ class SyncEngine {
             `INSERT OR REPLACE INTO remote_resources (global_id, namespace, metadata, hash, updated)
              VALUES (?, ?, ?, ?, ?)`,
             [globalId, namespace,
-              JSON.stringify({ title: r.name, type: r.type }),
+              JSON.stringify({ name: r.name, type: r.type }),
               r.hash || '', Date.now()],
             (err) => { if (err) reject(err); else resolve(); }
           );
