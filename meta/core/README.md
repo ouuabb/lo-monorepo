@@ -7,7 +7,7 @@
 | 分类 | 内容 |
 |---|---|
 | [`guide/`](guide/) | 快速上手、核心理念、工作流、迁移 |
-| [`core/`](core/) | 资源模型、Schema、RID、加密、认证、配置、数据库、搜索、同步、View、版本、标签分类、Markdown 图片关系 |
+| [`core/`](core/) | 资源模型、Schema、View、容器系统、RID、加密、认证、配置、数据库、搜索、同步、版本、标签分类、Markdown 图片关系 |
 | [`advanced/`](advanced/) | 安全、运维、Operation 语义、架构（数据一致性 / 迁移 / 生产差距 / schema 审计） |
 | [`knowledge/`](knowledge/) | 知识图谱、自动化、联邦、知识分析等 |
 | [`systems/`](systems/) | 插件系统、事件总线、工作流、权限、Agent、协作、AI、演化等子系统 |

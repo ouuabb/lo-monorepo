@@ -29,6 +29,10 @@
 | `REPOSITORY_INFO` | `lo-core:repository-info` | `apps/agent/src/main/ipc.cjs` |
 | `RESOURCE_LOCATION` | `lo-core:resource-location` | `apps/agent/src/main/ipc.cjs` |
 | `REVEAL_RESOURCE` | `lo-core:reveal-resource` | `apps/agent/src/main/ipc.cjs` |
+| `GRAPH` | `lo-core:graph` | `apps/agent/src/main/ipc.cjs` |
+| `MODES_LIST` | `lo-core:modes` | `apps/agent/src/main/ipc.cjs` |
+| `MODES_RESOLVE` | `lo-core:modes-resolve` | `apps/agent/src/main/ipc.cjs` |
+| `VIEWERS_LIST` | `lo-core:viewers` | `apps/agent/src/main/ipc.cjs` |
 
 ## agent-plugins:*（插件能力白名单）
 
@@ -42,6 +46,8 @@
 | `RENDER_PANEL` | `agent-plugins:render-panel` | `apps/agent/src/main/plugin/plugin-ipc.cjs` |
 | `LIST_EDITORS` | `agent-plugins:list-editors` | `apps/agent/src/main/plugin/plugin-ipc.cjs` |
 | `RENDER_EDITOR` | `agent-plugins:render-editor` | `apps/agent/src/main/plugin/plugin-ipc.cjs` |
+| `LIST_VIEWERS` | `agent-plugins:list-viewers` | `apps/agent/src/main/plugin/plugin-ipc.cjs` |
+| `RENDER_VIEWER` | `agent-plugins:render-viewer` | `apps/agent/src/main/plugin/plugin-ipc.cjs` |
 | `LIST_SERVICES` | `agent-plugins:list-services` | `apps/agent/src/main/plugin/plugin-ipc.cjs` |
 | `GET_UI_MODULE` | `agent-plugins:get-ui-module` | `apps/agent/src/main/plugin/plugin-ipc.cjs` |
 | `CTX` | `agent-plugins:ctx` | `apps/agent/src/main/plugin/plugin-ipc.cjs` |

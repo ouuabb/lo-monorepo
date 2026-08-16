@@ -24,7 +24,6 @@
 npm test       # Jest（覆盖率默认开启）
 npm run lint   # ESLint
 npm run format # Prettier
-npm run docs:build # 文档占位校验（scripts/docs-check.cjs）
 ```
 
 ## 依赖方向（速记）

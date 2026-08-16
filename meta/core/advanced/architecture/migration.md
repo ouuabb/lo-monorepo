@@ -106,7 +106,7 @@ ROLLBACK (on error)       ← 全部撤销
 ├─ open() 创建空库
 ├─ runMigrations()
 │   ├─ 创建 schema_migrations（空表）
-│   └─ 执行 001_initial_schema → 建全部 40 张表 + 种子数据
+│   └─ 执行 001_initial_schema → 建全部 62 张表 + 种子数据
 └─ 启动完成
 ```
 
@@ -151,7 +151,7 @@ ROLLBACK (on error)       ← 全部撤销
    ...
    025_normalize
 
-✅ 001_initial_schema   ← 一张迁移包含全部 40 张表
+✅ 001_initial_schema   ← 一张迁移包含全部 62 张表
 ```
 
 lo 当前处于压缩后状态：唯一迁移是 `001_initial_schema.cjs`。
@@ -161,7 +161,7 @@ lo 当前处于压缩后状态：唯一迁移是 `001_initial_schema.cjs`。
 新库首次启动：
 
 ```
-[MIGRATION] Running 001_initial_schema — Create full initial database schema (40 tables)
+[MIGRATION] Running 001_initial_schema — Create full initial database schema (62 tables)
 [MIGRATION] Success 001_initial_schema
 ```
 
@@ -196,4 +196,4 @@ lo 当前处于压缩后状态：唯一迁移是 `001_initial_schema.cjs`。
 ## 相关文档
 
 - [数据库表结构审计](/advanced/architecture/schema-audit) — 迁移系统建立背景与审计过程
-- [数据库与资源索引](/core/database) — 全部 40 张表结构说明
+- [数据库与资源索引](/core/database) — 全部 62 张表结构说明

@@ -8,17 +8,18 @@
 ### packages/core（@lo/core）
 | 功能 | 状态 | 代码位置 | 验证 |
 |---|---|---|---|
-| 世界模型（Resource/Relation/Operation/Event/Workflow） | ✅ | `src/repo/`、`src/operations/`、`src/event/` | `test/repo/`、`test/operations/` 等（270 suites） |
+| 世界模型（Resource/Relation/Operation/Event/Workflow） | ✅ | `src/repo/`、`src/operations/`、`src/event/` | `test/repo/`、`test/operations/` 等（282 suites） |
 | CLI（`lo` 40+ 子命令） | ✅ | `src/cli.cjs`、`src/commands/` | `test/commands/` |
 | HTTP 服务（`lo serve`，8765） | ✅ | `src/commands/serve.cjs` | `test/commands/protocolHttp.test.cjs` 等 |
 | 插件系统（PluginContext facade + 分发） | ✅ | `src/plugin/` | `test/plugin/` |
 | 工作流 / 自动化 / Agent / AI / 协作 / 安全 / 演化 | ✅ | `src/workflow/` `src/automation/` `src/agent/` `src/ai/` `src/collaboration/` `src/security/` `src/evolution/` | 对应 `test/` |
+| Usage 层（S0–U4 闭环）：Mode/Viewer 注册表 + 解析、插件贡献（annotating/metadata/viewer.epub-reader）、epub 命令域 | ✅ | `src/repo/{modeRegistry,viewerRegistry,usageResolver}.cjs`、`src/repo/repository.cjs`、migrations/001（62 表基线） | `test/repo/{usageResolver,modeRegistration}.test.cjs`、`test/commands/modesHttp.test.cjs` |
 | sdkResolver（旧跨仓库 hook） | ❌ 已移除（monorepo workspace 取代） | — | — |
 
 ### packages/client（@lo/client）
 | 功能 | 状态 | 代码位置 | 验证 |
 |---|---|---|---|
-| HTTP 客户端 + 命名空间（notes/search/schemas/views/workflows/automations/evolution/admin/sync/health/relations/operations/events） | ✅ | `src/client.cjs` | `test/client.test.cjs` |
+| HTTP 客户端 + 命名空间（notes/search/schemas/views/workflows/automations/evolution/admin/sync/health/relations/operations/events/modes/viewers） | ✅ | `src/client.cjs` | `test/client.test.cjs`（101） |
 | SSH 挑战-应答认证 | ✅ | `src/auth.cjs` | `test/auth.test.cjs` |
 | 错误模型（LoApiError/LoHttpError） | ✅ | `src/http.cjs` | `test/http.test.cjs` |
 
@@ -32,6 +33,7 @@
 |---|---|---|---|
 | AgentPlugin/AgentPluginContext/lo-facade/extensions-facade/manifest/lifecycle/事件/日志 | ✅ | `src/` | `test/`（契约测试） |
 | manifest 校验 + manifestSchema | ✅ | `src/manifest.cjs` | `test/validateManifest.test.cjs` |
+| Usage Viewer 扩展点（contributes.viewers / ctx.extensions.registerViewer） | ✅ | `src/manifest.cjs`、`src/extensions-facade.cjs` | `test/validateManifest.test.cjs`、`test/extensions-facade.test.cjs` |
 | mountEl 渲染端契约（manifest.ui） | ✅ | `types/index.d.ts` | 契约测试 |
 
 ### apps/agent（lo-agent）
@@ -39,6 +41,8 @@
 |---|---|---|---|
 | 主进程↔Core（LoCoreService + IPC 白名单） | ✅ | `src/main/lo-core.cjs`、`src/main/ipc.cjs` | `test/main/` |
 | 插件宿主（加载/生命周期/扩展点/服务/依赖/懒激活/mountEl） | ✅ | `src/main/plugin/` | `test/main/plugin-manager.test.cjs` 等 |
+| Session 模型 + readOnly 迁移（U2）：openResource → modes.resolve → viewers.list → Session；viewer 渲染注册表 | ✅ | `src/renderer/src/services/SessionService.mjs`、`viewerRegistry.js`、`App.jsx` | `test/renderer/sessionService.test.cjs`（9） |
+| 插件 Usage Viewer 渲染桥（U3：render-viewer 快照 + 注册表合并） | ✅ | `src/main/plugin/{plugin-manager,plugin-ipc,extension-registry}.cjs`、`src/preload/index.cjs`、`src/renderer/src/services/viewerRegistry.js` | `test/main/`、`test/preload/` |
 | mountEl UI（isolated world + G2） | ✅ | `src/preload/index.cjs`、`src/renderer/src/plugin/` | 真实链路冒烟 + `test/preload/` |
 | renderer 挂载层自动化测试（jsdom） | ❌ 未实现 | — | 靠真实链路冒烟 + 手动 |
 | 插件市场（marketplace） | ❌ 未来 | — | 生态 Phase D |
@@ -57,5 +61,6 @@
 
 ## 验证现状
 
-- `pnpm test` 全绿（core 270 suites/3638、client、两个 SDK、agent 182、plugins 209+ 等）。
-- `pnpm lint` 通过；`pnpm --filter lo-meta docs:build` 构建站点；`check` 校验通过。
+- `pnpm test` 全绿（core 282 suites/3745、client 101、plugins-sdk 134、agent-plugins-sdk 94、agent 226、plugins 213 等）。
+- `pnpm lint` 通过；`pnpm --filter lo-meta docs:build` 构建站点；`check` 校验通过（含 core/docs 镜像一致性）。
+- 文档同步：改 `meta/core/` 后运行 `pnpm --filter lo-meta docs:sync` 推送 CLI 运行数据镜像。

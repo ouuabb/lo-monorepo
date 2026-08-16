@@ -144,7 +144,18 @@ lo sync conflict resolve <id> manual
 
 > **只读原则**：外部仓库的数据库以 `OPEN_READONLY` 模式打开，确保不会意外修改。
 
-### 八、架构示意
+### 八、集体知识（collectiveKnowledgeEngine，Phase 5.11）
+
+联邦**共享概念分析**引擎：跨联邦仓库聚合统计与模式发现，不修改任何仓库数据：
+
+- `analyze()`：遍历已注册联邦仓库（本地 + 远程只读）→ `_findSharedConcepts`
+  （跨库共享概念识别）→ `_findCrossRepoPatterns`（跨仓库模式发现，如多仓库
+  共同引用/共同作者/同名概念）。
+- 只读原则与联邦图一致：外部仓库 `OPEN_READONLY` 打开。
+- 命令面：`lo knowledge` 子命令族经 `Repository.collectiveKnowledge` 装配（见
+  `core/commands/knowledge.md`）。
+
+### 九、架构示意
 
 ```
 ┌──────────────────────────────────────────────────────┐

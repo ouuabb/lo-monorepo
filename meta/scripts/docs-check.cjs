@@ -121,6 +121,33 @@ for (const [rel, content] of Object.entries(generate())) {
   }
 }
 
+// 4) CLI 运行数据镜像一致性（meta/core 源 → packages/core/docs 镜像；防漂移回归）
+//    packages/core/docs/ 是运行数据（lo help/manual/docs/docs-serve 读取），
+//    必须与唯一正式源 meta/core 逐文件一致；core/docs 独有 index.md/.vitepress 不受约束
+const CORE_SRC = path.join(META, 'core');
+const CORE_MIRROR = path.join(ROOT, 'packages', 'core', 'docs');
+const MIRROR_SKIP = new Set(['README.md']);
+function walkMds(dir, base, acc = []) {
+  if (!fs.existsSync(dir)) return acc;
+  for (const name of fs.readdirSync(dir)) {
+    const full = path.join(dir, name);
+    const rel = path.join(base, name);
+    if (name.startsWith('.')) continue;
+    if (fs.statSync(full).isDirectory()) walkMds(full, rel, acc);
+    else if (name.endsWith('.md')) acc.push(rel);
+  }
+  return acc;
+}
+for (const rel of walkMds(CORE_SRC, '')) {
+  if (MIRROR_SKIP.has(rel)) continue;
+  const mirror = path.join(CORE_MIRROR, rel);
+  if (!fs.existsSync(mirror)) {
+    errors.push(`core/docs 镜像缺失 ${rel}：请运行 pnpm --filter lo-meta docs:sync`);
+  } else if (fs.readFileSync(mirror, 'utf8') !== fs.readFileSync(path.join(CORE_SRC, rel), 'utf8')) {
+    errors.push(`core/docs 镜像过期 ${rel}：请运行 pnpm --filter lo-meta docs:sync`);
+  }
+}
+
 if (errors.length) {
   console.error('✗ meta 文档检查失败：');
   for (const e of errors) console.error(`  - ${e}`);

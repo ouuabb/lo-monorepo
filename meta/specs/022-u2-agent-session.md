@@ -1,6 +1,6 @@
 # U2 · Agent Session 重构（含 readOnly 迁移）
 
-> 状态：**实施文档（待执行）**——由 U0（020）§3/§7 推导。
+> 状态：**实施文档（已完成）**——由 U0（020）§3/§7 推导。
 > 依赖：U1（021）已提供 `resolveModes`/`resolveViewers` API；本阶段重构 Agent 打开/编辑链路。
 > 原则：**直接删除旧实现**——`type !== 'note'` 只读判断与 `readOnlyOverrides` Set 一次性删除，不建 isLegacyReadOnly 等过渡函数、不同时维护两套状态。
 

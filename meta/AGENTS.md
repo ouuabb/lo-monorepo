@@ -123,7 +123,8 @@ Plugin → ctx.extensions（契约）→ Host ExtensionRegistry（实现）→ �
 - 结构：`src/cli.cjs`（CLI + 插件分发）、`src/repo/`（世界模型，SQLite）、`src/plugin/`
   （插件系统 + PluginContext facade）、`src/operations/`、`src/event/`、`src/workflow/`、
   `src/automation/`、`src/agent/`、`src/collaboration/`、`src/security/`、
-  `src/commands/serve.cjs`（HTTP 8765）。
+  `src/evolution/`、`src/runtime/`、`src/commands/serve.cjs`（HTTP 8765）、
+  `src/repo/{modeRegistry,viewerRegistry,usageResolver}.cjs`（Usage 层：Mode/Viewer/Session）。
 - 契约要点：插件命令分发注入 `PluginContext` facade，不注入裸 Repository；
   `getRepository()` 仅旧版兼容、**新代码禁用**；写操作一律经 `operationEngine`。
 - **`docs/` 为 CLI 功能数据**（`lo help/manual/docs/docs-serve` 读取的命令参考 Markdown），
@@ -229,6 +230,9 @@ Plugin → ctx.extensions（契约）→ Host ExtensionRegistry（实现）→ �
   分层不重复 / 进度如实。
 - 更新流程：改 `meta/` 源 → `pnpm --filter lo-meta check`（一致性校验）→
   `pnpm --filter lo-meta docs:build`（站点）→ 提交。
+- **CLI 运行数据镜像**：`packages/core/docs/` 是运行功能数据（`lo help/manual/docs/docs-serve`
+  读取），内容必须与唯一正式源 `meta/core/` 一致——改 `meta/core/` 后运行
+  `pnpm --filter lo-meta docs:sync`（幂等单向同步）；`docs-check` 强制两者一致，漂移即报错。
 - 历史溯源：原独立仓库 → monorepo 的迁移映射见 `meta/setup/`。
 
 ---
@@ -288,6 +292,9 @@ Agent 多进程；涉及需先确认不在冻结范围再动。
 |---|---|---|
 | Operation 语义 | 可追踪事实：`type+params+context(actor)` | `packages/core/src/operations/` |
 | Event 语义 | 领域事实广播（`resource.created`） | `packages/core/src/event/` |
+| Mode 语义 | 资源使用方式（`rules.writable/interactive`）；builtin=editing/reading/preview | `packages/core/src/repo/modeRegistry.cjs` + `usageResolver.cjs` |
+| Viewer 语义 | 单资源处理/呈现入口；`supports.modes` 双向解耦，无 Mode→Viewer 映射表 | `packages/core/src/repo/viewerRegistry.cjs` |
+| Session 语义 | 一次使用实例（纯运行时，不落库）；`state.readOnly = !rules.writable \|\| overrides` | `apps/agent` renderer `SessionService.mjs` |
 | PluginContext facade | Core 插件的受限能力面 | `packages/core/src/plugin/pluginContext.cjs` |
 | ctx.lo 门面 | 客户端插件经 `@lo/client` 访问 Core 的白名单契约 | `packages/agent-plugins-sdk` + `apps/agent` lo-adapter |
 | 最小权限 | 插件默认只读，写需声明 | `manifest.permissions.lo`；`resolvePermissions` |

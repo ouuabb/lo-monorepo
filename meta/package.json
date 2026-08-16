@@ -6,6 +6,7 @@
   "scripts": {
     "docs": "vitepress build ../docs",
     "docs:gen": "node scripts/docs-gen.cjs",
+    "docs:sync": "node scripts/sync-docs.cjs",
     "docs:dev": "vitepress dev ../docs",
     "docs:build": "vitepress build ../docs",
     "docs:preview": "vitepress preview ../docs",

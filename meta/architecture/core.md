@@ -20,9 +20,13 @@ Workflow 全部由本包定义与落库；对外出口为 CLI（`lo`）与 HTTP 
 ## 2. 世界模型核心（src/repo/）
 
 - `repository.cjs`：仓库聚合根；`database.cjs`：SQLite 封装；`migrationRunner.cjs` +
-  `migrations/`（001_initial_schema、002_automation）。
+  `migrations/`（S0 收敛后唯一迁移 `001_initial_schema.cjs`，62 表最终基线）。
 - 能力服务：`resourceService.cjs`、`relationService.cjs`、`queryEngine.cjs`、
   `schemaRegistry.cjs`、`viewRegistry.cjs`。
+- **Usage 层（U1–U4 收敛）**：`modeRegistry.cjs` / `viewerRegistry.cjs` / `usageResolver.cjs`
+  ——Mode（builtin=editing/reading/preview，插件经 `ctx.modes.register` 贡献 annotating/metadata）、
+  Viewer（`supports.modes` 双向解耦，插件贡献 viewer.epub-reader）、
+  Session（Agent 运行态，`state.readOnly = !rules.writable || overrides`，不落库）。
 - **写路径统一收敛到 Operation 语义**：`operationEngine.cjs` / `operationRegistry.cjs` /
   `operationLogger.cjs`；事件由 Operation 统一 emit。
 - 其他：`graphEngine.cjs`/`graphBuilder.cjs`/`graphCache.cjs`、`syncEngine.cjs`/

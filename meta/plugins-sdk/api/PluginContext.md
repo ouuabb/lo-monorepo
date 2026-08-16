@@ -40,12 +40,52 @@ class P extends Plugin {
 | 属性 | 类型 | 说明 |
 |------|------|------|
 | `pluginId` | string | 当前插件 ID |
+| `repoPath` | string | lo 仓库根目录路径（只读字符串，**非 Repository 对象**；插件用于解析仓库内相对路径） |
 | `logger` | [Logger](./Logger) | 日志（debug/info/warn/error + child） |
 | `extensions` | ExtensionRegistry | 扩展点（register/unregister/get/has/list） |
 | `hooks` | HookManager | Hook（register/unregister/runBefore/runAfter） |
 | `events` | [EventApi](./EventApi) | 事件总线（on/off/once/emit/emitAsync） |
 | `resources` | ResourceFacade | 资源 CRUD 稳定 API |
 | `relations` | RelationFacade | 关系 CRUD 稳定 API |
+| `modes` | ModeFacade（U3） | Usage Mode 注册/解析（见下） |
+| `viewers` | ViewerFacade（U3） | Usage Viewer 注册（见下） |
+
+---
+
+## Usage 门面（U3：ctx.modes / ctx.viewers）
+
+插件贡献 / 查询 Usage 层（Mode/Viewer 定义见 `architecture/usage-layer.md`；写入 Core
+`mode_definitions` / `viewer_definitions` 表，builtin 冲突抛错）：
+
+### `ctx.modes`
+
+```js
+// 注册插件 Mode（applicableTo.types 非空；rules 仅允许 writable/interactive，
+// 禁止塞入 operations/permission/schema 等）
+await ctx.modes.register({
+  modeId: 'annotating',
+  semantics: '以标注方式使用',
+  applicableTo: { types: ['epub'] },
+  rules: { writable: true, interactive: true },
+});
+
+// 解析资源可用 Mode（builtin ∪ 插件表；命令域校验用）
+const { modes } = await ctx.modes.resolve(rid);   // [{ modeId, semantics, rules }]
+```
+
+### `ctx.viewers`
+
+```js
+await ctx.viewers.register({
+  viewerId: 'viewer.epub-reader',
+  label: 'EPUB 阅读器',
+  semantics: 'EPUB 阅读',
+  supports: { modes: ['reading'] },   // 非空数组
+});
+```
+
+> 默认（未注入）行为：`register` 先执行契约校验再抛「未注入」错误；`resolve` 返回安全空结果。
+> 契约校验函数 `validateModeDef` / `validateViewerDef` 由 `@lo/plugins-sdk/PluginContext` 导出。
 
 ---
 

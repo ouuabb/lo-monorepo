@@ -96,8 +96,18 @@ curl -X POST \
      -F "file=@/path/to/photo.jpg" \
      -F "title=我的照片" \
      -F "tags=photo,trip" \
-     http://127.0.0.1:8765/api/notes/upload
+      http://127.0.0.1:8765/api/notes/upload
 ```
+
+**资源类型认定（Core 模型层统一负责）：**
+
+- 上传与创建时，`type` 由 Core 模型层按 filename 扩展名统一认定
+  （`TypeRegistry` / `ResourceType` 为唯一事实源），serve 不做任何类型判断。
+- 常见映射：`.md → note`（可编辑）、`.png/.jpg → image`、`.mp4 → video`、
+  `.mp3 → audio`、`.txt → text`、`.py/.js/.ts → code`、`.pdf → pdf`、
+  `.xls/.xlsx → spreadsheet`、`.ppt/.pptx → presentation`；未知扩展名 → `unknown`。
+- 显式传入 `type`（如 `POST /api/notes` 的 `body.type`、CLI `--type`、插件调用）优先于扩展名认定。
+- 无 `type` 且无 `filename` 时默认 `note`。
 
 **获取笔记内容：**
 

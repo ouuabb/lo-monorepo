@@ -26,7 +26,7 @@ class P extends AgentPlugin {
 |---|---|
 | `ctx.pluginId` / `ctx.logger` / `ctx.events`（AgentEventEmitter） | 基础 |
 | `ctx.lo` | 能力门面：`operations / relations / events / resources / health`（Host 注入，权限过滤） |
-| `ctx.extensions` | 注册面：`registerCommands / registerView / registerPanel / registerEditor / registerService / getService / listServices` |
+| `ctx.extensions` | 注册面：`registerCommands / registerView / registerPanel / registerEditor / registerViewer / registerService / getService / listServices` |
 | `ctx.config(key?, def?)` | 配置（默认值 + 用户配置合并） |
 | `ctx.settings` | 插件私有设置（get/set，Host 注入时可用） |
 
@@ -51,8 +51,11 @@ class P extends AgentPlugin {
 ## Manifest
 
 - 必填：`id / name / version / main`；`id` kebab-case；`version` x.y.z。
-- 可选：`contributes`（commands/views/panels/editors/services）、`permissions.lo`、
+- 可选：`contributes`（commands/views/panels/editors/viewers/services）、`permissions.lo`、
   `dependsOn`、`activationEvents`、`ui`（mountEl）、`config`。
+- `contributes.viewers`（U3）：`[{ viewerId, label? }]`——Usage Viewer 渲染贡献，
+  viewerId 对应 Core `viewer_definitions` 已注册 Viewer；宿主按 `Session.viewerId` 匹配
+  渲染（`ctx.extensions.registerViewer({ viewerId, label, render })`）。
 - 完整规范：`meta/specs/manifest-spec.md`；机器可读 schema：`manifestSchema`。
 
 ## mountEl（渲染端 UI）

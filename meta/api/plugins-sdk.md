@@ -25,12 +25,17 @@ class HelloPlugin extends Plugin {
 
 | 面 | 说明 |
 |---|---|
-| `ctx.config(key, default)` | 读配置 |
+| `ctx.config(key, default)` / `ctx.setConfig(key, value)` | 读/写配置 |
 | `ctx.logger` | 日志（debug/info/warn/error） |
+| `ctx.repoPath` | lo 仓库根目录路径（只读字符串，非 Repository 对象） |
 | `ctx.extensions.register(...)` | 注册扩展点（commands 等） |
 | `ctx.hooks.register(name, fn)` | 注册 Hook（如 beforeResourceCreate） |
 | `ctx.events.on(event, handler)` | 事件订阅 |
 | `ctx.resources.create(built)` / `ctx.relations.create(built)` | Facade 资源/关系操作 |
+| `ctx.modes.register(def)` / `ctx.modes.resolve(rid)` | Usage Mode 注册/解析（U3；契约校验：rules 仅 writable/interactive，builtin 冲突抛错） |
+| `ctx.viewers.register(def)` | Usage Viewer 注册（U3；supports.modes 非空，builtin 冲突抛错） |
+
+> Usage 门面完整契约见 `plugins-sdk/api/PluginContext.md` 与 `architecture/usage-layer.md`。
 
 ## 构建器
 

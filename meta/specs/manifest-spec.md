@@ -94,7 +94,7 @@
 
 `contributes` 是**纯数据声明**，供宿主发现/展示；实际 handler / render / api 在激活期
 经 `ctx.extensions` 动态注册（`registerCommands` / `registerView` / `registerPanel` /
-`registerEditor` / `registerService`）。
+`registerEditor` / `registerViewer` / `registerService`）。
 
 允许类型（`manifestSchema.contributesTypes`）：
 
@@ -104,9 +104,10 @@
 | `views` | `{ id, title?, type? }` | `ctx.extensions.registerView([...])` | 视图面板（type: panel/sidebar/editor） |
 | `panels` | `{ id, title? }` | `ctx.extensions.registerPanel(...)` | 侧边栏/底部面板 |
 | `editors` | `{ id, title?, resourceType? }` | `ctx.extensions.registerEditor(...)` | 自定义编辑器 |
+| `viewers` | `{ viewerId, label? }` | `ctx.extensions.registerViewer(...)` | Usage Viewer 渲染贡献（U3）：`viewerId` 必须与 Core `viewer_definitions` 表已注册的 Viewer 一致（如 epub 插件贡献的 `viewer.epub-reader`），宿主按 `Session.viewerId` 匹配渲染 |
 | `services` | `{ id, title? }` | `ctx.extensions.registerService([...])` | 插件间服务（消费方经 `getService`） |
 
-包含未知类型（如 `"foo": []`）即校验报错。
+包含未知类型（如 `"foo": []`）即校验报错；`viewers` 条目缺 `viewerId` 即校验报错。
 
 ### 4.1 服务消费契约
 

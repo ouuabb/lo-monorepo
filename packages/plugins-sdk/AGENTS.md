@@ -21,7 +21,6 @@
 
 ```bash
 npm test              # Jest（sdk.test.cjs / edge.test.cjs / setup.cjs）
-npm run docs:build    # vitepress build docs
 ```
 
 ## 契约铁律（速记）

@@ -24,7 +24,7 @@
 
 - 纯 CommonJS；Node >= 20；Yarn。
 - `yarn run build`：打包分发产物（tar.gz + index.json，含 sha256）。
-- `npm run docs`：生成插件目录；`npm run docs:check`：文档系统一致性校验。
+- `yarn test`：构建冒烟（build.cjs --plugin demo-hello）。
 
 ## 契约铁律（插件收敛，速记）
 

@@ -271,7 +271,7 @@ lo ext epub:bookmarks <rid>
 
 ## 扩展点
 
-插件注册 4 个扩展点：
+插件注册 5 类扩展点（含 U3 Usage 贡献）：
 
 | 扩展点 | key | 说明 |
 |-------|-----|------|
@@ -280,6 +280,37 @@ lo ext epub:bookmarks <rid>
 | commands | `epub-reader:*` 12 个 | Web 阅读器 HTTP 端点（lo serve 挂载） |
 | resourceTypes | `epub`、`note` | 注册 epub 资源类型与 note 笔记类型及 metadata schema（`epub-reader/src/manifest.cjs`） |
 | relationTypes | `source-of` | EPUB 与笔记的来源关系 |
+| modes（U3） | `annotating`、`metadata` | 经 `ctx.modes.register` 贡献（见下节） |
+| viewers（U3） | `viewer.epub-reader` | 经 `ctx.viewers.register` 贡献（见下节） |
+
+## Usage 贡献（U3：Mode / Viewer）
+
+插件经 `ctx.modes.register` / `ctx.viewers.register` 门面（SDK 契约，写入 Core
+`mode_definitions` / `viewer_definitions` 表）贡献使用层能力：
+
+| 贡献 | modeId / viewerId | 说明 |
+|------|------|------|
+| Mode | `annotating` | 以标注方式使用（创建笔记/高亮/书签），`rules: { writable: true, interactive: true }`，applicableTo `types: ['epub']` |
+| Mode | `metadata` | 以元数据方式使用（查看/管理书籍元数据），`rules: { writable: false, interactive: false }`，applicableTo `types: ['epub']` |
+| Viewer | `viewer.epub-reader` | EPUB 阅读入口，`supports: { modes: ['reading'] }`——阅读能力由 Core builtin `reading` Mode（U1，已覆盖 epub）承载，**不重复注册** |
+
+**读取 Mode（`reading`）由 Core builtin 提供**（U1 §3：editing/reading/preview），epub
+资源在插件已注册后解析结果：
+
+```
+epub → [reading（Core builtin）, annotating（插件）, metadata（插件）]
+     → resolveViewers(reading) → [viewer.generic-preview, viewer.epub-reader]
+```
+
+**命令域（U3）**：CLI 命令不再用 `resource.type !== 'epub'` 守卫，改为
+`requireMode(ctx, rid, requiredModes)` 经 `ctx.modes.resolve` 判定使用上下文：
+
+| 命令 | 所需 Mode |
+|------|------|
+| `epub:open` / `epub:info` / `epub:notes` / `epub:highlights` / `epub:bookmarks` | `reading` |
+| `epub:note` / `epub:highlight` / `epub:bookmark` | `annotating` |
+
+资源不处于所需 Mode（如非 epub 资源只有 `[editing]`/`[preview]`）时命令拒绝执行。
 
 ### importers 扩展点
 

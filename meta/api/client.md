@@ -19,8 +19,11 @@ await client.login({ privateKeyPath: '~/.ssh/id_ed25519' });
 ## 命名空间与方法（完整清单）
 
 | 命名空间 | 方法 |
-|---|---|
+|---|---|---|
 | `health` | `ping / stats / tags` |
+| `repository` | `info / resolveLocation(rid)`（Repository Identity + Resolver 三态） |
+| `modes` | `list / resolve(rid)`（U1：Usage Mode 解析） |
+| `viewers` | `list(query) / resolve(modeId)`（U1：Usage Viewer 解析，?mode=） |
 | `notes` | `list / get / create / update / remove / upload` |
 | `search` | `search` |
 | `schemas` | `list / get / create / update / remove / attach / detach` |

@@ -1,6 +1,6 @@
 # S0 · 数据库 Schema / Migration 基线重构
 
-> 状态：**实施基线（待执行）**
+> 状态：**实施基线（已完成）**
 > 依赖：概念依据见 **U0（020-usage-layer-concepts.md）**——本阶段只需 `mode_definitions` / `viewer_definitions` 两表的粗结构（字段由 U1 细化），其余表结构由最终概念模型直接决定。
 > 顺序：本阶段在 U0 文档之后阅读、在 U1 之前执行。
 > 原则：开发阶段直接收敛——不保留历史 migration、无兼容层、无 old/new 双结构、无 deprecated 字段；代码、Schema、API、测试全部一次性向最终模型收敛。

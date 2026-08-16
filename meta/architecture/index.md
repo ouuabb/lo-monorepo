@@ -34,6 +34,7 @@ lo 生态统一架构：**一个代码工作区，一个文档来源，一个站
 | `apps/agent` | [`agent.md`](agent.md)（主进程↔Core/IPC 白名单/插件宿主/mountEl/渲染） |
 | `plugins/core` | [`plugins-core.md`](plugins-core.md)（Core 插件源码+分发） |
 | `plugins/agent` | [`plugins-agent.md`](plugins-agent.md)（客户端插件源码+分发） |
+| Usage 层（Mode/Viewer/Session） | [`usage-layer.md`](usage-layer.md)（最终模型：定义/归属/链路/边界；演进见 specs/020~024） |
 
 ## 关键机制
 
@@ -41,5 +42,6 @@ lo 生态统一架构：**一个代码工作区，一个文档来源，一个站
 - 插件访问 Core：只经 `ctx.lo`（权限白名单 facade）→ `@lo/client`。
 - 插件 UI：渲染进程 isolated world，`ctx` 唯一入口，G2 安全模型（见 [`../design/adr-001-mountel-g2.md`](../design/adr-001-mountel-g2.md)）。
 - 生命周期：`dependsOn` 拓扑 + `activationEvents` 懒激活。
+- 使用方式：Mode → Session → Viewer（`rules.writable → state.readOnly → UI`，见 [`usage-layer.md`](usage-layer.md)）。
 
 详见 [`../specs/012-plugin-runtime-architecture`](../specs/012-plugin-runtime-architecture) 等。

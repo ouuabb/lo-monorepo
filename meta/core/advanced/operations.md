@@ -1,5 +1,70 @@
 ## 操作追踪体系
 
+> 本文含两部分：① **Operation 语义体系**（010 收敛后的全部写操作审计 + undo + 事务）；
+> ② **sync_ops 同步操作日志**（跨设备同步用的旧日志体系）。两者并存：
+> `operations` 表 = 全部写操作的可追踪事实（Resource/Relation/Schema/View/Automation/
+> Member/Workflow 级）；`sync_ops` 表 = 同步传播单位（跨设备回放）。
+
+---
+
+## 一、Operation 语义体系（operations 表）
+
+### 1.1 概念
+
+Operation = 可追踪事实：`type + params + context(actor)`。**所有写操作必须经
+OperationEngine 执行**（import/link 亦收敛到 `resource.create`），每条记录持久化到
+`operations` 表（S0 后由 `container_operations` 更名），可经 `lo undo` 或
+`lo container transaction undo` 回滚。
+
+### 1.2 引擎与状态机（src/repo/）
+
+| 模块 | 职责 |
+|---|---|
+| `operationEngine.cjs` | 统一执行入口 `execute()`：OperationRegistry 查找 handler → 状态生命周期 `pending → success / failed / rolled_back` → 持久化 operations 表 → undo（父子操作链） |
+| `operationRegistry.cjs` | 操作类型注册表：`{ execute, undo }` handler 映射（替代硬编码 switch） |
+| `operationLogger.cjs` | 容器操作历史 + Undo 系统 |
+| `transactionEngine.cjs` | 两层事务：SQLite 原子事务 + 业务事务记录（container_transactions）；失败自动 undo |
+
+`src/operations/index.cjs` 自动扫描注册全部 `{type, execute, undo}` 完整 handler。
+
+### 1.3 操作类型清单（30 个）
+
+| 域 | 操作 |
+|---|---|
+| 资源 | `resource.create`（含 import/link）/ `resource.update` / `resource.delete`（软删）/ `resource.move` |
+| 关系 | `relation.create` / `relation.update` / `relation.remove`（软删） |
+| 成员 | `member.add` / `delete` / `update` / `rename` / `move` / `copy` / `remove` / `restore` / `promote` / `demote` / `ignore` / `unignore` |
+| Schema | `schema.create` / `schema.update` / `schema.delete` |
+| View | `view.create` / `view.update` / `view.delete` |
+| 自动化 | `automation.create` / `automation.update` / `automation.remove` |
+| 工作流 | `workflow.transition`（唯一合法状态变化入口，undo 回滚实例状态） |
+
+### 1.4 undo 语义
+
+- `resource.update`：执行前抓取 before 状态；content 变更快照到
+  `.repo/operations/<opId>.bak`，undo 回滚内容与字段。
+- `resource.create`：undo = 软删已建资源；`resource.delete`：undo = 恢复 deleted=0 与原 name。
+- 成员操作：before 快照恢复（promote/demote/rename/move/copy/ignore 等）。
+- 父子操作链：事务内子操作随父操作 undo 级联。
+
+### 1.5 HTTP / CLI 面
+
+- `POST /api/operations`（execute，options 含 actor/parentOperationId/transactionId）、
+  `GET /api/operations`（历史）、`GET /api/operations/:id`、`POST /api/operations/:id/undo`；
+  事务：`POST /api/operations/transaction`（begin）+ `/transaction/:id/{execute,commit,rollback}`。
+- CLI：`lo operation`（列表/详情）、`lo undo <operationId>`（撤销最近或指定操作）、
+  `lo container transaction ...`。
+
+### 1.6 事件联动
+
+Operation 执行后统一 emit 领域事件（`resource.created` / `relation.created` /
+`workflow.transition` 等）——事件是领域事实广播，Operation 是写路径事实（见
+`core/systems/event.md`）。
+
+---
+
+## 二、sync_ops 同步操作日志（跨设备同步）
+
 ### 操作类型（OP_TYPES）
 
 `sync_ops` 表定义了 5 种操作类型：

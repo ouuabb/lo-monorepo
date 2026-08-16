@@ -23,7 +23,7 @@
 ## 技术栈与命令
 
 - 纯 CommonJS；Node >= 20；Yarn。
-- `yarn test` / `npm test`（Jest，209+ 用例）；`yarn run build`（打包）；`yarn run docs:build`。
+- `yarn test` / `npm test`（Jest，209+ 用例）；`yarn run build`（打包 tar.gz + index.json）。
 
 ## 契约铁律（插件收敛，速记）
 
