@@ -260,7 +260,7 @@ class ResourceService {
     // 无文件资源（虚拟资源，如翻译记录、浏览历史等）跳过文件操作
     const hasFile = absPath != null && absPath.length > 0;
 
-    // 自动提取元数据（title, wordCount, size, mtime），调用方传入的优先级更高
+    // 自动提取元数据（wordCount 等；018：title 不再提取为 Resource 名称），调用方传入的优先级更高
     // ── 扩展点: resourceTypes.<type>.extractMetadata ──
     const extracted = hasFile
       ? await this._extractMetadata(absPath, finalType)

@@ -1548,7 +1548,7 @@ route("GET", "/api/admin/resources", async (req, res, { repo, url }) => {
     // 过滤内部系统资源
     resources = resources.filter((r) => r.rid !== "__system__");
 
-    // 如果指定了搜索关键词，按 title 过滤
+        // 如果指定了搜索关键词，按 name 过滤
     if (q) {
       const lowerQ = q.toLowerCase();
       resources = resources.filter((r) => {

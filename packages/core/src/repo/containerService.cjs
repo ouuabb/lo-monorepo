@@ -1,6 +1,7 @@
 const fs = require("fs-extra");
 const path = require("path");
 const HashUtils = require("../utils/hash.cjs");
+const StringUtils = require("../utils/string.cjs");
 const ResourceType = require("../plugin/typeRegistry.cjs");
 const MemberStateMachine = require("../domain/memberStateMachine.cjs");
 
@@ -882,8 +883,10 @@ class ContainerService {
       return byRid.rid;
     }
 
-    // 2. 按名称匹配（活跃层）
-    const byName = await this.resourceService.getByName(identifier);
+    // 2. 按名称匹配（活跃层；018：名称查询统一 normalize 后精确匹配）
+    const byName = await this.resourceService.getByName(
+      StringUtils.normalizeResourceName(identifier),
+    );
     if (byName && (await this.hasContainerCapability(byName.rid))) {
       return byName.rid;
     }
