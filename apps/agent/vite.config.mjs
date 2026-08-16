@@ -24,6 +24,10 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
   },
+  optimizeDeps: {
+    // workspace CJS 包按源码服务（dev 下浏览器无 require）→ 强制预构建为 ESM
+    include: ['@lo/editor-assist'],
+  },
   build: {
     outDir: path.resolve(__dirname, 'dist'),
     emptyOutDir: true,
