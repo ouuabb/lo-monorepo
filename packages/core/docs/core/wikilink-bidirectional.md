@@ -20,22 +20,34 @@
 - 不匹配嵌套 `[[]]`、不匹配含 `|` 的 target（`|` 后为 alias）；
 - `parseTargets` 提供去重 target 列表。
 
-## 2. 解析入口与时机
+## 2. 解析入口与一致性原则
+
+**一致性原则（强约束）**：Markdown content 是事实，wikilink/embed relation 是**派生数据**。
+任何正式 content mutation 写入口完成后，必须重建派生关系——不允许部分入口同步、
+部分不同步，也不允许依赖调用方自行记得同步。
 
 **唯一解析入口**：`src/utils/markdownParser.cjs`（`MarkdownParser.parse(content)`）——
 聚合 Wikilink 与 Embed（`![alt](path)` / `<img>`）两种引用，返回
 `{ wikilinks: [], embeds: [] }`。`WikiLinkParser` 是其子解析器之一。
 
-**触发时机**（`syncMarkdownRelations(rid)`，`repository.cjs:4134`）：
+**Content Mutation 全覆盖矩阵**（每个正式写入口完成后的行为）：
 
-| 时机 | 位置 |
-|---|---|
-| note 资源创建/导入后 | `createResource` / `importFile`（`:549`、`:4826` 内容变更 rehash 后） |
-| 内容更新后 | `updateResource`（`:4826`） |
-| `lo sync --wikilinks` 全量重建 | `sync` 的 `wikilinks` 选项（`:4670`） |
-| 全量重建命令 | `rebuildAllMarkdownRelations`（`:4324`） |
+| 写入口 | 内容落盘 | 派生同步 | 触发位置 |
+|---|---|---|---|
+| `repository.createResource`（CLI new/daily、API create/upload、AI、automation） | 写文件 | ✅ | `repository.cjs` `_syncMarkdownRelationsSafe`（尾部） |
+| `repository.importFile`（`lo import`） | 文件即内容 | ✅ | 同上（importFile 尾部） |
+| `operations resource.update`（Agent 保存/API PUT/CLI edit 保存） | `resourceService.updateContent` | ✅ | `resourceUpdate.cjs` execute（content 更新后） |
+| `operations resource.update` undo（内容回滚） | 快照写回 | ✅ | `resourceUpdate.cjs` undo（恢复后） |
+| 外部编辑器直接改文件 | 文件直接改 | ✅ | FileWatcher change → hash 变化检测 → `_syncMarkdownRelationsSafe` |
+| `lo sync --wikilinks` / `syncAllMarkdownRelations` | — | ✅（全量重建） | 手动 |
+| decrypt/encrypt（文本不变） | 重写同内容 | 无需 | — |
+| rename/move（内容不变） | 不写内容 | 无需 | — |
+| 非 note 资源（text/json/...） | — | 不触发 | 仅 note 参与解析 |
 
-仅 `type === 'note'` 的 Markdown 资源参与解析（`:4143`）。
+**FileWatcher 生命周期**：`repo.startWatcher()` 在 `lo serve` 启动时启用（`--no-watch`
+可禁用，测试/CI 用）；change 事件先 rehash 比较 hash，**仅内容实际变化才同步**
+（operation 自身写文件产生的 change 事件不会重复同步——幂等 + hash 检测双重保证）。
+同步本身幂等（事务内删旧建新），重复触发结果一致，不形成循环（同步不写文件）。
 
 ## 3. 保存模型：文本即事实 + 派生关系
 

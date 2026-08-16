@@ -104,7 +104,7 @@ describe("Core HTTP API (workflow/automation/container/evolution)", () => {
     logs = "";
     server = spawn(
       process.execPath,
-      [BIN, "serve", "--repo", ctx.tempDir, "--port", String(port)],
+      [BIN, "serve", "--repo", ctx.tempDir, "--port", String(port), "--no-watch"],
       {
         cwd: ctx.tempDir,
         stdio: ["ignore", "pipe", "pipe"],

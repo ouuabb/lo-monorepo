@@ -3184,6 +3184,18 @@ module.exports = async function serve(argv) {
     process.exit(1);
   }
 
+  // FileWatcher 生命周期：serve 常驻期间监听 resources/ 目录——
+  // 外部编辑器直接修改 Markdown 时自动 rehash + 重建派生关系（wikilink/embed）。
+  // change 事件对 operation 自身写入幂等（hash 未变不重复同步）；进程退出自动清理。
+  // 测试/CI 可用 --no-watch 禁用（避免与脚本化文件操作竞争）。
+  if (argv.watch !== false) {
+    try {
+      repo.startWatcher();
+    } catch (e) {
+      console.error(chalk.yellow(`文件监听启动失败（不影响服务）: ${e.message}`));
+    }
+  }
+
   // 读取已注册的 SSH 公钥（启动时加载，支持热更新）
   const authState = { needAuth: false, registeredKeys: [] };
 

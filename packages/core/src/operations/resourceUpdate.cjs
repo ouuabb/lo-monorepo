@@ -72,6 +72,12 @@ module.exports = {
     }
     const result = await ctx.resourceService.update(rid, restUpdates);
 
+    // 一致性：content 更新成功 → 重建 Markdown 派生关系（wikilink + embed）
+    // 幂等（sync 内部删旧建新）；失败只记日志，不阻塞保存（关系可手动重建）
+    if (content !== undefined && result && result.type === "note") {
+      await ctx.repo._syncMarkdownRelationsSafe(rid);
+    }
+
     // 快照旧状态返回给 undo；浅拷贝 rid 对齐
     return {
       ...result,
@@ -142,6 +148,11 @@ module.exports = {
           throw e;
         }
         await fs.remove(snapshotPath);
+        // 一致性：内容已回滚 → 重建 Markdown 派生关系
+        const rolledBack = await ctx.resourceService.getByRid(rid);
+        if (rolledBack && rolledBack.type === "note") {
+          await ctx.repo._syncMarkdownRelationsSafe(rid);
+        }
       }
     }
 

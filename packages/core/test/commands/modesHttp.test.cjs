@@ -86,7 +86,7 @@ describe("Usage Mode/Viewer HTTP API (U1)", () => {
     port = await findFreePort();
     server = spawn(
       process.execPath,
-      [BIN, "serve", "--repo", ctx.tempDir, "--port", String(port)],
+      [BIN, "serve", "--repo", ctx.tempDir, "--port", String(port), "--no-watch"],
       { cwd: ctx.tempDir, stdio: ["ignore", "pipe", "pipe"] },
     );
     await waitForServer(server, port);

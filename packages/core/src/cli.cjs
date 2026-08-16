@@ -1548,6 +1548,11 @@ cli
       .option('admin-token', {
         type: 'string',
         description: 'Admin API 共享密钥（也可通过 LO_ADMIN_TOKEN 环境变量设置）'
+      })
+      .option('watch', {
+        type: 'boolean',
+        description: '启用 FileWatcher（监听 resources/ 目录，外部改文件自动同步派生关系）',
+        default: true
       });
   }, serve)
 

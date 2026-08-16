@@ -543,16 +543,9 @@ class Repository {
       );
     }
 
-    // 如果是 note 类型资源，自动解析并同步所有派生关系（wikilink + embed）
+    // 一致性：note 导入后立即同步派生关系（wikilink + embed）
     if (resource && resource.type === "note") {
-      try {
-        await this.syncMarkdownRelations(resource.rid);
-      } catch (e) {
-        require("../utils/logger.cjs").error(
-          "repository: 同步markdown关系失败",
-          e,
-        );
-      }
+      await this._syncMarkdownRelationsSafe(resource.rid);
     }
     return resource;
   }
@@ -674,6 +667,10 @@ class Repository {
           },
         );
       }
+      // 一致性：覆盖写入了 content，note 资源重建 Markdown 派生关系
+      if (existing.type === "note") {
+        await this._syncMarkdownRelationsSafe(existing.rid);
+      }
       return updated;
     }
 
@@ -706,7 +703,29 @@ class Repository {
       );
     }
 
+    // 一致性：新建 note 且写入过 content（或本地文件已含链接）时，
+    // 立即重建 Markdown 派生关系（wikilink + embed）
+    if (result && result.type === "note") {
+      await this._syncMarkdownRelationsSafe(result.rid);
+    }
+
     return result;
+  }
+
+  /**
+   * 安全触发 Markdown 派生关系同步（幂等；失败只记日志，不阻塞写入口）
+   * 一致性原则：content 是事实，wikilink/embed relation 是派生数据——
+   * 任何正式 content mutation 完成后都必须收敛。
+   */
+  async _syncMarkdownRelationsSafe(rid) {
+    try {
+      await this.syncMarkdownRelations(rid);
+    } catch (e) {
+      require("../utils/logger.cjs").error(
+        "repository: 同步markdown关系失败",
+        e,
+      );
+    }
   }
 
   /**
@@ -1038,6 +1057,9 @@ class Repository {
     this.operationEngine.setService("resourceService", this.resourceService);
     this.operationEngine.setService("schemaRegistry", this.schemaRegistry);
     this.operationEngine.setService("viewRegistry", this.viewRegistry);
+    // 一致性：content mutation 的 operation handler 需要触发 Markdown 派生关系同步
+    // （resourceUpdate execute/undo 后重建 wikilink/embed 关系——见 syncMarkdownRelations）
+    this.operationEngine.setService("repo", this);
     // 注入领域事件发射器：OperationEngine.execute 成功后统一 emit（Operation → Event 绑定）
     this.operationEngine.setEventEmitter((type, payload) =>
       this.emitEvent(type, payload, { source: "repository" }),
@@ -4819,17 +4841,14 @@ class Repository {
       case "change":
         const resource = await this.resourceService.getByPath(filePath);
         if (resource) {
+          // 先算旧 hash：仅当内容实际变化时才同步派生关系——
+          // 避免 operation 自身写文件产生的 change 事件触发重复同步（幂等但浪费）
+          const oldHash = resource.hash;
           await this.resourceService.rehash(resource.rid);
-          // note 类型资源内容变化时，重新解析所有派生关系
-          if (resource.type === "note") {
-            try {
-              await this.syncMarkdownRelations(resource.rid);
-            } catch (e) {
-              require("../utils/logger.cjs").error(
-                "repository: 同步markdown关系失败",
-                e,
-              );
-            }
+          const after = await this.resourceService.getByRid(resource.rid);
+          const hashChanged = !after || after.hash !== oldHash;
+          if (hashChanged && resource.type === "note") {
+            await this._syncMarkdownRelationsSafe(resource.rid);
           }
         }
         break;
