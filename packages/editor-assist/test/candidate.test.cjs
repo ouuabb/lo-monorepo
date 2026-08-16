@@ -32,8 +32,8 @@ describe('buildCandidates', () => {
     expect(source.search).not.toHaveBeenCalled();
     expect(r.range).toEqual({ start: 4, end: 6 });
     expect(r.suggestions).toEqual([
-      { label: '笔记一', detail: 'type: note', insertText: '笔记一]]' },
-      { label: '笔记二', detail: 'type: note', insertText: '笔记二]]' },
+      { label: '笔记一', detail: 'type: note', insertText: '[[笔记一]]' },
+      { label: '笔记二', detail: 'type: note', insertText: '[[笔记二]]' },
     ]);
   });
 
@@ -44,7 +44,7 @@ describe('buildCandidates', () => {
     expect(source.listRecent).not.toHaveBeenCalled();
     expect(r.token).toBe('J');
     expect(r.range).toEqual({ start: 0, end: 3 });
-    expect(r.suggestions[0].insertText).toBe('JavaScript 笔记]]');
+    expect(r.suggestions[0].insertText).toBe('[[JavaScript 笔记]]');
   });
 
   test('去重：同 name 只保留首次出现', async () => {
@@ -90,5 +90,19 @@ describe('buildCandidates', () => {
     await expect(
       buildCandidates({ text: '[[', cursorOffset: 2, source: { listRecent: () => {} } }),
     ).rejects.toThrow(/CandidateSource/);
+  });
+
+  test('range 扩展：光标后 Monaco auto-closing 的连续 ] 纳入替换', async () => {
+    const source = makeSource();
+    // 模拟输入 [[ 后 Monaco 自动补出 ]]：文本 '[[]]'，光标在 [[ 与 ]] 中间（offset 2）
+    const r = await buildCandidates({ text: '[[]]', cursorOffset: 2, source });
+    expect(r.range).toEqual({ start: 0, end: 4 });
+    expect(r.suggestions[0].insertText).toBe('[[笔记一]]');
+  });
+
+  test('range 扩展：单个 ] 也纳入（部分自动闭合）', async () => {
+    const source = makeSource();
+    const r = await buildCandidates({ text: 'a [[]', cursorOffset: 4, source });
+    expect(r.range).toEqual({ start: 2, end: 5 });
   });
 });

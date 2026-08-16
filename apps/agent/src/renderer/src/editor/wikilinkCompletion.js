@@ -8,9 +8,11 @@
  * 行为：
  *   [[        → 最近笔记候选（notes.list，created DESC）
  *   [[J       → search("J") 模糊候选
- *   选择候选   → 在光标处插入 `name]]`（光标已在 `[[` 之后 → 形成 `[[name]]`；
- *               不提供 range——Monaco 按光标 word 推断替换范围，覆盖已输入 token；
- *               带起始于 `[[` 的 range 会被 Monaco 校验丢弃）
+ *   选择候选   → 用 `[[name]]` 替换「已输入的 [[ 到光标」——range 起点即 `[[`
+ *               起点，Monaco 校验通过（range 与光标同行）；NoteEditor 关闭
+ *               auto-closing（输入 [[ 不自动补 ]]），替换结果恒为完整 [[name]]
+ *
+ * 前置条件（NoteEditor 配置）：autoClosingBrackets: 'never'
  */
 import * as monaco from 'monaco-editor/editor/editor.api';
 import { detectWikilinkTrigger, buildCandidates } from '@lo/editor-assist';
@@ -50,14 +52,22 @@ export function registerWikilinkCompletion(loCore) {
       return buildCandidates({ text, cursorOffset, source })
         .then((result) => {
           if (!result) return { suggestions: [] };
-          // filterText = token + label：`[[J` 场景光标 word='J' 时放行（候选已由 search 产生）
-          const prefix = result.token || '';
+          const range = new monaco.Range(
+            model.getPositionAt(result.range.start).lineNumber,
+            model.getPositionAt(result.range.start).column,
+            model.getPositionAt(result.range.end).lineNumber,
+            model.getPositionAt(result.range.end).column,
+          );
+          // filterText = `[[` + token + label：过滤词由 range 起点决定（覆盖 `[[` 时
+          // 过滤词含 `[[`+token），前缀拼接保证 Monaco 过滤放行
+          const filterPrefix = '[[' + (result.token || '');
           const items = result.suggestions.map((s) => ({
             label: s.label,
             kind: monaco.languages.CompletionItemKind.Reference,
             detail: s.detail,
             insertText: s.insertText,
-            filterText: prefix ? prefix + s.label : undefined,
+            filterText: filterPrefix + s.label,
+            range,
           }));
           return { suggestions: items };
         })

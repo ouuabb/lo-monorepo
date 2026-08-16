@@ -43,6 +43,8 @@ export default function NoteEditor({ value, onChange, readOnly = false }) {
       scrollBeyondLastLine: false,
       tabSize: 2,
       readOnly,
+      // 关闭方括号自动闭合：输入 [[ 不自动补 ]]，补全替换范围干净（无残留括号）
+      autoClosingBrackets: 'never',
     });
     editorRef.current = editor;
 
