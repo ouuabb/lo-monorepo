@@ -12,10 +12,10 @@
  *   - token 非空 → search(token)
  *   - 去重：按 name 精确去重（保留首次出现）
  *   - 排序：保持数据源返回顺序（listRecent 已 created DESC；search 已按评分）
- *   - 插入文本：`[[name]]`（完整闭合，替换范围覆盖已输入的 `[[` 及 Monaco
- *     auto-closing 自动补出的连续 `]`）
- *   - range：start = `[[` 起点；end = 光标后，若光标后紧跟自动闭合的 `]`（Monaco
- *     autoClosingBrackets 产物）则连续纳入，保证替换后不残留多余括号
+ *   - 插入文本：`[[name]]`（完整闭合）
+ *   - range：start = `[[` 起点；end = 光标（替换已输入的 `[[` 与 token）
+ *   - trailingClose：光标后 Monaco auto-closing 自动补出的连续 `]` 数量
+ *     （宿主以 additionalTextEdits 删除，保证结果无残留括号）
  */
 
 /**
@@ -55,13 +55,15 @@ async function buildCandidates({ text, cursorOffset, source, limit = 20 }) {
     if (suggestions.length >= limit) break;
   }
 
-  // 替换范围：`[[` 起点 → 光标；光标后紧跟的连续 `]`（Monaco auto-closing 产物）一并纳入
-  let endOffset = trigger.endOffset;
-  while (text[endOffset] === ']') endOffset++;
+  // 替换范围：`[[` 起点 → 光标（覆盖已输入的 [[ 与 token）
+  // trailingClose：光标后 Monaco auto-closing 自动补出的连续 `]`（宿主删除）
+  let trailingClose = 0;
+  while (text[trigger.endOffset + trailingClose] === ']') trailingClose++;
 
   return {
-    range: { start: trigger.startOffset, end: endOffset },
+    range: { start: trigger.startOffset, end: trigger.endOffset },
     token,
+    trailingClose,
     suggestions,
   };
 }

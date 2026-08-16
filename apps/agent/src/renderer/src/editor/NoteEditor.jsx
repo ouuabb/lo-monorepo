@@ -43,7 +43,8 @@ export default function NoteEditor({ value, onChange, readOnly = false }) {
       scrollBeyondLastLine: false,
       tabSize: 2,
       readOnly,
-      // 关闭方括号自动闭合：输入 [[ 不自动补 ]]，补全替换范围干净（无残留括号）
+      // 关闭方括号自动闭合：输入 [[ 不自动补 ]]——wikilink 补全替换范围干净（无残留）；
+      // 自动闭合与「替换已输入 [[」冲突（Monaco 限制），关闭后 [[ 输入直接触发候选
       autoClosingBrackets: 'never',
     });
     editorRef.current = editor;

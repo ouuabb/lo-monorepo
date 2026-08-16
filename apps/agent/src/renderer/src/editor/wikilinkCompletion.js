@@ -52,21 +52,22 @@ export function registerWikilinkCompletion(loCore) {
       return buildCandidates({ text, cursorOffset, source })
         .then((result) => {
           if (!result) return { suggestions: [] };
-          const range = new monaco.Range(
-            model.getPositionAt(result.range.start).lineNumber,
-            model.getPositionAt(result.range.start).column,
-            model.getPositionAt(result.range.end).lineNumber,
-            model.getPositionAt(result.range.end).column,
-          );
-          // filterText = `[[` + token + label：过滤词由 range 起点决定（覆盖 `[[` 时
-          // 过滤词含 `[[`+token），前缀拼接保证 Monaco 过滤放行
+          const startPos = model.getPositionAt(result.range.start);
+          const cursorPos = model.getPositionAt(result.range.end);
+          const endPos = model.getPositionAt(result.range.end + (result.trailingClose || 0));
+          const range = {
+            startLineNumber: startPos.lineNumber,
+            startColumn: startPos.column,
+            endLineNumber: endPos.lineNumber,
+            endColumn: endPos.column,
+          };
+          // filterText = `[[` + token：过滤词由 range 起点决定（覆盖 `[[` 时过滤词含 `[[`+token），
+          // 前缀匹配即放行（候选已由 listRecent/search 按语义产生）
           const filterPrefix = '[[' + (result.token || '');
           const items = result.suggestions.map((s) => ({
             label: s.label,
-            kind: monaco.languages.CompletionItemKind.Reference,
-            detail: s.detail,
             insertText: s.insertText,
-            filterText: filterPrefix + s.label,
+            filterText: filterPrefix,
             range,
           }));
           return { suggestions: items };

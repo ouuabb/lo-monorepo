@@ -92,17 +92,26 @@ describe('buildCandidates', () => {
     ).rejects.toThrow(/CandidateSource/);
   });
 
-  test('range 扩展：光标后 Monaco auto-closing 的连续 ] 纳入替换', async () => {
+  test('trailingClose：光标后 Monaco auto-closing 的连续 ] 数量（宿主删除）', async () => {
     const source = makeSource();
     // 模拟输入 [[ 后 Monaco 自动补出 ]]：文本 '[[]]'，光标在 [[ 与 ]] 中间（offset 2）
     const r = await buildCandidates({ text: '[[]]', cursorOffset: 2, source });
-    expect(r.range).toEqual({ start: 0, end: 4 });
+    expect(r.range).toEqual({ start: 0, end: 2 });
+    expect(r.trailingClose).toBe(2);
     expect(r.suggestions[0].insertText).toBe('[[笔记一]]');
   });
 
-  test('range 扩展：单个 ] 也纳入（部分自动闭合）', async () => {
+  test('trailingClose：单个 ]（部分自动闭合）', async () => {
     const source = makeSource();
     const r = await buildCandidates({ text: 'a [[]', cursorOffset: 4, source });
-    expect(r.range).toEqual({ start: 2, end: 5 });
+    expect(r.range).toEqual({ start: 2, end: 4 });
+    expect(r.trailingClose).toBe(1);
+  });
+
+  test('trailingClose：无自动闭合时为 0', async () => {
+    const source = makeSource();
+    const r = await buildCandidates({ text: 'a [[', cursorOffset: 4, source });
+    expect(r.range).toEqual({ start: 2, end: 4 });
+    expect(r.trailingClose).toBe(0);
   });
 });
