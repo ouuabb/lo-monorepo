@@ -1585,7 +1585,7 @@ function PluginPanel(props) {
   return (
     <>
       <section className="panel-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="panel-head">
           <h3 style={{ margin: 0, fontSize: 14 }}>已安装插件</h3>
           <button className="btn ghost" onClick={refresh} disabled={loading || !!busyId}>
             {loading ? '加载中…' : '刷新'}
@@ -1669,7 +1669,7 @@ function PluginPanel(props) {
       </section>
 
       <section className="panel-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="panel-head">
           <h3 style={{ margin: 0, fontSize: 14 }}>已注册服务</h3>
           <button className="btn ghost" onClick={refreshServices} disabled={servicesLoading}>
             {servicesLoading ? '加载中…' : '刷新'}
@@ -1821,7 +1821,7 @@ function ViewPanel(props) {
 
   return (
     <section className="panel-card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="panel-head">
         <h3 style={{ margin: 0, fontSize: 14 }}>插件视图</h3>
         <button className="btn ghost" onClick={refresh} disabled={loading}>
           {loading ? '加载中…' : '刷新'}
@@ -1926,7 +1926,7 @@ function PanelPanel(props) {
 
   return (
     <section className="panel-card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="panel-head">
         <h3 style={{ margin: 0, fontSize: 14 }}>插件面板</h3>
         <button className="btn ghost" onClick={refresh} disabled={loading}>
           {loading ? '加载中…' : '刷新'}
@@ -2031,7 +2031,7 @@ function EditorPanel(props) {
 
   return (
     <section className="panel-card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="panel-head">
         <h3 style={{ margin: 0, fontSize: 14 }}>插件编辑器</h3>
         <button className="btn ghost" onClick={refresh} disabled={loading}>
           {loading ? '加载中…' : '刷新'}
@@ -2121,7 +2121,7 @@ function CommandPanel(props) {
 
   return (
     <section className="panel-card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="panel-head">
         <h3 style={{ margin: 0, fontSize: 14 }}>已注册命令</h3>
         <button className="btn ghost" onClick={refresh} disabled={busy || loading}>
           {loading ? '加载中…' : '刷新'}
@@ -2256,7 +2256,7 @@ function RelationPanel(props) {
 
   return (
     <section className="panel-card rel-panel">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="panel-head">
         <h3 style={{ margin: 0, fontSize: 14 }}>关联关系</h3>
         <button className="btn ghost" onClick={refresh} disabled={busy}>
           {busy ? '加载中…' : '刷新'}
@@ -2369,7 +2369,7 @@ function OperationHistory(props) {
 
   return (
     <section className="panel-card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="panel-head">
         <h2 style={{ margin: 0 }}>操作历史</h2>
         <button className="btn ghost" onClick={refresh} disabled={busy}>
           {busy ? '加载中…' : '刷新'}
@@ -2445,7 +2445,7 @@ function WorkspacePanel(props) {
   return (
     <>
       <section className="panel-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="panel-head">
           <h2 style={{ margin: 0 }}>仓库状态</h2>
           <button className="btn ghost" onClick={onRefresh} disabled={busy}>
             {busy ? '刷新中…' : '刷新'}

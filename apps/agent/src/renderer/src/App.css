@@ -287,6 +287,45 @@ body {
   overflow: hidden;
 }
 
+/* ── 右侧栏窄屏适配（container queries；原横向单行文字一律不换行） ── */
+.bar-body {
+  container-type: inline-size;
+}
+
+@container (max-width: 520px) {
+  .bar-body .sub-panel {
+    padding: 16px 20px;
+  }
+  .bar-body .panel-card {
+    padding: 14px 16px;
+  }
+  .bar-body .sub-nav button {
+    padding: 8px 10px;
+  }
+  .bar-body .sub-nav {
+    margin-bottom: 14px;
+  }
+}
+
+@container (max-width: 420px) {
+  .bar-body .sub-panel {
+    padding: 12px 14px;
+  }
+  .bar-body .panel-card {
+    padding: 12px 14px;
+  }
+  .bar-body .sub-nav button {
+    padding: 8px;
+    font-size: 13px;
+  }
+  .bar-body .plugin-item-head {
+    gap: 8px;
+  }
+  .bar-body .command-item {
+    gap: 8px;
+  }
+}
+
 /* 第一栏：侧边栏（紧挨 rail 列） */
 .bar-sidebar {
   flex: none;
@@ -755,10 +794,13 @@ body {
   gap: 4px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 20px;
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 .sub-nav button {
   appearance: none;
+  flex: none;
   background: var(--panel);
   border: none;
   border-bottom: 2px solid transparent;
@@ -766,6 +808,7 @@ body {
   padding: 8px 14px;
   font-size: 14px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .sub-nav button:hover {
@@ -860,6 +903,28 @@ body {
   border-radius: 12px;
   padding: 20px 24px;
   margin-bottom: 20px;
+}
+
+/* 面板头部（标题 + 刷新/操作按钮）：横向单行，不换行 */
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.panel-head h2,
+.panel-head h3 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-head .btn {
+  flex: none;
+  white-space: nowrap;
 }
 
 .panel-card h2 {
@@ -983,10 +1048,16 @@ select {
   gap: 12px;
   padding: 8px 0;
   border-bottom: 1px solid var(--border);
+  min-width: 0;
 }
 
 .command-item:last-child {
   border-bottom: none;
+}
+
+.command-item .btn {
+  flex: none;
+  white-space: nowrap;
 }
 
 .command-info {
@@ -1063,6 +1134,12 @@ select {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
+}
+
+.plugin-item-head .btn {
+  flex: none;
+  white-space: nowrap;
 }
 
 .plugin-info {
@@ -1078,6 +1155,10 @@ select {
   gap: 8px;
   font-size: 13px;
   font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .plugin-version {
@@ -1238,14 +1319,18 @@ select {
   gap: 8px;
   padding: 4px 0;
   font-size: 13px;
+  min-width: 0;
 }
 
 .rel-dir {
   color: var(--muted);
   font-size: 12px;
+  flex: none;
 }
 
 .rel-target {
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
