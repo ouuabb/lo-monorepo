@@ -2057,6 +2057,41 @@ route("GET", "/api/events/stream", async (req, res, { repo, url }) => {
   res.on("close", () => clearInterval(heartbeat));
 });
 
+// ---- Usage Mode / Viewer API（U1） -------------------------------------
+
+// 全部 Mode（builtin + 插件表）
+route("GET", "/api/modes", async (req, res, { repo }) => {
+  try {
+    const modes = await repo.listModes();
+    jsonOk(res, { modes });
+  } catch (e) {
+    serverError(res, e.message);
+  }
+});
+
+// 解析资源的可用 Mode
+route("GET", "/api/modes/:rid", async (req, res, { repo, url }) => {
+  const match = url.pathname.match(/^\/api\/modes\/(res_[A-Za-z0-9_]+)$/);
+  if (!match) return notFound(res, "Invalid resource rid");
+  try {
+    const modes = await repo.resolveModes(match[1]);
+    jsonOk(res, { resource: match[1], modes });
+  } catch (e) {
+    serverError(res, e.message);
+  }
+});
+
+// 全部 Viewer（可选 ?mode=:id 过滤）
+route("GET", "/api/viewers", async (req, res, { repo, url }) => {
+  try {
+    const modeId = url.searchParams.get("mode") || null;
+    const viewers = await repo.listViewers(modeId);
+    jsonOk(res, { viewers });
+  } catch (e) {
+    serverError(res, e.message);
+  }
+});
+
 route("GET", "/api/admin/relations", async (req, res, { repo, url }) => {
   try {
     const rid = url.searchParams.get("rid") || null;
@@ -3113,6 +3148,11 @@ function matchRoute(method, pathname) {
   if (/^\/api\/automations\/[^/]+\/(enable|disable|run)$/.test(pathname)) {
     const action = pathname.split("/").pop();
     const exactKey = `/api/automations/:id/${action}`;
+    if (map.has(exactKey)) return map.get(exactKey);
+  }
+
+  if (/^\/api\/modes\/res_[A-Za-z0-9_]+$/.test(pathname)) {
+    const exactKey = "/api/modes/:rid";
     if (map.has(exactKey)) return map.get(exactKey);
   }
 

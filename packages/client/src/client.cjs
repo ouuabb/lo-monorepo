@@ -60,6 +60,8 @@ class LoClient {
     this.operations = createOperationsApi(this);
     this.events = createEventsApi(this);
     this.repository = createRepositoryApi(this);
+    this.modes = createModesApi(this);
+    this.viewers = createViewersApi(this);
   }
 
   get baseUrl() {
@@ -403,6 +405,48 @@ function createEventsApi(client) {
           req.destroy();
         },
       };
+    },
+  };
+}
+
+function createModesApi(client) {
+  return {
+    /**
+     * 全部 Mode（builtin + 插件表）
+     * @returns {Promise<{ modes: Array<{ modeId, semantics, rules }> }>}
+     */
+    list() {
+      return client.get('/api/modes').then((r) => r.body);
+    },
+    /**
+     * 解析资源的可用 Mode（type 精确 > capability 条件 > preview 兜底）
+     * @param {string} rid
+     * @returns {Promise<{ resource: string, modes: Array<{ modeId, semantics, rules }> }>}
+     */
+    resolve(rid) {
+      const encoded = encodeURIComponent(rid);
+      return client.get(`/api/modes/${encoded}`).then((r) => r.body);
+    },
+  };
+}
+
+function createViewersApi(client) {
+  return {
+    /**
+     * 全部 Viewer（可选按 mode 过滤）
+     * @param {object} [query] — { mode?: string }
+     * @returns {Promise<{ viewers: Array<{ viewerId, label, semantics, supports }> }>}
+     */
+    list(query) {
+      return client.get('/api/viewers', query).then((r) => r.body);
+    },
+    /**
+     * 解析 Mode 可用的 Viewer
+     * @param {string} modeId
+     * @returns {Promise<{ viewers: Array<{ viewerId, label, semantics, supports }> }>}
+     */
+    resolve(modeId) {
+      return client.get('/api/viewers', { mode: modeId }).then((r) => r.body);
     },
   };
 }

@@ -38,6 +38,9 @@ const FederationManager = require("./federationManager.cjs");
 const FederatedGraphEngine = require("./federatedGraphEngine.cjs");
 const SyncEngine = require("./syncEngine.cjs");
 const KnowledgeEvolutionEngine = require("./knowledgeEvolutionEngine.cjs");
+const usageResolver = require("./usageResolver.cjs");
+const modeRegistry = require("./modeRegistry.cjs");
+const viewerRegistry = require("./viewerRegistry.cjs");
 const KnowledgePatternEngine = require("./knowledgePatternEngine.cjs");
 const KnowledgeStrategyEngine = require("./knowledgeStrategyEngine.cjs");
 const CollectiveKnowledgeEngine = require("./collectiveKnowledgeEngine.cjs");
@@ -1551,6 +1554,124 @@ class Repository {
 
   async getResourceByName(name) {
     return this.resourceService.getByName(name);
+  }
+
+  // ─── Usage Mode / Viewer（U1） ───────────────────────────────────────
+
+  /** 解析 JSON 列；空/非法回退 {}（表值由插件写入，容忍脏数据） */
+  _parseJsonCol(value) {
+    if (typeof value !== 'string' || !value) return {};
+    try {
+      return JSON.parse(value);
+    } catch {
+      return {};
+    }
+  }
+
+  /** 读取 mode_definitions 表（插件贡献；U3 写入，U1 读取路径） */
+  async _listPluginModes() {
+    const rows = await this.db.all(
+      'SELECT mode_id, semantics, applies_to, rules, plugin_id FROM mode_definitions',
+    );
+    return rows.map((r) => ({
+      modeId: r.mode_id,
+      semantics: r.semantics,
+      applicableTo: (this._parseJsonCol(r.applies_to)),
+      rules: (this._parseJsonCol(r.rules)),
+      pluginId: r.plugin_id,
+    }));
+  }
+
+  /** 读取 viewer_definitions 表（插件贡献；U3 写入，U1 读取路径） */
+  async _listPluginViewers() {
+    const rows = await this.db.all(
+      'SELECT viewer_id, label, semantics, supports, plugin_id FROM viewer_definitions',
+    );
+    return rows.map((r) => ({
+      viewerId: r.viewer_id,
+      label: r.label,
+      semantics: r.semantics,
+      supports: (this._parseJsonCol(r.supports)),
+      pluginId: r.plugin_id,
+    }));
+  }
+
+  /**
+   * 全部 Mode（builtin + 插件表；按注册顺序；builtin 冲突优先）
+   * @returns {Promise<Array<{ modeId, semantics, rules }>>}
+   */
+  async listModes() {
+    const pluginModes = await this._listPluginModes();
+    const seen = new Set();
+    const out = [];
+    for (const m of [...modeRegistry.BUILTIN_MODES, ...pluginModes]) {
+      if (seen.has(m.modeId)) continue;
+      seen.add(m.modeId);
+      out.push({ modeId: m.modeId, semantics: m.semantics, rules: m.rules });
+    }
+    return out;
+  }
+
+  /**
+   * 解析资源的可用 Mode（U1 §4：type 精确 > capability 条件 > preview 兜底）
+   * @param {string} rid
+   * @returns {Promise<Array<{ modeId, semantics, rules }>>}
+   */
+  async resolveModes(rid) {
+    const resource = await this.resourceService.getByRid(rid);
+    if (!resource) throw new Error(`Resource 不存在: ${rid}`);
+    const pluginModes = await this._listPluginModes();
+    return usageResolver.resolveModes(
+      { type: resource.type, capabilities: resource.capabilities },
+      pluginModes,
+    );
+  }
+
+  /**
+   * 解析 Viewers（可选按 modeId；缺省取第一个可用 Mode）
+   * @param {string} rid
+   * @param {string} [modeId]
+   * @returns {Promise<Array<{ viewerId, label, semantics, supports }>>}
+   */
+  async resolveViewers(rid, modeId = null) {
+    const resource = await this.resourceService.getByRid(rid);
+    if (!resource) throw new Error(`Resource 不存在: ${rid}`);
+    const pluginModes = await this._listPluginModes();
+    const modes = usageResolver.resolveModes(
+      { type: resource.type, capabilities: resource.capabilities },
+      pluginModes,
+    );
+    const target = modeId || (modes.length ? modes[0].modeId : null);
+    if (!target) return [];
+    const pluginViewers = await this._listPluginViewers();
+    return usageResolver.resolveViewers(target, pluginViewers);
+  }
+
+  /**
+   * 全部 Viewer（可选按 modeId 过滤；builtin + 插件表；builtin 冲突优先）
+   * @param {string} [modeId]
+   * @returns {Promise<Array<{ viewerId, label, semantics, supports }>>}
+   */
+  async listViewers(modeId = null) {
+    const pluginViewers = await this._listPluginViewers();
+    const seen = new Set();
+    const candidates = [];
+    for (const v of [...viewerRegistry.BUILTIN_VIEWERS, ...pluginViewers]) {
+      if (seen.has(v.viewerId)) continue;
+      seen.add(v.viewerId);
+      candidates.push(v);
+    }
+    const filtered = modeId
+      ? candidates.filter(
+          (v) => v.supports && Array.isArray(v.supports.modes) && v.supports.modes.includes(modeId),
+        )
+      : candidates;
+    return filtered.map((v) => ({
+      viewerId: v.viewerId,
+      label: v.label,
+      semantics: v.semantics,
+      supports: v.supports,
+    }));
   }
 
   async getResourceByPath(filePath) {

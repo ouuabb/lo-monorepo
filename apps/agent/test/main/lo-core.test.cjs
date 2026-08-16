@@ -13,6 +13,8 @@ function makeMockClient(overrides = {}) {
     events: { subscribe: jest.fn(), history: jest.fn() },
     repository: { info: jest.fn(), resolveLocation: jest.fn() },
     admin: { graph: jest.fn(), graphPath: jest.fn() },
+    modes: { list: jest.fn(), resolve: jest.fn() },
+    viewers: { list: jest.fn(), resolve: jest.fn() },
     ...overrides,
   };
   return client;
@@ -671,6 +673,59 @@ describe('LoCoreService', () => {
     it('未配置时 subscribeEvents 报错', async () => {
       const service = new LoCoreService({});
       const res = service.subscribeEvents(['a'], () => {});
+      expect(res.ok).toBe(false);
+      expect(res.message).toContain('configure');
+    });
+  });
+
+  describe('Usage Mode/Viewer（U1）', () => {
+    it('getModes 透传 client.modes.list', async () => {
+      const client = makeMockClient();
+      client.modes.list.mockResolvedValue({
+        modes: [{ modeId: 'editing' }, { modeId: 'reading' }],
+      });
+      const service = new LoCoreService({ LoClient: class {} });
+      service.client = client;
+      const res = await service.getModes();
+      expect(res.ok).toBe(true);
+      expect(res.modes.map((m) => m.modeId)).toEqual(['editing', 'reading']);
+    });
+
+    it('resolveModes 透传 client.modes.resolve(rid)', async () => {
+      const client = makeMockClient();
+      client.modes.resolve.mockResolvedValue({
+        resource: 'res_1',
+        modes: [{ modeId: 'editing' }],
+      });
+      const service = new LoCoreService({ LoClient: class {} });
+      service.client = client;
+      const res = await service.resolveModes('res_1');
+      expect(client.modes.resolve).toHaveBeenCalledWith('res_1');
+      expect(res.resource).toBe('res_1');
+      expect(res.modes[0].modeId).toBe('editing');
+    });
+
+    it('getViewers 无 modeId → client.viewers.list；有 modeId → resolve', async () => {
+      const client = makeMockClient();
+      client.viewers.list.mockResolvedValue({ viewers: [{ viewerId: 'viewer.generic-preview' }] });
+      client.viewers.resolve.mockResolvedValue({
+        viewers: [{ viewerId: 'viewer.markdown-editor' }],
+      });
+      const service = new LoCoreService({ LoClient: class {} });
+      service.client = client;
+
+      const all = await service.getViewers();
+      expect(client.viewers.list).toHaveBeenCalled();
+      expect(all.viewers[0].viewerId).toBe('viewer.generic-preview');
+
+      const byMode = await service.getViewers('editing');
+      expect(client.viewers.resolve).toHaveBeenCalledWith('editing');
+      expect(byMode.viewers[0].viewerId).toBe('viewer.markdown-editor');
+    });
+
+    it('未配置时报错', async () => {
+      const service = new LoCoreService({});
+      const res = await service.getModes();
       expect(res.ok).toBe(false);
       expect(res.message).toContain('configure');
     });

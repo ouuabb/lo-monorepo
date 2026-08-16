@@ -31,6 +31,9 @@ const CHANNEL = {
   RESOURCE_LOCATION: 'lo-core:resource-location',
   REVEAL_RESOURCE: 'lo-core:reveal-resource',
   GRAPH: 'lo-core:graph',
+  MODES_LIST: 'lo-core:modes',
+  MODES_RESOLVE: 'lo-core:modes-resolve',
+  VIEWERS_LIST: 'lo-core:viewers',
   PLUGINS_LIST: 'agent-plugins:list-commands',
   PLUGINS_EXECUTE: 'agent-plugins:execute-command',
   PLUGINS_VIEWS: 'agent-plugins:list-views',
@@ -69,6 +72,13 @@ contextBridge.exposeInMainWorld('loAgent', {
     },
     revealResource: (rid) => ipcRenderer.invoke(CHANNEL.REVEAL_RESOURCE, rid),
     graph: (query) => ipcRenderer.invoke(CHANNEL.GRAPH, query),
+    modes: {
+      list: () => ipcRenderer.invoke(CHANNEL.MODES_LIST),
+      resolve: (rid) => ipcRenderer.invoke(CHANNEL.MODES_RESOLVE, rid),
+    },
+    viewers: {
+      list: (modeId) => ipcRenderer.invoke(CHANNEL.VIEWERS_LIST, modeId),
+    },
     listNotes: (query) => ipcRenderer.invoke(CHANNEL.LIST_NOTES, query),
     getNote: (rid) => ipcRenderer.invoke(CHANNEL.GET_NOTE, rid),
     createNote: (body) => ipcRenderer.invoke(CHANNEL.CREATE_NOTE, body),

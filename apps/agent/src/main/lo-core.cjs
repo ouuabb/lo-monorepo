@@ -404,6 +404,52 @@ class LoCoreService {
     }
   }
 
+  /**
+   * 获取 Core Usage Mode 列表（U1；builtin + 插件）
+   * @returns {Promise<{ ok: true, modes: Array<{ modeId, semantics, rules }> }>}
+   */
+  async getModes() {
+    try {
+      this._ensureClient();
+      const data = await this.client.modes.list();
+      return { ok: true, modes: data.modes };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
+  /**
+   * 解析资源的可用 Mode（U1）
+   * @param {string} rid
+   * @returns {Promise<{ ok: true, resource: string, modes: Array }>}
+   */
+  async resolveModes(rid) {
+    try {
+      this._ensureClient();
+      const data = await this.client.modes.resolve(rid);
+      return { ok: true, resource: data.resource, modes: data.modes };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
+  /**
+   * 获取 Core Usage Viewer 列表（U1；可选按 mode 过滤）
+   * @param {string} [modeId]
+   * @returns {Promise<{ ok: true, viewers: Array }>}
+   */
+  async getViewers(modeId) {
+    try {
+      this._ensureClient();
+      const data = modeId
+        ? await this.client.viewers.resolve(modeId)
+        : await this.client.viewers.list();
+      return { ok: true, viewers: data.viewers };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
   /** 关闭当前事件订阅 */
   unsubscribeEvents() {
     if (this._eventSub) {

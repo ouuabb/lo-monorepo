@@ -119,6 +119,25 @@ describe('src/preload/index.cjs', () => {
     expect(res.graph).toEqual({ nodes: [], edges: [] });
   });
 
+  it('loCore.modes / viewers 经白名单通道透传（U1）', async () => {
+    require('../../src/preload/index.cjs');
+    const { mockExposeInMainWorld, mockInvoke } = require('electron').__mocks;
+    const api = mockExposeInMainWorld.mock.calls[0][1];
+    mockInvoke.mockResolvedValue({ ok: true, modes: [{ modeId: 'editing' }] });
+    expect(api.loCore.modes.list).toBeDefined();
+    expect(api.loCore.modes.resolve).toBeDefined();
+    expect(api.loCore.viewers.list).toBeDefined();
+
+    await api.loCore.modes.list();
+    expect(mockInvoke).toHaveBeenLastCalledWith('lo-core:modes');
+
+    await api.loCore.modes.resolve('res_1');
+    expect(mockInvoke).toHaveBeenLastCalledWith('lo-core:modes-resolve', 'res_1');
+
+    await api.loCore.viewers.list('reading');
+    expect(mockInvoke).toHaveBeenLastCalledWith('lo-core:viewers', 'reading');
+  });
+
   it('pluginUi 桥暴露 mount/render/dispose（isolated world）', () => {
     require('../../src/preload/index.cjs');
     const { mockExposeInMainWorld } = require('electron').__mocks;

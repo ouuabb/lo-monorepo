@@ -883,4 +883,49 @@ describe('notes.upload（multipart 构造）', () => {
       LoApiError,
     );
   });
+
+  describe('modes namespace', () => {
+    it('list → GET /api/modes', async () => {
+      const { client, calls } = makeClient(() =>
+        Promise.resolve({ status: 200, body: { modes: [{ modeId: 'editing' }] }, headers: {} }),
+      );
+      fakeAuthed(client);
+      const res = await client.modes.list();
+      expect(res.modes[0].modeId).toBe('editing');
+      expect(calls[0].method).toBe('GET');
+      expect(calls[0].url).toBe('http://127.0.0.1:8765/api/modes');
+    });
+
+    it('resolve(rid) → GET /api/modes/:rid（rid 编码）', async () => {
+      const { client, calls } = makeClient(() =>
+        Promise.resolve({ status: 200, body: { resource: 'res_1', modes: [] }, headers: {} }),
+      );
+      fakeAuthed(client);
+      const res = await client.modes.resolve('res_1');
+      expect(res.resource).toBe('res_1');
+      expect(calls[0].url).toBe('http://127.0.0.1:8765/api/modes/res_1');
+    });
+  });
+
+  describe('viewers namespace', () => {
+    it('list() → GET /api/viewers（无 query）', async () => {
+      const { client, calls } = makeClient(() =>
+        Promise.resolve({ status: 200, body: { viewers: [] }, headers: {} }),
+      );
+      fakeAuthed(client);
+      await client.viewers.list();
+      expect(calls[0].method).toBe('GET');
+      expect(calls[0].url).toBe('http://127.0.0.1:8765/api/viewers');
+    });
+
+    it('resolve(modeId) → GET /api/viewers?mode=:id', async () => {
+      const { client, calls } = makeClient(() =>
+        Promise.resolve({ status: 200, body: { viewers: [] }, headers: {} }),
+      );
+      fakeAuthed(client);
+      await client.viewers.resolve('reading');
+      expect(calls[0].url).toContain('/api/viewers?');
+      expect(calls[0].url).toContain('mode=reading');
+    });
+  });
 });

@@ -25,6 +25,9 @@ function makeService() {
     resolveResourceLocation: jest.fn(async (rid) => ({ ok: true, resolved: { kind: 'local', resolved: true, absolutePath: '/tmp/lo-demo/resources/a.md' } })),
     revealResource: jest.fn(async (rid) => ({ ok: true })),
     getGraph: jest.fn(async (query) => ({ ok: true, graph: { nodes: [], edges: [] } })),
+    getModes: jest.fn(async () => ({ ok: true, modes: [{ modeId: 'editing' }] })),
+    resolveModes: jest.fn(async (rid) => ({ ok: true, resource: rid, modes: [{ modeId: 'editing' }] })),
+    getViewers: jest.fn(async (modeId) => ({ ok: true, viewers: [{ viewerId: 'viewer.generic-preview' }] })),
   };
 }
 
@@ -57,7 +60,10 @@ describe('registerLoCoreIpc', () => {
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.RESOURCE_LOCATION, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.REVEAL_RESOURCE, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.GRAPH, expect.any(Function));
-    expect(ipcMain.handle.mock.calls.length).toBe(23);
+    expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.MODES_LIST, expect.any(Function));
+    expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.MODES_RESOLVE, expect.any(Function));
+    expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.VIEWERS_LIST, expect.any(Function));
+    expect(ipcMain.handle.mock.calls.length).toBe(26);
   });
 
   it('Repository 通道委托 service（info / resolveLocation）', async () => {
@@ -96,6 +102,29 @@ describe('registerLoCoreIpc', () => {
     const res = await byChannel(CHANNELS.GRAPH)({}, { limit: 50 });
     expect(service.getGraph).toHaveBeenCalledWith({ limit: 50 });
     expect(res.graph).toEqual({ nodes: [], edges: [] });
+  });
+
+  it('Mode/Viewer 通道委托 service', async () => {
+    const ipcMain = { handle: jest.fn() };
+    const service = makeService();
+    registerLoCoreIpc(ipcMain, service);
+    const byChannel = (ch) => ipcMain.handle.mock.calls.find(([c]) => c === ch)[1];
+
+    const modes = await byChannel(CHANNELS.MODES_LIST)();
+    expect(service.getModes).toHaveBeenCalled();
+    expect(modes.modes[0].modeId).toBe('editing');
+
+    const resolved = await byChannel(CHANNELS.MODES_RESOLVE)({}, 'res_1');
+    expect(service.resolveModes).toHaveBeenCalledWith('res_1');
+    expect(resolved.resource).toBe('res_1');
+
+    const viewers = await byChannel(CHANNELS.VIEWERS_LIST)({}, 'reading');
+    expect(service.getViewers).toHaveBeenCalledWith('reading');
+    expect(viewers.viewers[0].viewerId).toBe('viewer.generic-preview');
+
+    const allViewers = await byChannel(CHANNELS.VIEWERS_LIST)({}, undefined);
+    expect(service.getViewers).toHaveBeenCalledWith(null);
+    expect(allViewers.viewers).toHaveLength(1);
   });
 
   it('handler 委托并传参', async () => {
