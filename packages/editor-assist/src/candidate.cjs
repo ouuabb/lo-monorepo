@@ -12,7 +12,9 @@
  *   - token 非空 → search(token)
  *   - 去重：按 name 精确去重（保留首次出现）
  *   - 排序：保持数据源返回顺序（listRecent 已 created DESC；search 已按评分）
- *   - 插入文本：`[[name]]`；替换范围 = [startOffset, endOffset]（由 trigger 给出）
+ *   - 插入文本：`name]]`——触发语义为「光标已在 `[[` 之后」，插入后即形成完整 `[[name]]`；
+ *     不返回替换 range（Monaco 按光标 word 推断，覆盖已输入 token）——返回带起始于
+ *     `[[` 的 range 会被 Monaco 校验丢弃（range.start < 光标 word 起点）。
  */
 
 /**
@@ -47,7 +49,7 @@ async function buildCandidates({ text, cursorOffset, source, limit = 20 }) {
     suggestions.push({
       label: item.name,
       detail: item.type ? `type: ${item.type}` : undefined,
-      insertText: `[[${item.name}]]`,
+      insertText: `${item.name}]]`,
     });
     if (suggestions.length >= limit) break;
   }

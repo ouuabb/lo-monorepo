@@ -33,6 +33,7 @@
 | `MODES_LIST` | `lo-core:modes` | `apps/agent/src/main/ipc.cjs` |
 | `MODES_RESOLVE` | `lo-core:modes-resolve` | `apps/agent/src/main/ipc.cjs` |
 | `VIEWERS_LIST` | `lo-core:viewers` | `apps/agent/src/main/ipc.cjs` |
+| `SEARCH` | `lo-core:search` | `apps/agent/src/main/ipc.cjs` |
 
 ## agent-plugins:*（插件能力白名单）
 

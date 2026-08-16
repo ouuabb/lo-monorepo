@@ -32,8 +32,8 @@ describe('buildCandidates', () => {
     expect(source.search).not.toHaveBeenCalled();
     expect(r.range).toEqual({ start: 4, end: 6 });
     expect(r.suggestions).toEqual([
-      { label: '笔记一', detail: 'type: note', insertText: '[[笔记一]]' },
-      { label: '笔记二', detail: 'type: note', insertText: '[[笔记二]]' },
+      { label: '笔记一', detail: 'type: note', insertText: '笔记一]]' },
+      { label: '笔记二', detail: 'type: note', insertText: '笔记二]]' },
     ]);
   });
 
@@ -44,7 +44,7 @@ describe('buildCandidates', () => {
     expect(source.listRecent).not.toHaveBeenCalled();
     expect(r.token).toBe('J');
     expect(r.range).toEqual({ start: 0, end: 3 });
-    expect(r.suggestions[0].insertText).toBe('[[JavaScript 笔记]]');
+    expect(r.suggestions[0].insertText).toBe('JavaScript 笔记]]');
   });
 
   test('去重：同 name 只保留首次出现', async () => {

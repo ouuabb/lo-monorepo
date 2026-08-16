@@ -8,7 +8,9 @@
  * 行为：
  *   [[        → 最近笔记候选（notes.list，created DESC）
  *   [[J       → search("J") 模糊候选
- *   选择候选   → 插入 [[name]]（替换 [[ 到光标的文本）
+ *   选择候选   → 在光标处插入 `name]]`（光标已在 `[[` 之后 → 形成 `[[name]]`；
+ *               不提供 range——Monaco 按光标 word 推断替换范围，覆盖已输入 token；
+ *               带起始于 `[[` 的 range 会被 Monaco 校验丢弃）
  */
 import * as monaco from 'monaco-editor/editor/editor.api';
 import { detectWikilinkTrigger, buildCandidates } from '@lo/editor-assist';
@@ -45,22 +47,17 @@ export function registerWikilinkCompletion(loCore) {
       const trigger = detectWikilinkTrigger(text, cursorOffset);
       if (!trigger) return { suggestions: [] };
 
-      const range = new monaco.Range(
-        model.getPositionAt(trigger.startOffset).lineNumber,
-        model.getPositionAt(trigger.startOffset).column,
-        position.lineNumber,
-        position.column,
-      );
-
       return buildCandidates({ text, cursorOffset, source })
         .then((result) => {
           if (!result) return { suggestions: [] };
+          // filterText = token + label：`[[J` 场景光标 word='J' 时放行（候选已由 search 产生）
+          const prefix = result.token || '';
           const items = result.suggestions.map((s) => ({
             label: s.label,
             kind: monaco.languages.CompletionItemKind.Reference,
             detail: s.detail,
             insertText: s.insertText,
-            range,
+            filterText: prefix ? prefix + s.label : undefined,
           }));
           return { suggestions: items };
         })

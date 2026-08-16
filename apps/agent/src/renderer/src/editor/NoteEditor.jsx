@@ -8,6 +8,8 @@
 import { useEffect, useRef } from 'react';
 import * as monaco from 'monaco-editor/editor/editor.api';
 import 'monaco-editor/languages/definitions/markdown/register';
+// editor.api 不含 suggest contrib：显式引入 suggestController（word-based 随 editorWorkerService 已加载）
+import 'monaco-editor/editor/contrib/suggest/browser/suggestController.js';
 import editorWorker from 'monaco-editor/editor/editor.worker?worker';
 import { registerWikilinkCompletion } from './wikilinkCompletion.js';
 
