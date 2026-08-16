@@ -1,7 +1,7 @@
 /**
  * KnowledgeTimeline — 知识演化分析
  *
- * Phase 5.7: 利用 container_operations 表分析知识增长趋势。
+ * Phase 5.7: 利用 operations 表分析知识增长趋势。
  * 不修改数据，只做聚合分析。
  */
 
@@ -104,7 +104,7 @@ class KnowledgeTimeline {
   _queryOps() {
     return new Promise((resolve, reject) => {
       this.db.db.all(
-        `SELECT type, created FROM container_operations ORDER BY created ASC`,
+        `SELECT type, created FROM operations ORDER BY created ASC`,
         [],
         (err, rows) => {
           if (err) reject(err);

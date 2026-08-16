@@ -48,7 +48,7 @@ describe('OperationEngine', () => {
       expect(result.result).toEqual({ ok: true, path: 'a.md' });
       expect(handler.execute).toHaveBeenCalledTimes(1);
 
-      const op = await db.get('SELECT * FROM container_operations WHERE operation_id = ?', [result.operationId]);
+      const op = await db.get('SELECT * FROM operations WHERE operation_id = ?', [result.operationId]);
       expect(op.status).toBe('success');
       expect(op.container_rid).toBe(SYSTEM);
       expect(op.member_path).toBe('a.md');
@@ -59,7 +59,7 @@ describe('OperationEngine', () => {
     test('should default containerRid to system and accept memberPath', async () => {
       registerHandler('test.op');
       const { operationId } = await engine.execute('test.op', { memberPath: 'x.md' });
-      const op = await db.get('SELECT * FROM container_operations WHERE operation_id = ?', [operationId]);
+      const op = await db.get('SELECT * FROM operations WHERE operation_id = ?', [operationId]);
       expect(op.container_rid).toBe(SYSTEM);
       expect(op.member_path).toBe('x.md');
     });
@@ -67,7 +67,7 @@ describe('OperationEngine', () => {
     test('should record transactionId and actor', async () => {
       registerHandler('test.op');
       const { operationId } = await engine.execute('test.op', {}, { transactionId: 'tx_1', actor: 'alice' });
-      const op = await db.get('SELECT * FROM container_operations WHERE operation_id = ?', [operationId]);
+      const op = await db.get('SELECT * FROM operations WHERE operation_id = ?', [operationId]);
       expect(op.transaction_id).toBe('tx_1');
       expect(op.actor).toBe('alice');
     });
@@ -75,7 +75,7 @@ describe('OperationEngine', () => {
     test('should mark op as failed and rethrow when handler throws', async () => {
       registerHandler('test.op', { execute: jest.fn(async () => { throw new Error('boom'); }) });
       await expect(engine.execute('test.op', {})).rejects.toThrow('boom');
-      const rows = await db.all('SELECT * FROM container_operations');
+      const rows = await db.all('SELECT * FROM operations');
       expect(rows).toHaveLength(1);
       expect(rows[0].status).toBe('failed');
       expect(rows[0].error).toBe('boom');
@@ -103,7 +103,7 @@ describe('OperationEngine', () => {
     test('should throw when operation is not success', async () => {
       registerHandler('test.op', { execute: jest.fn(async () => { throw new Error('x'); }) });
       await expect(engine.execute('test.op', {})).rejects.toThrow();
-      const rows = await db.all('SELECT operation_id FROM container_operations');
+      const rows = await db.all('SELECT operation_id FROM operations');
       await expect(engine.undo(rows[0].operation_id)).rejects.toThrow('只能撤销成功的操作');
     });
 
@@ -111,7 +111,7 @@ describe('OperationEngine', () => {
       registerHandler('test.op');
       const { operationId } = await engine.execute('test.op', {});
       const { operationId: undoId } = await engine.execute('test.op', {}, { parentOperationId: operationId });
-      await db.run('UPDATE container_operations SET status = ? WHERE operation_id = ?', ['success', undoId]);
+      await db.run('UPDATE operations SET status = ? WHERE operation_id = ?', ['success', undoId]);
       await expect(engine.undo(operationId)).rejects.toThrow('操作已被撤销');
     });
 
@@ -131,9 +131,9 @@ describe('OperationEngine', () => {
       expect(undoParams.operationResult).toEqual({ newPath: 'b.md' });
       expect(undoParams.operation.operation_id).toBe(operationId);
 
-      const original = await db.get('SELECT status FROM container_operations WHERE operation_id = ?', [operationId]);
+      const original = await db.get('SELECT status FROM operations WHERE operation_id = ?', [operationId]);
       expect(original.status).toBe('rolled_back');
-      const undoOp = await db.get('SELECT * FROM container_operations WHERE operation_id = ?', [result.undoOperationId]);
+      const undoOp = await db.get('SELECT * FROM operations WHERE operation_id = ?', [result.undoOperationId]);
       expect(undoOp.type).toBe('undo.test.op');
       expect(undoOp.parent_operation_id).toBe(operationId);
       expect(undoOp.status).toBe('success');
@@ -145,7 +145,7 @@ describe('OperationEngine', () => {
       });
       const { operationId } = await engine.execute('test.op', {});
       await expect(engine.undo(operationId)).rejects.toThrow('undo boom');
-      const rows = await db.all('SELECT type, status FROM container_operations ORDER BY created');
+      const rows = await db.all('SELECT type, status FROM operations ORDER BY created');
       expect(rows[1].type).toBe('undo.test.op');
       expect(rows[1].status).toBe('failed');
     });
@@ -164,9 +164,9 @@ describe('OperationEngine', () => {
       const [redoParams] = handler.execute.mock.calls[1].slice(1);
       expect(redoParams.memberPath).toBe('a.md');
 
-      const original = await db.get('SELECT status FROM container_operations WHERE operation_id = ?', [operationId]);
+      const original = await db.get('SELECT status FROM operations WHERE operation_id = ?', [operationId]);
       expect(original.status).toBe('rolled_back');
-      const undoOp = await db.get('SELECT status FROM container_operations WHERE operation_id = ?', [undoOperationId]);
+      const undoOp = await db.get('SELECT status FROM operations WHERE operation_id = ?', [undoOperationId]);
       expect(undoOp.status).toBe('rolled_back');
     });
 
@@ -174,7 +174,7 @@ describe('OperationEngine', () => {
       registerHandler('test.op', { execute: jest.fn(), undo: jest.fn() });
       const { operationId } = await engine.execute('test.op', {});
       const { undoOperationId } = await engine.undo(operationId);
-      await db.run('DELETE FROM container_operations WHERE operation_id = ?', [operationId]);
+      await db.run('DELETE FROM operations WHERE operation_id = ?', [operationId]);
       await expect(engine.undo(undoOperationId)).rejects.toThrow('找不到被撤销的原始操作');
     });
   });
@@ -233,9 +233,9 @@ describe('OperationEngine', () => {
       registerHandler('test.op');
       const direct = await engine.execute('test.op', { memberPath: 'm.md' });
       const byBefore = await engine.execute('test.op', { containerRid: SYSTEM, path: 'old.md' });
-      await db.run('UPDATE container_operations SET before = ? WHERE operation_id = ?', [JSON.stringify({ path: 'old.md' }), byBefore.operationId]);
+      await db.run('UPDATE operations SET before = ? WHERE operation_id = ?', [JSON.stringify({ path: 'old.md' }), byBefore.operationId]);
       const byAfter = await engine.execute('test.op', { containerRid: SYSTEM, memberPath: 'z.md' });
-      await db.run('UPDATE container_operations SET after = ? WHERE operation_id = ?', [JSON.stringify({ newPath: 'z.md' }), byAfter.operationId]);
+      await db.run('UPDATE operations SET after = ? WHERE operation_id = ?', [JSON.stringify({ newPath: 'z.md' }), byAfter.operationId]);
 
       const forM = await engine.getMemberHistory(SYSTEM, 'm.md');
       expect(forM.map(o => o.operation_id)).toEqual([direct.operationId]);

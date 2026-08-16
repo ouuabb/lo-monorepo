@@ -198,7 +198,7 @@ Agent(agt_research)
 
 **Context 不属于 Operation，Operation 只保存 context 快照。**
 
-OperationRecord 在现有 `container_operations` 基础上增加一列（或替代现有 `actor` 列）：
+OperationRecord 在现有 `operations` 基础上增加一列（或替代现有 `actor` 列）：
 
 ```json
 {

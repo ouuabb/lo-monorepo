@@ -102,7 +102,7 @@ density = relation_count / resource_count
 
 **KnowledgeTimeline：**
 
-利用 container_operations 表分析知识增长趋势，纯聚合分析，不修改数据。
+利用 operations 表分析知识增长趋势，纯聚合分析，不修改数据。
 
 **monthly()** — 按月统计操作：
 

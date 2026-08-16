@@ -18,7 +18,7 @@ lo operation types
 
 操作类型来自 `src/operations/` 目录自动加载的 handler（`loadOperations` 注册到仓库的 `operationRegistry`，见 `src/operations/index.cjs`），涵盖容器成员操作（`member.*`）、关系操作（`relation.*`）、资源生命周期操作（`resource.create/update/delete/move`）、Schema / View / Automation 定义操作（`schema.*` / `view.*` / `automation.*`）与工作流状态转换（`workflow.transition`）。
 
-每个 handler 由 `execute`（正向执行）与 `undo`（逆向恢复）组成，所有变更经 OperationEngine 记录到 `container_operations` 审计表，可被 `lo undo <operation>` 或 `lo container transaction undo` 回滚。
+每个 handler 由 `execute`（正向执行）与 `undo`（逆向恢复）组成，所有变更经 OperationEngine 记录到 `operations` 审计表，可被 `lo undo <operation>` 或 `lo container transaction undo` 回滚。
 
 ### 相关命令
 

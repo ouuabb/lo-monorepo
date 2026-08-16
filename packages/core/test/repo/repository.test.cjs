@@ -856,11 +856,11 @@ describe('Repository', () => {
 
     await repo.db.run('INSERT INTO container_members (container_rid, path, name, status) VALUES (?, ?, ?, ?)', [p1.rid, 'bad-status.md', 'bad-status.md', 'invalid_status']);
     await repo.db.run(
-      'INSERT INTO container_operations (operation_id, container_rid, type, before, created, transaction_id) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO operations (operation_id, container_rid, type, before, created, transaction_id) VALUES (?, ?, ?, ?, ?, ?)',
       ['op_bad_json', p1.rid, 'member.add', 'not-json', Date.now(), null]
     );
     await repo.db.run(
-      'INSERT INTO container_operations (operation_id, container_rid, type, before, created, transaction_id) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO operations (operation_id, container_rid, type, before, created, transaction_id) VALUES (?, ?, ?, ?, ?, ?)',
       ['op_bad_tx', p1.rid, 'member.add', '{"x":1}', Date.now(), 'tx_missing_1']
     );
     await repo.db.run(

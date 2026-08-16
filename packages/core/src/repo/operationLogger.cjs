@@ -53,7 +53,7 @@ class OperationLogger {
     const created = Date.now();
 
     await this.db.run(
-      `INSERT INTO container_operations (operation_id, container_rid, type, member_id, member_path, source_id, before, after, created)
+      `INSERT INTO operations (operation_id, container_rid, type, member_id, member_path, source_id, before, after, created)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         operationId,
@@ -81,7 +81,7 @@ class OperationLogger {
   async getHistory(containerRid, options = {}) {
     const { limit = 50, type = null } = options;
 
-    let sql = "SELECT * FROM container_operations WHERE container_rid = ?";
+    let sql = "SELECT * FROM operations WHERE container_rid = ?";
     const params = [containerRid];
 
     if (type) {
@@ -110,7 +110,7 @@ class OperationLogger {
   async getMemberHistory(containerRid, memberPath) {
     // 按路径匹配（考虑 rename 后的路径变化）
     const rows = await this.db.all(
-      `SELECT * FROM container_operations
+      `SELECT * FROM operations
        WHERE container_rid = ?
        ORDER BY created DESC`,
       [containerRid],
@@ -139,7 +139,7 @@ class OperationLogger {
    */
   async getOperation(operationId) {
     const row = await this.db.get(
-      "SELECT * FROM container_operations WHERE operation_id = ?",
+      "SELECT * FROM operations WHERE operation_id = ?",
       [operationId],
     );
     if (!row) return null;
@@ -170,7 +170,7 @@ class OperationLogger {
 
     // 检查是否已经被撤销（查找类型为 undo_+type 的新操作）
     const existingUndo = await this.db.get(
-      `SELECT id FROM container_operations WHERE type = ? AND created > ? AND container_rid = ?`,
+      `SELECT id FROM operations WHERE type = ? AND created > ? AND container_rid = ?`,
       [`undo_${op.type}`, op.created, op.container_rid],
     );
     if (existingUndo) {

@@ -44,7 +44,7 @@ describe('OperationLogger', () => {
         after: { path: 'b.md' }
       });
       expect(operationId).toMatch(/^op_[0-9a-f]{8}$/);
-      const row = await db.get('SELECT * FROM container_operations WHERE operation_id = ?', [operationId]);
+      const row = await db.get('SELECT * FROM operations WHERE operation_id = ?', [operationId]);
       expect(row.type).toBe('member_renamed');
       expect(row.member_path).toBe('a.md');
       expect(row.source_id).toBe(7);
@@ -54,7 +54,7 @@ describe('OperationLogger', () => {
 
     test('should allow null before/after snapshots', async () => {
       const { operationId } = await logger.recordOp({ containerRid: '__system__', type: 'member_removed' });
-      const row = await db.get('SELECT before, after FROM container_operations WHERE operation_id = ?', [operationId]);
+      const row = await db.get('SELECT before, after FROM operations WHERE operation_id = ?', [operationId]);
       expect(row.before).toBeNull();
       expect(row.after).toBeNull();
     });
@@ -128,7 +128,7 @@ describe('OperationLogger', () => {
       const result = await logger.undo(operationId);
       expect(result).toEqual({ undone: true, undoOpId: operationId });
       expect(containerService.renameMember).toHaveBeenCalledWith('c1', 'b.md', 'a.md');
-      const rows = await db.all("SELECT type FROM container_operations WHERE type = 'undo_member_renamed'");
+      const rows = await db.all("SELECT type FROM operations WHERE type = 'undo_member_renamed'");
       expect(rows).toHaveLength(1);
     });
 

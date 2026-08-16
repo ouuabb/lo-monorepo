@@ -3,7 +3,7 @@
 
 module.exports = {
   id: '001_initial_schema',
-  description: 'Create full initial database schema (40 tables)',
+  description: 'Create full initial database schema (62 tables)',
 
   async up(db) {
     // ======================== 核心资源表 ========================
@@ -25,7 +25,8 @@ module.exports = {
       );
       CREATE INDEX IF NOT EXISTS idx_resources_type ON resources(type);
       CREATE INDEX IF NOT EXISTS idx_resources_location ON resources(location);
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_resources_name_layer ON resources(name, layer);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_resources_name_layer
+        ON resources(name, layer) WHERE deleted = 0;
       -- 同文件仅一条活跃 layer-0 记录（name-stack 的 layer>0 版本共享 location；
       -- 唯一性限定 local：external 同一文件可被多个 Resource 引用（016 D4 无全局唯一要求）；
       -- location='' 虚拟资源不受约束）
@@ -195,7 +196,7 @@ module.exports = {
     `);
 
     await db.exec(`
-      CREATE TABLE IF NOT EXISTS container_operations (
+      CREATE TABLE IF NOT EXISTS operations (
         id                  INTEGER PRIMARY KEY AUTOINCREMENT,
         operation_id        TEXT UNIQUE NOT NULL,
         container_rid       TEXT NOT NULL,
@@ -214,12 +215,12 @@ module.exports = {
         FOREIGN KEY(container_rid) REFERENCES resources(rid) ON DELETE CASCADE,
         FOREIGN KEY(member_id) REFERENCES container_members(id) ON DELETE SET NULL
       );
-      CREATE INDEX IF NOT EXISTS idx_ops_container ON container_operations(container_rid);
-      CREATE INDEX IF NOT EXISTS idx_ops_type ON container_operations(type);
-      CREATE INDEX IF NOT EXISTS idx_ops_member ON container_operations(member_id);
-      CREATE INDEX IF NOT EXISTS idx_ops_parent ON container_operations(parent_operation_id);
-      CREATE INDEX IF NOT EXISTS idx_ops_status ON container_operations(status);
-      CREATE INDEX IF NOT EXISTS idx_ops_transaction ON container_operations(transaction_id);
+      CREATE INDEX IF NOT EXISTS idx_ops_container ON operations(container_rid);
+      CREATE INDEX IF NOT EXISTS idx_ops_type ON operations(type);
+      CREATE INDEX IF NOT EXISTS idx_ops_member ON operations(member_id);
+      CREATE INDEX IF NOT EXISTS idx_ops_parent ON operations(parent_operation_id);
+      CREATE INDEX IF NOT EXISTS idx_ops_status ON operations(status);
+      CREATE INDEX IF NOT EXISTS idx_ops_transaction ON operations(transaction_id);
     `);
 
     await db.exec(`
@@ -278,23 +279,7 @@ module.exports = {
         metadata    TEXT,
         relations   TEXT DEFAULT '[]',
         created_at  INTEGER
-      );
-
-      CREATE TABLE IF NOT EXISTS ai_interactions (
-        id        INTEGER PRIMARY KEY AUTOINCREMENT,
-        request   TEXT,
-        response  TEXT,
-        actions   TEXT,
-        created_at INTEGER
-      );
-
-      CREATE TABLE IF NOT EXISTS ai_learning (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        pattern     TEXT,
-        feedback    TEXT,
-        adjustment  TEXT,
-        created_at  INTEGER
-      );
+      );
     `);
 
     // ======================== 知识事件 / 快照 ========================
@@ -753,5 +738,59 @@ module.exports = {
        VALUES ('__system__', '__system__', 0, 'system', 'virtual', '', '', '{}', 0, ?, ?)`,
       [now, now]
     );
+    // ======================== Automation（002 并入）======================
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS automations (
+        id          TEXT PRIMARY KEY,
+        name        TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        source      TEXT DEFAULT '{}',
+        trigger     TEXT DEFAULT '{}',
+        condition   TEXT DEFAULT '{}',
+        actions     TEXT DEFAULT '[]',
+        policy      TEXT DEFAULT '{}',
+        status      TEXT DEFAULT 'active',
+        created     INTEGER,
+        updated     INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_automations_status ON automations(status);
+
+      CREATE TABLE IF NOT EXISTS automation_runs (
+        id                TEXT PRIMARY KEY,
+        automation_id     TEXT NOT NULL,
+        trigger_source    TEXT DEFAULT 'cli',
+        execution_context TEXT DEFAULT '{}',
+        actions_result    TEXT DEFAULT '[]',
+        status            TEXT DEFAULT 'running',
+        started           INTEGER,
+        finished          INTEGER,
+        error             TEXT DEFAULT ''
+      );
+      CREATE INDEX IF NOT EXISTS idx_automation_runs_automation_id ON automation_runs(automation_id);
+      CREATE INDEX IF NOT EXISTS idx_automation_runs_status ON automation_runs(status);
+      CREATE INDEX IF NOT EXISTS idx_automation_runs_started ON automation_runs(started);
+    `);
+
+    // ======================== Usage Layer（Mode/Viewer 定义）==============
+    // builtin Mode/Viewer 以 Core 代码注册为准（U1）；插件贡献落此表。
+    // 命名映射：列名 snake_case；JSON 数据内部 camelCase（仅序列化边界）。
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS mode_definitions (
+        mode_id    TEXT PRIMARY KEY,
+        semantics  TEXT NOT NULL,
+        applies_to TEXT NOT NULL,
+        rules      TEXT NOT NULL,
+        plugin_id  TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS viewer_definitions (
+        viewer_id TEXT PRIMARY KEY,
+        label     TEXT NOT NULL,
+        semantics TEXT NOT NULL,
+        supports  TEXT NOT NULL,
+        plugin_id TEXT
+      );
+    `);
+
   }
 };

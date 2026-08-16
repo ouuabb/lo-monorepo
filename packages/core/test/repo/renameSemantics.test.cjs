@@ -75,7 +75,7 @@ describe('Repository 命名语义（018 P3）', () => {
 
     // rename 经 operation，可撤销 → 恢复旧名（取最近 success 的 resource.update）
     const hist = await repo.db.all(
-      "SELECT operation_id FROM container_operations WHERE type = 'resource.update' AND status = 'success' ORDER BY created DESC",
+      "SELECT operation_id FROM operations WHERE type = 'resource.update' AND status = 'success' ORDER BY created DESC",
     );
     await repo.undoContainerOperation(hist[0].operation_id);
     const after = await repo.resourceService.getByRid(a.rid);

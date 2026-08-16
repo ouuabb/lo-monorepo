@@ -1469,7 +1469,7 @@ class Repository {
 
     // 2. Operation 检查
     const ops = await this.db.all(
-      "SELECT * FROM container_operations WHERE container_rid = ?",
+      "SELECT * FROM operations WHERE container_rid = ?",
       [containerRid],
     );
 

@@ -12,7 +12,7 @@ const Repository = require('../../src/repo/repository.cjs');
 
 async function countOps(repo, type) {
   const rows = await repo.db.all(
-    'SELECT operation_id, type, container_rid FROM container_operations WHERE type = ?',
+    'SELECT operation_id, type, container_rid FROM operations WHERE type = ?',
     [type],
   );
   return rows;

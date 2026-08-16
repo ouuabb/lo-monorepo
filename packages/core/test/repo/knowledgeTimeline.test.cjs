@@ -29,7 +29,7 @@ describe('KnowledgeTimeline', () => {
 
   async function addOp(operationId, type, createdSeconds) {
     await db.run(
-      `INSERT INTO container_operations (operation_id, container_rid, type, created) VALUES (?, ?, ?, ?)`,
+      `INSERT INTO operations (operation_id, container_rid, type, created) VALUES (?, ?, ?, ?)`,
       [operationId, 'container-1', type, createdSeconds]
     );
   }

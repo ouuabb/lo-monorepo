@@ -7,7 +7,7 @@
  * 职责：
  *   1. 通过 Registry 查找 handler
  *   2. 管理操作状态生命周期（pending → success | failed | rollback）
- *   3. 持久化操作记录到 container_operations
+ *   3. 持久化操作记录到 operations
  *   4. 支持 undo（产生父子操作链）
  *
  * Phase 4.3 / 5.2
@@ -90,7 +90,7 @@ class OperationEngine {
 
     // 写入 pending 状态
     await this.db.run(
-      `INSERT INTO container_operations (operation_id, container_rid, type, member_path, source_id, status, parent_operation_id, transaction_id, actor, before, created)
+      `INSERT INTO operations (operation_id, container_rid, type, member_path, source_id, status, parent_operation_id, transaction_id, actor, before, created)
        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
       [
         operationId,
@@ -114,7 +114,7 @@ class OperationEngine {
 
       // 成功 → 写入 after 快照
       await this.db.run(
-        `UPDATE container_operations SET status = 'success', after = ? WHERE operation_id = ?`,
+        `UPDATE operations SET status = 'success', after = ? WHERE operation_id = ?`,
         [JSON.stringify(result), operationId],
       );
 
@@ -138,7 +138,7 @@ class OperationEngine {
     } catch (err) {
       // 失败 → 记录错误
       await this.db.run(
-        `UPDATE container_operations SET status = 'failed', error = ? WHERE operation_id = ?`,
+        `UPDATE operations SET status = 'failed', error = ? WHERE operation_id = ?`,
         [err.message, operationId],
       );
       throw err;
@@ -164,7 +164,7 @@ class OperationEngine {
 
     // 检查是否已被撤销
     const alreadyUndone = await this.db.get(
-      `SELECT id FROM container_operations WHERE parent_operation_id = ? AND status = 'success'`,
+      `SELECT id FROM operations WHERE parent_operation_id = ? AND status = 'success'`,
       [operationId],
     );
     if (alreadyUndone) {
@@ -192,7 +192,7 @@ class OperationEngine {
     const undoOperationId = this._genOpId();
 
     await this.db.run(
-      `INSERT INTO container_operations (operation_id, container_rid, type, member_path, source_id, status, parent_operation_id, actor, before, created)
+      `INSERT INTO operations (operation_id, container_rid, type, member_path, source_id, status, parent_operation_id, actor, before, created)
        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
       [
         undoOperationId,
@@ -213,18 +213,18 @@ class OperationEngine {
 
       // 标记 undo 成功 + 原操作标记为 rolled_back
       await this.db.run(
-        `UPDATE container_operations SET status = 'success', after = ? WHERE operation_id = ?`,
+        `UPDATE operations SET status = 'success', after = ? WHERE operation_id = ?`,
         [JSON.stringify(result), undoOperationId],
       );
       await this.db.run(
-        `UPDATE container_operations SET status = 'rolled_back' WHERE operation_id = ?`,
+        `UPDATE operations SET status = 'rolled_back' WHERE operation_id = ?`,
         [operationId],
       );
 
       return { undoOperationId, result };
     } catch (err) {
       await this.db.run(
-        `UPDATE container_operations SET status = 'failed', error = ? WHERE operation_id = ?`,
+        `UPDATE operations SET status = 'failed', error = ? WHERE operation_id = ?`,
         [err.message, undoOperationId],
       );
       throw err;
@@ -239,7 +239,7 @@ class OperationEngine {
     const { limit = 50, type = null } = options;
 
     let sql = `SELECT operation_id, container_rid, type, status, member_path, parent_operation_id, error, actor, before, after, created
-                 FROM container_operations WHERE container_rid = ?`;
+                 FROM operations WHERE container_rid = ?`;
     const params = [containerRid];
 
     if (type) {
@@ -277,7 +277,7 @@ class OperationEngine {
    */
   async getOperationsByTransaction(transactionId) {
     const rows = await this.db.all(
-      `SELECT * FROM container_operations WHERE transaction_id = ? ORDER BY created ASC`,
+      `SELECT * FROM operations WHERE transaction_id = ? ORDER BY created ASC`,
       [transactionId],
     );
     return rows.map((r) => ({
@@ -292,7 +292,7 @@ class OperationEngine {
    */
   async getMemberHistory(containerRid, memberPath) {
     const rows = await this.db.all(
-      `SELECT * FROM container_operations
+      `SELECT * FROM operations
        WHERE container_rid = ?
        ORDER BY created DESC`,
       [containerRid],
@@ -322,7 +322,7 @@ class OperationEngine {
    */
   async _getOp(operationId) {
     const row = await this.db.get(
-      "SELECT * FROM container_operations WHERE operation_id = ?",
+      "SELECT * FROM operations WHERE operation_id = ?",
       [operationId],
     );
     if (!row) return null;
@@ -354,7 +354,7 @@ class OperationEngine {
     // 重新创建 redo 操作记录
     const redoOpId = this._genOpId();
     await this.db.run(
-      `INSERT INTO container_operations (operation_id, container_rid, type, member_path, source_id, status, parent_operation_id, actor, before, created)
+      `INSERT INTO operations (operation_id, container_rid, type, member_path, source_id, status, parent_operation_id, actor, before, created)
        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
       [
         redoOpId,
@@ -375,18 +375,18 @@ class OperationEngine {
       const redoResult = await handler.execute(ctx, params);
 
       await this.db.run(
-        `UPDATE container_operations SET status = 'success', after = ? WHERE operation_id = ?`,
+        `UPDATE operations SET status = 'success', after = ? WHERE operation_id = ?`,
         [JSON.stringify(redoResult), redoOpId],
       );
       await this.db.run(
-        `UPDATE container_operations SET status = 'rolled_back' WHERE operation_id = ?`,
+        `UPDATE operations SET status = 'rolled_back' WHERE operation_id = ?`,
         [undoOp.operation_id],
       );
 
       return { undoOperationId: redoOpId, result: redoResult };
     } catch (err) {
       await this.db.run(
-        `UPDATE container_operations SET status = 'failed', error = ? WHERE operation_id = ?`,
+        `UPDATE operations SET status = 'failed', error = ? WHERE operation_id = ?`,
         [err.message, redoOpId],
       );
       throw err;

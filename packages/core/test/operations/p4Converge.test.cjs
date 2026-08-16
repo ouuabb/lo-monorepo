@@ -19,7 +19,7 @@ jest.mock('child_process', () => ({ exec: jest.fn() }));
 
 async function countOps(repo, type) {
   const rows = await repo.db.all(
-    'SELECT operation_id FROM container_operations WHERE type = ?',
+    'SELECT operation_id FROM operations WHERE type = ?',
     [type],
   );
   return rows;

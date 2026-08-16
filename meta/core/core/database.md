@@ -19,7 +19,7 @@ lo 使用 SQLite 作为本地数据库。
 | resource_sources | 资源内容来源绑定 |
 | container_members | 容器成员列表 |
 | container_ignore_patterns | 容器忽略规则（V24 从 container_schema JSON 迁移）|
-| container_operations | 容器操作审计日志 |
+| operations | 容器操作审计日志 |
 | container_transactions | 容器操作事务记录 |
 | staging_changes | 暂存区（V25 从 staging.json 迁移）|
 | roles | 角色定义 |
@@ -45,8 +45,6 @@ lo 使用 SQLite 作为本地数据库。
 | ai_memory | AI 语义记忆（V25 从内存持久化）|
 | ai_concepts | AI 概念记忆（V25 从内存持久化）|
 | ai_suggestions | AI 建议 |
-| ai_interactions | AI 交互记录 |
-| ai_learning | AI 学习记录 |
 | evolution_states | 自演化状态快照 |
 | evolution_actions | 自演化动作（V25 从内存持久化）|
 | evolution_history | 自演化历史 |
@@ -60,6 +58,10 @@ lo 使用 SQLite 作为本地数据库。
 | repositories | 外部仓库引用 |
 | plugins | 插件注册表 |
 | plugin_settings | 插件设置 |
+| automations | 自动化定义 |
+| automation_runs | 自动化执行记录 |
+| mode_definitions | Usage Mode 定义（builtin 以 Core 代码注册为准，U1；插件贡献落此表） |
+| viewer_definitions | Usage Viewer 定义（插件贡献落此表） |
 | events | 事件历史 |
 | runtime_instances | Runtime 实例 |
 | runtime_events | Runtime 事件 |
