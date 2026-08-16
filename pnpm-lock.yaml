@@ -35,6 +35,9 @@ importers:
       '@lo/client':
         specifier: workspace:*
         version: link:../../packages/client
+      '@lo/editor-assist':
+        specifier: workspace:*
+        version: link:../../packages/editor-assist
       d3:
         specifier: ^7.9.0
         version: 7.9.0
@@ -187,6 +190,18 @@ importers:
         version: 3.1.14
       prettier:
         specifier: ^3.2.5
+        version: 3.9.6
+
+  packages/editor-assist:
+    devDependencies:
+      eslint:
+        specifier: ^8.57.0
+        version: 8.57.1
+      jest:
+        specifier: ^29.7.0
+        version: 29.7.0(@types/node@26.2.0)
+      prettier:
+        specifier: ^3.4.2
         version: 3.9.6
 
   packages/plugins-sdk:

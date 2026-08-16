@@ -15,6 +15,7 @@ function makeMockClient(overrides = {}) {
     admin: { graph: jest.fn(), graphPath: jest.fn() },
     modes: { list: jest.fn(), resolve: jest.fn() },
     viewers: { list: jest.fn(), resolve: jest.fn() },
+    search: { search: jest.fn() },
     ...overrides,
   };
   return client;
@@ -678,8 +679,32 @@ describe('LoCoreService', () => {
     });
   });
 
-  describe('Usage Mode/Viewer（U1）', () => {
-    it('getModes 透传 client.modes.list', async () => {
+    describe('search（编辑器 [[ 补全数据源）', () => {
+    it('search(q) 透传 client.search.search(q)', async () => {
+      const client = makeMockClient();
+      client.search.search.mockResolvedValue({
+        query: 'J',
+        total: 2,
+        data: [{ rid: 'res_1', name: 'JavaScript 笔记' }],
+      });
+      const service = new LoCoreService({ LoClient: class {} });
+      service.client = client;
+      const res = await service.search('J');
+      expect(client.search.search).toHaveBeenCalledWith('J');
+      expect(res.ok).toBe(true);
+      expect(res.total).toBe(2);
+      expect(res.data[0].name).toBe('JavaScript 笔记');
+    });
+
+    it('未配置时报错', async () => {
+      const service = new LoCoreService({});
+      const res = await service.search('J');
+      expect(res.ok).toBe(false);
+      expect(res.message).toContain('configure');
+    });
+  });
+
+  describe('Usage Mode/Viewer（U1）', () => {    it('getModes 透传 client.modes.list', async () => {
       const client = makeMockClient();
       client.modes.list.mockResolvedValue({
         modes: [{ modeId: 'editing' }, { modeId: 'reading' }],

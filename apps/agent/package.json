@@ -42,6 +42,7 @@
   "dependencies": {
     "@lo/agent-plugins-sdk": "workspace:*",
     "@lo/client": "workspace:*",
+    "@lo/editor-assist": "workspace:*",
     "d3": "^7.9.0",
     "monaco-editor": "^0.56.0",
     "react": "^19.2.8",

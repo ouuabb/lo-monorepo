@@ -405,6 +405,21 @@ class LoCoreService {
   }
 
   /**
+   * 搜索资源（Fuse.js 模糊搜索；编辑器 [[ 补全候选数据源之一）
+   * @param {string} q — 查询词
+   * @returns {Promise<{ ok: true, query: string, total: number, data: Array }>}
+   */
+  async search(q) {
+    try {
+      this._ensureClient();
+      const result = await this.client.search.search(q);
+      return { ok: true, query: result.query, total: result.total, data: result.data };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
+  /**
    * 获取 Core Usage Mode 列表（U1；builtin + 插件）
    * @returns {Promise<{ ok: true, modes: Array<{ modeId, semantics, rules }> }>}
    */

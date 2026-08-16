@@ -9,12 +9,17 @@ import { useEffect, useRef } from 'react';
 import * as monaco from 'monaco-editor/editor/editor.api';
 import 'monaco-editor/languages/definitions/markdown/register';
 import editorWorker from 'monaco-editor/editor/editor.worker?worker';
+import { registerWikilinkCompletion } from './wikilinkCompletion.js';
 
 if (!self.MonacoEnvironment) {
   self.MonacoEnvironment = {
     getWorker: () => new editorWorker(),
   };
 }
+
+// 模块级一次性注册 [[ 补全 provider（loCore 数据源注入；编辑器实例化即可用）
+const loCore = (typeof window !== 'undefined' && window.loAgent && window.loAgent.loCore) || null;
+registerWikilinkCompletion(loCore);
 
 export default function NoteEditor({ value, onChange, readOnly = false }) {
   const containerRef = useRef(null);

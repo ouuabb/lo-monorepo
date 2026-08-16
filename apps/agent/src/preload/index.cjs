@@ -34,6 +34,7 @@ const CHANNEL = {
   MODES_LIST: 'lo-core:modes',
   MODES_RESOLVE: 'lo-core:modes-resolve',
   VIEWERS_LIST: 'lo-core:viewers',
+  SEARCH: 'lo-core:search',
   PLUGINS_LIST: 'agent-plugins:list-commands',
   PLUGINS_EXECUTE: 'agent-plugins:execute-command',
   PLUGINS_VIEWS: 'agent-plugins:list-views',
@@ -81,6 +82,7 @@ contextBridge.exposeInMainWorld('loAgent', {
     viewers: {
       list: (modeId) => ipcRenderer.invoke(CHANNEL.VIEWERS_LIST, modeId),
     },
+    search: (q) => ipcRenderer.invoke(CHANNEL.SEARCH, q),
     listNotes: (query) => ipcRenderer.invoke(CHANNEL.LIST_NOTES, query),
     getNote: (rid) => ipcRenderer.invoke(CHANNEL.GET_NOTE, rid),
     createNote: (body) => ipcRenderer.invoke(CHANNEL.CREATE_NOTE, body),
