@@ -114,10 +114,10 @@ describe('LoClient 基础', () => {
       Promise.resolve({ status: 200, body: {}, headers: {} }),
     );
     fakeAuthed(client);
-    await client.notes.create({ title: 'hi' });
+    await client.notes.create({ name: 'hi' });
     expect(calls[0].method).toBe('POST');
     expect(calls[0].url).toBe('http://127.0.0.1:8765/api/notes');
-    expect(calls[0].requestOpts.body).toEqual({ title: 'hi' });
+    expect(calls[0].requestOpts.body).toEqual({ name: 'hi' });
   });
 
   it('PUT 与 DELETE', async () => {
@@ -274,7 +274,7 @@ describe('端点覆盖', () => {
     await client.notes.list({ limit: 5 });
     await client.notes.get('res_1');
     await client.notes.create({ content: 'x' });
-    await client.notes.update('res_1', { title: 't' });
+    await client.notes.update('res_1', { name: 't' });
     await client.notes.remove('res_1');
     expect(calls).toHaveLength(5);
     expect(calls.map((c) => c.method)).toEqual(['GET', 'GET', 'POST', 'PUT', 'DELETE']);
@@ -869,7 +869,7 @@ describe('notes.upload（multipart 构造）', () => {
       Promise.resolve({ status: 201, body: { uploaded: 0, data: [] }, headers: {} }),
     );
     fakeAuthed(client);
-    await client.notes.upload([], { title: 'x' });
+    await client.notes.upload([], { name: 'x' });
     const { requestOpts } = calls[0];
     expect(requestOpts.body.toString()).toContain('--');
   });
