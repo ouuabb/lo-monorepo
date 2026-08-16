@@ -111,6 +111,10 @@ body {
   -webkit-app-region: no-drag;
 }
 
+.topbar-split {
+  -webkit-app-region: no-drag;
+}
+
 .conn-dot:hover {
   outline: 1px solid var(--border-strong);
   outline-offset: 2px;

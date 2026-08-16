@@ -200,21 +200,6 @@ const [repoCtx, setRepoCtx] = useState(null);
     async (n, groupId, opts = {}) => {
       if (!api || !n) return null;
       const { makeActive = false } = opts;
-      // 目标 group 查重（group 内唯一；不同 group 可双开同一 rid）
-      const group = groups.find((g) => g.id === groupId);
-      if (!group) return null;
-      const existing = group.tabs.find((t) => t.rid === n.rid);
-      if (existing) {
-        if (makeActive || group.activeTabId !== existing.id) {
-          setGroups((prev) =>
-            prev.map((g) =>
-              g.id === groupId ? { ...g, activeTabId: existing.id } : g,
-            ),
-          );
-        }
-        setActiveGroupId(groupId);
-        return existing;
-      }
       setBusy(true);
       notify('');
       try {
@@ -255,17 +240,41 @@ const [repoCtx, setRepoCtx] = useState(null);
               schema: data.schema || null,
             },
           };
-          setGroups((prev) =>
-            prev.map((g) =>
-              g.id === groupId
+          // 函数式更新：查组（不存在则创建）→ 组内查重 → append/激活——
+          // 不依赖闭包 groups，消除「先建组再用旧闭包打开」的竞态
+          setGroups((prev) => {
+            let g = prev.find((x) => x.id === groupId);
+            if (!g) {
+              g = { id: groupId, tabs: [], activeTabId: null };
+              prev = [...prev, g];
+            }
+            const existing = g.tabs.find((t) => t.rid === n.rid);
+            if (existing) {
+              return prev.map((x) =>
+                x.id === groupId
+                  ? {
+                      ...x,
+                      activeTabId:
+                        makeActive || x.tabs.length === 0
+                          ? existing.id
+                          : x.activeTabId,
+                    }
+                  : x,
+              );
+            }
+            return prev.map((x) =>
+              x.id === groupId
                 ? {
-                    ...g,
-                    tabs: [...g.tabs, tab],
-                    activeTabId: makeActive || g.tabs.length === 0 ? tab.id : g.activeTabId,
+                    ...x,
+                    tabs: [...x.tabs, tab],
+                    activeTabId:
+                      makeActive || x.tabs.length === 0
+                        ? tab.id
+                        : x.activeTabId,
                   }
-                : g,
-            ),
-          );
+                : x,
+            );
+          });
           setActiveGroupId(groupId);
           setRelationsOpen(true);
           return tab;
@@ -279,26 +288,22 @@ const [repoCtx, setRepoCtx] = useState(null);
         setBusy(false);
       }
     },
-    [api, groups],
+    [api],
   );
 
-  // P0：layout 恢复 effect 不得依赖 openIntoGroup（其 deps 含 groups），
-  // 否则恢复过程 setGroups → openIntoGroup 引用变化 → effect 重跑 → 无限恢复循环。
-  // 经 ref 取最新引用：恢复只执行一次，切 tab/切组不再触发恢复。
+  // P0：layout 恢复 effect 不得依赖 openIntoGroup，否则恢复过程 setGroups → 引用变化
+  // → effect 重跑 → 无限恢复循环。恢复 effect 仅依赖 [api, authenticated]（mount-once）；
+  // 此处经 ref 调用，保持恢复逻辑与 effect 依赖彻底解耦。
   const openIntoGroupRef = useRef(null);
   openIntoGroupRef.current = openIntoGroup;
 
-  /** 打开到当前焦点 group（无 group 时创建默认组） */
+  /** 打开到当前焦点 group（无 group 时由 openIntoGroup 兜底创建默认组） */
   const openResource = useCallback(
     async (n) => {
       if (!api || !n) return;
-      let gid = activeGroupId;
-      if (!gid) {
-        gid = makeGroupId();
-        setGroups((prev) => [...prev, { id: gid, tabs: [], activeTabId: null }]);
-        setActiveGroupId(gid);
-      }
-      await openIntoGroup(n, gid, { makeActive: true });
+      await openIntoGroup(n, activeGroupId || makeGroupId(), {
+        makeActive: true,
+      });
     },
     [api, activeGroupId, openIntoGroup],
   );
@@ -307,9 +312,7 @@ const [repoCtx, setRepoCtx] = useState(null);
   const openInNewGroup = useCallback(
     async (n) => {
       if (!api || !n) return;
-      const gid = makeGroupId();
-      setGroups((prev) => [...prev, { id: gid, tabs: [], activeTabId: null }]);
-      await openIntoGroup(n, gid, { makeActive: true });
+      await openIntoGroup(n, makeGroupId(), { makeActive: true });
     },
     [api, openIntoGroup],
   );
@@ -412,25 +415,15 @@ const [repoCtx, setRepoCtx] = useState(null);
     );
   }, []);
 
-  /** 关闭整个分屏组：有未保存修改则拒绝（提示先保存/逐个关闭），否则整组移除 */
-  const closeGroup = useCallback(
-    (groupId) => {
-      const group = groups.find((g) => g.id === groupId);
-      if (!group) return;
-      if (group.tabs.some((t) => isDirty(t))) {
-        notify('当前分屏组存在未保存修改，请先保存或逐个关闭标签页');
-        return;
-      }
-      const { groups: next, activeGroupId: nextActive } = removeGroup(
-        groups,
-        groupId,
-        activeGroupId,
-      );
-      setGroups(next);
-      if (nextActive !== activeGroupId) setActiveGroupId(nextActive);
-    },
-    [groups, activeGroupId, isDirty, notify],
-  );
+  /** 正文变更同步：分屏双开同一 rid 时，text 广播到所有同 rid tab（草稿实时同步） */
+  const patchRidText = useCallback((rid, text) => {
+    setGroups((prev) =>
+      prev.map((g) => ({
+        ...g,
+        tabs: g.tabs.map((t) => (t.rid === rid ? { ...t, text } : t)),
+      })),
+    );
+  }, []);
 
   const requestCloseTab = useCallback(
     (tabId) => {
@@ -464,11 +457,12 @@ const [repoCtx, setRepoCtx] = useState(null);
       }
       const res = await api.updateNote(activeTab.rid, body);
       if (res.ok) {
+        // 保存成功：同 rid 全部实例（分屏双开）同步 saved 状态（text 已实时同步）
         setGroups((prev) =>
           prev.map((g) => ({
             ...g,
             tabs: g.tabs.map((t) =>
-              t.id === activeTab.id
+              t.rid === activeTab.rid
                 ? {
                     ...t,
                     savedText: t.text,
@@ -960,6 +954,18 @@ useEffect(() => {
           aria-label={authenticated ? '已登录' : '未连接'}
           onClick={openLogin}
         />
+        <button
+          type="button"
+          className="win-btn topbar-split"
+          title="分屏：在新组打开当前笔记"
+          aria-label="分屏"
+          onClick={splitActiveTab}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            <path d="M12 3v18" stroke="currentColor" strokeWidth="1.8" />
+          </svg>
+        </button>
         {renderCtlButtons()}
       </header>
       <div className={`app-shell ${collapsed ? 'sidebar-hidden' : ''}`}>
@@ -1066,35 +1072,13 @@ useEffect(() => {
                             aria-label="分类"
                           />
                           {isDirty(tab) && <span className="chip chip-dirty">未保存</span>}
-                        </div>
-                        <div className="editor-toolbar-actions">
-                          <button
-                            type="button"
-                            className="btn ghost"
-                            title="分屏：在新组打开当前笔记"
-                            onClick={splitActiveTab}
-                          >
-                            分屏
-                          </button>
-                          {groups.length > 1 && (
-                            <button
-                              type="button"
-                              className="btn ghost"
-                              title="关闭当前分屏组（保留其余）"
-                              onClick={() => closeGroup(group.id)}
-                            >
-                              关闭分屏
-                            </button>
-                          )}
-                        </div>
                       </div>
+                    </div>
 
                       <div className="editor-body">
                         <EditorRenderer
                           tab={tab}
-                          onChange={(text) =>
-                            patchActiveGroupTab(group.id, tab.id, { text })
-                          }
+                          onChange={(text) => patchRidText(tab.rid, text)}
                           pluginViewers={pluginViewers}
                         />
                       </div>
