@@ -39,11 +39,13 @@ ctx.viewers.register({ viewerId, label, semantics, supports });
 |---|---|
 | manifest 注册 epub 类型（保留） | 不变（TypeRegistry） |
 | 命令守卫 `resource.type !== 'epub'`（commands.cjs:40） | **删除**；命令入口校验改为「当前 Session.modeId ∈ {reading, annotating}」 |
-| —（新增） | `ctx.modes.register`：reading（writable=false）/ annotating（writable=true）/ metadata（writable=false）——applicableTo types:[epub] |
+| —（新增） | `ctx.modes.register`：`annotating`（writable=true）/ `metadata`（writable=false）——applicableTo types:[epub]；**不注册 reading**（builtin 已覆盖 epub，U1 §3） |
 | —（新增） | `ctx.viewers.register`：`viewer.epub-reader`（supports modes:[reading]） |
 | HTTP 阅读器端点 | 保留（作为 viewer.epub-reader 的实现载体）；Agent 桥接新 viewer 渲染入口 |
 | 标注（note + source-of 关系） | 保留（Operation/Relation 体系，U0 §6 边界）——annotating Mode 是其使用上下文 |
 | 命令/端点注册 | 保留（命令注册机制不变） |
+
+> **Mode 归属分工（与 U1 一致）**：builtin = editing/reading/preview；epub 插件贡献 = annotating/metadata（reading 由 builtin 提供，不重复注册——同 modeId 冲突规则即防此重复）。
 
 ## 4. epub 端到端链路（验收路径）
 
@@ -62,7 +64,7 @@ ctx.viewers.register({ viewerId, label, semantics, supports });
 | 用例 | 断言 |
 |---|---|
 | plugins-sdk registerMode/registerViewer | 契约校验（禁入字段拒绝）；写入表可读回 |
-| epub Mode 解析 | resolveModes(epub 资源) = [reading, annotating, metadata] |
+| epub Mode 解析（**插件已安装并注册后**） | resolveModes(epub 资源) = [reading, annotating, metadata]（reading 来自 builtin，annotating/metadata 来自插件） |
 | epub Viewer 解析 | resolveViewers(reading) 含 viewer.epub-reader |
 | 命令域 | epub 命令在 reading/annotating Session 可用；非 epub Session 拒绝 |
 | 标注链路 | annotating 上下文创建 note + source-of 关系可撤销 |
@@ -78,3 +80,7 @@ ctx.viewers.register({ viewerId, label, semantics, supports });
 ## 7. Checkpoint
 
 提交信息：`feat(plugins-sdk): 模式与查看器注册契约（U3）`
+
+## 8. 阶段状态即验收边界（原则）
+
+本阶段完成 = **Plugin 能扩展 Mode/Viewer，并完成 epub**：SDK 注册契约可用、epub 插件贡献 annotating/metadata + viewer.epub-reader、命令域经 Session Mode 校验。**不提前依赖后续阶段**：全仓收敛扫描与最终验收（U4）不在本阶段；本阶段断言基于「插件已安装并注册」状态，与 U1 的插件未装态断言相互独立、不交叉。

@@ -54,6 +54,8 @@ resolveViewerComponent(viewerId);
 
 **删除**：`type !== 'note'` 的全部使用（App.jsx:199/583）；`readOnlyOverrides` 定义与引用。
 
+> **Query View 不受影响**：设置栏「视图」（ViewPanel + CoreViewPanel，Query View 消费链）与本阶段重构无关——View（集合观察）与 Viewer（单资源入口）保持完全独立；本阶段只动资源打开/编辑链路。
+
 ## 4. readOnly 迁移（三层严格分离，依据 U0 §7）
 
 ```
@@ -88,3 +90,7 @@ Mode.writable（来自 resolveModes 的 rules.writable）
 ## 7. Checkpoint
 
 提交信息：`feat(agent): 会话模型与只读迁移（U2）`
+
+## 8. 阶段状态即验收边界（原则）
+
+本阶段完成 = **Agent 能基于 Mode/Viewer 建立 Session**：openResource 经 resolveModes/resolveViewers 创建 Session、readOnly 迁移到 Session.state、viewer 渲染注册表（内置）可用。**不提前依赖后续阶段**：插件 Viewer（U3）、epub 阅读器（U3）不在本阶段验收；epub 在插件未装态走 generic-preview。Query View 面板行为不变（本阶段不验收其变更）。

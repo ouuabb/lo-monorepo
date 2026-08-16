@@ -30,7 +30,9 @@ migrations/
 
 ## 3. 全部表最终归属（62 张逐表定案）
 
-### 3.1 保留（结构不动，47 张）
+> **最终核算**：59 保留 + 1 改名 + 2 新增 = **62**（60 原 001 − 2 删除 + 2 并入 002 + 2 新增 = 62）。
+
+### 3.1 保留（结构不动，59 张）
 
 | 概念域 | 表 |
 |---|---|
@@ -63,8 +65,8 @@ migrations/
 CREATE TABLE mode_definitions (
   mode_id    TEXT PRIMARY KEY,
   semantics  TEXT NOT NULL,
-  applies_to TEXT NOT NULL,     -- JSON { types: string[], capabilities?: string[] }
-  rules      TEXT NOT NULL,     -- JSON { writable: boolean, interactive: boolean }
+  applies_to TEXT NOT NULL,     -- JSON（camelCase 键）：{ types: string[], capabilities?: string[] }
+  rules      TEXT NOT NULL,     -- JSON（camelCase 键）：{ writable: boolean, interactive: boolean }
   plugin_id  TEXT
 );
 
@@ -73,10 +75,12 @@ CREATE TABLE viewer_definitions (
   viewer_id TEXT PRIMARY KEY,
   label     TEXT NOT NULL,
   semantics TEXT NOT NULL,
-  supports  TEXT NOT NULL,      -- JSON { modes: string[], types?: string[] }
+  supports  TEXT NOT NULL,      -- JSON（camelCase 键）：{ modes: string[], types?: string[] }
   plugin_id TEXT
 );
 ```
+
+> **命名映射约定（只属于持久化序列化边界，不产生额外概念）**：数据库列名统一 **snake_case**（`applies_to`/`supports` 等）；JSON 数据内部统一 **camelCase**（`applicableTo`/`supports`/`writable`/`interactive`）。概念/API 侧使用 camelCase（`applicableTo`、`supports`），与列名 snake_case 的映射仅发生在序列化层。
 
 ### 3.4 删除（2 张，无消费者）
 
@@ -137,5 +141,9 @@ CREATE TABLE viewer_definitions (
 提交信息：`refactor(core): 数据库收敛为最终基线（62 表）`
 
 ---
+
+## 11. 阶段状态即验收边界（原则）
+
+本阶段完成 = **数据库为最终 001 基线（62 表）**：唯一 migration 文件、operations 表名、partial unique 索引、mode_definitions/viewer_definitions 就绪、ai 表删除、全仓引用与测试适配。**不提前依赖后续阶段**：U1 的 Mode/Viewer 注册逻辑不在本阶段实现；本阶段只保证表结构与引用收敛。
 
 **本阶段变更对象**：`001_initial_schema.cjs`（重写）、删除 `002`/`003`、`operationEngine`/`transactionEngine`/`operationLogger`/`serve`/测试的 `container_operations`→`operations` 引用、`migrationRunner.test.cjs`。

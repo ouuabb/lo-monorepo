@@ -112,7 +112,15 @@ Operation             ← 实际执行并记录写操作
 5. **Session 纯运行时**，不进入 Core 数据库；Mode/Viewer 定义层（builtin 代码注册 + 插件贡献落表）。
 6. **Resource 不因 Usage Layer 增加 mode/viewer 字段**。
 
-## 10. 依赖引用
+## 10. 阶段状态即验收边界（原则）
+
+U0 为概念冻结（无实施验收）；此后每阶段的验收**只验证该阶段已存在的模型**——不允许为「测试最终状态」而提前依赖后续阶段：
+- U1 完成 = Core 能独立提供 builtin Mode/Viewer
+- U2 完成 = Agent 能基于 Mode/Viewer 建立 Session
+- U3 完成 = Plugin 能扩展 Mode/Viewer，并完成 epub
+- U4 完成 = 全部模型收敛并完成全仓验收
+
+## 11. 依赖引用
 
 - U1（021）实现 Mode/Viewer Registry + Resolver + 内置定义 —— 依据 §2/§4/§6
 - U2（022）Agent Session 重构 + readOnly 迁移 —— 依据 §3/§7

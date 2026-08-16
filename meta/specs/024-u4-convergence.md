@@ -22,7 +22,7 @@
 | + | serve admin 仅 note | — | **Admin API 约束** | 保留 |
 | + | system 不可删 | — | **Lifecycle** | 保留 |
 
-**验收断言**：Core/Agent 新增使用判断必须经 `resolveModes`；不迁移项以注释标注归属，禁止新增散落 type 使用分支。
+**验收断言**：Core/Agent 新增使用判断必须经 `resolveModes`；不迁移项以注释标注归属，禁止新增散落 type 使用分支。epub 完整 Mode 列表 `[reading, annotating, metadata]` 仅在**插件已注册**状态断言（U3 后）；U1 阶段插件未装态断言为 `[reading]`——两阶段断言各自独立，不交叉。
 
 ## 2. 全仓语义扫描（自动化断言）
 
@@ -32,6 +32,7 @@
 - `ai_interactions` / `ai_learning`：**零**（S0 已删表）
 - `ResourceView` / `QueryView` 兼容别名：**零**
 - `mode_definitions` / `viewer_definitions` 消费链路：存在（U1 读取 + U3 写入）
+- **annotating/metadata 归属**：仅存在于插件注册表（epub），Core builtin 定义中**零**（U1 §3 分工复核）
 - 扫描方式：grep 脚本 + 单测断言（防回归）
 
 ## 3. 回归
@@ -52,6 +53,10 @@
 ## 5. Checkpoint
 
 提交信息：`chore(core): 使用层全量收敛（U4）`
+
+## 6. 阶段状态即验收边界（原则）
+
+本阶段完成 = **全部模型收敛并完成全仓验收**：17 分支归属复核、残留扫描断言、回归、epub 端到端。**本阶段是唯一以「最终模型全状态」为验收的阶段**；U1-U3 的测试不得为「最终状态」提前依赖本阶段（各阶段只验证该阶段已存在的模型）。
 
 ---
 
