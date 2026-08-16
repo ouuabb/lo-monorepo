@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import NoteEditor from './editor/NoteEditor.jsx';
 import PluginUiMount from './plugin/PluginUiMount.jsx';
 import { hasUi } from './plugin/pluginUi.js';
 import { BarArea, Bar } from './layout/BarArea.jsx';
