@@ -733,19 +733,38 @@ body {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  gap: 10px;
 }
 
-.graph-toolbar {
+/* 顶栏（标题 + 统计 + 提示 + 刷新） */
+.graph-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 12px;
+  min-width: 0;
+}
+
+.graph-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a2a3a;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .graph-stats {
   font-size: 12px;
   color: var(--text-secondary, inherit);
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.graph-legend-note {
+  color: #b0bcc8;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 
 .graph-empty {
@@ -763,29 +782,177 @@ body {
   flex: 1;
   min-height: 0;
   width: 100%;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  display: block;
+  background: #ffffff;
+  border: 1px solid #eef2f7;
+  border-radius: 12px;
   cursor: grab;
+  overflow: hidden;
 }
 
 .graph-svg:active {
   cursor: grabbing;
 }
 
+/* ── 图谱元素（参考实现样式） ── */
+.graph-svg .link {
+  stroke: #8899b0;
+  stroke-opacity: 0.5;
+  stroke-width: 1.8;
+  transition: stroke-opacity 0.3s, stroke-width 0.3s;
+}
+
+.graph-svg .node {
+  cursor: pointer;
+}
+
+.graph-svg .node circle {
+  fill: #2c3e50;
+  stroke: #ffffff;
+  stroke-width: 2.5px;
+  transition: stroke-width 0.3s;
+}
+
+.graph-svg .node circle:hover {
+  stroke-width: 4.5px;
+}
+
+.graph-svg .node text {
+  font-size: 11px;
+  font-weight: 500;
+  fill: #2c3e50;
+  dominant-baseline: central;
+  text-anchor: middle;
+  pointer-events: none;
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.graph-svg .decor-ring {
+  fill: none;
+  stroke: #d0d8e2;
+  stroke-width: 0.5;
+  opacity: 0.3;
+}
+
+.graph-svg .decor-line {
+  stroke: #d0d8e2;
+  stroke-width: 0.3;
+  opacity: 0.2;
+}
+
+/* ── 控制条（极简：参数不变，仅外观） ── */
+.graph-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+  justify-content: center;
+  color: #a4b2c4;
+  font-size: 11px;
+  user-select: none;
+}
+
+.graph-controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  color: #8a9ab0;
+}
+
+/* 滑条：极简——细轨道（已选段填充）+ 实心圆点（覆盖全局 input 边框/padding） */
+.graph-controls input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 64px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  --track-h: 3px;
+}
+
+.graph-controls input[type='range']::-webkit-slider-runnable-track {
+  height: var(--track-h);
+  border-radius: 999px;
+  border: none;
+  box-shadow: none;
+  background: linear-gradient(
+    to right,
+    #5a6b82 0%,
+    #5a6b82 var(--p),
+    #e2e8f0 var(--p),
+    #e2e8f0 100%
+  );
+}
+
+.graph-controls input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: calc((var(--track-h) - 12px) / 2);
+  border-radius: 50%;
+  background: #5a6b82;
+  border: none;
+  box-shadow: none;
+}
+
+.graph-controls .val {
+  min-width: 2rem;
+  text-align: center;
+  color: #5a6b82;
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.graph-reset {
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #a4b2c4;
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.graph-reset:hover {
+  color: #5a6b82;
+  border-color: #d3dbe6;
+}
+
+/* ── tooltip（参考实现样式） ── */
 .graph-tooltip {
   position: fixed;
   background: rgba(255, 255, 255, 0.96);
   color: #1a2634;
-  padding: 4px 10px;
-  border-radius: 8px;
-  font-size: 12px;
+  padding: 8px 18px;
+  border-radius: 14px;
+  font-size: 13px;
   border: 1px solid #d0d8e2;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
   pointer-events: none;
   opacity: 0;
-  z-index: 100;
+  transition: opacity 0.25s;
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
   white-space: nowrap;
+  backdrop-filter: blur(4px);
+  z-index: 100;
+}
+
+.graph-tooltip.visible {
+  opacity: 1;
+}
+
+.graph-tooltip strong {
+  font-weight: 600;
 }
 
 .sub-nav {
