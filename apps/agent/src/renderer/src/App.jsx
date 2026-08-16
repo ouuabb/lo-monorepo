@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PluginUiMount from './plugin/PluginUiMount.jsx';
 import { hasUi } from './plugin/pluginUi.js';
-import { BarArea, Bar } from './layout/BarArea.jsx';
+import { BarArea, Bar, MainArea } from './layout/BarArea.jsx';
+import {
+  applyLayout,
+  buildLayout,
+  DEFAULT_SIDEBAR_WIDTH,
+} from './layout/paneLayout.mjs';
 import CoreViewPanel from './views/ViewPanel.jsx';
 import GraphView from './views/GraphView.jsx';
 import { revealFeedback } from './services/revealFeedback.mjs';
@@ -29,17 +34,11 @@ const SUB_NAV = [
   { id: 'graph', label: '图谱' },
 ];
 
-const MIN_SIDEBAR_WIDTH = 200;
-const MAX_SIDEBAR_WIDTH = 480;
-
 export default function App() {
   const [view, setView] = useState('workspace');
   const [subOpen, setSubOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(220);
-  const [resizing, setResizing] = useState(false);
-  const [dragFromCollapsed, setDragFromCollapsed] = useState(false);
-  const lastWidthRef = useRef(220);
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [loginOpen, setLoginOpen] = useState(false);
   const [pluginView, setPluginView] = useState(false);
   const [pluginTab, setPluginTab] = useState('commands');
@@ -65,6 +64,7 @@ const [repoCtx, setRepoCtx] = useState(null);
   const deleteRidRef = useRef(null);
   const toastTimerRef = useRef(null);
   const autoSaveTimerRef = useRef(null);
+  const layoutTimerRef = useRef(null);
   const [toastCopied, setToastCopied] = useState(false);
 
   const notify = useCallback((text) => {
@@ -550,40 +550,54 @@ useEffect(() => {
     setConfig((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
-  const startResize = useCallback(
-    (e) => {
-      e.preventDefault();
-      setResizing(true);
-      const startX = e.clientX;
-      const wasCollapsed = collapsed;
-      setDragFromCollapsed(wasCollapsed);
-      // 折叠状态起锚为 0：边线从隐藏处跟手滑出
-      const startWidth = wasCollapsed ? 0 : sidebarWidth;
-      let lastW = startWidth;
-      const onMove = (ev) => {
-        const next = startWidth + (ev.clientX - startX);
-        lastW = Math.max(0, Math.min(MAX_SIDEBAR_WIDTH, next));
-        if (lastW < MIN_SIDEBAR_WIDTH) {
-          // 未到最小边：边线先停在最小边（折叠态可见），保持隐藏
-          setSidebarWidth(MIN_SIDEBAR_WIDTH);
-          return;
-        }
-        setCollapsed(false);
-        setSidebarWidth(lastW);
-      };
-      const stop = () => {
-        setResizing(false);
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('pointerup', stop);
-        document.body.classList.remove('no-select');
-        if (lastW < MIN_SIDEBAR_WIDTH) setCollapsed(true);
-      };
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', stop);
-      document.body.classList.add('no-select');
-    },
-    [sidebarWidth, collapsed],
+  // ── P0 布局持久化（sidebar + 右侧面板显隐；纯 UI 状态，经 agent-layout 白名单 IPC）──
+  const layoutPanels = useMemo(
+    () => ({ relations: relationsOpen, settings: subOpen, plugin: pluginView }),
+    [relationsOpen, subOpen, pluginView],
   );
+
+  useEffect(() => {
+    if (!api || !api.layout || typeof api.layout.load !== 'function') return;
+    api.layout
+      .load()
+      .then((res) => {
+        if (!res || !res.ok || !res.layout) return;
+        const app = applyLayout(res.layout);
+        setSidebarWidth(app.sidebar.size);
+        setCollapsed(!app.sidebar.visible);
+        setRelationsOpen(app.panels.relations);
+        setSubOpen(app.panels.settings);
+        setPluginView(app.panels.plugin);
+      })
+      .catch(() => {});
+  }, []);
+
+  const persistLayout = useCallback(() => {
+    if (!api || !api.layout || typeof api.layout.save !== 'function') return;
+    if (layoutTimerRef.current) clearTimeout(layoutTimerRef.current);
+    layoutTimerRef.current = setTimeout(() => {
+      layoutTimerRef.current = null;
+      api.layout
+        .save(
+          buildLayout({
+            sidebarVisible: !collapsed,
+            sidebarWidth,
+            panels: layoutPanels,
+          }),
+        )
+        .catch(() => {});
+    }, 500);
+  }, [collapsed, sidebarWidth, layoutPanels]);
+
+  useEffect(() => {
+    persistLayout();
+    return () => {
+      if (layoutTimerRef.current) {
+        clearTimeout(layoutTimerRef.current);
+        layoutTimerRef.current = null;
+      }
+    };
+  }, [persistLayout]);
 
   const openCtxMenu = useCallback(
     async (n, x, y) => {
@@ -605,14 +619,8 @@ useEffect(() => {
   );
 
   const toggleSidebar = useCallback(() => {
-    if (collapsed) {
-      setSidebarWidth(Math.max(MIN_SIDEBAR_WIDTH, lastWidthRef.current || sidebarWidth));
-      setCollapsed(false);
-    } else {
-      lastWidthRef.current = sidebarWidth;
-      setCollapsed(true);
-    }
-  }, [collapsed, sidebarWidth]);
+    setCollapsed((c) => !c);
+  }, []);
 
   const openLogin = () => setLoginOpen(true);
   const closeLogin = () => setLoginOpen(false);
@@ -760,7 +768,7 @@ useEffect(() => {
         />
         {renderCtlButtons()}
       </header>
-      <div className={`app-shell ${resizing ? 'resizing' : ''} ${collapsed ? 'sidebar-hidden' : ''}`}>
+      <div className={`app-shell ${collapsed ? 'sidebar-hidden' : ''}`}>
         <aside className="app-rail">
           <div className="rail-spacer" />
           <button
@@ -792,16 +800,14 @@ useEffect(() => {
             </svg>
           </button>
         </aside>
-        <BarArea>
-          <Bar
-            id="sidebar"
-            className={collapsed ? 'collapsed' : ''}
-            style={{
-              width:
-                (resizing && dragFromCollapsed) || !collapsed ? sidebarWidth : 0,
-            }}
-          >
-            <div className="bar-sidebar-inner" style={{ width: sidebarWidth }}>
+        <BarArea
+          sidebarWidth={sidebarWidth}
+          sidebarVisible={!collapsed}
+          onSidebarSize={setSidebarWidth}
+          onLayoutChange={persistLayout}
+        >
+          <Bar id="sidebar">
+            <div className="bar-sidebar-inner">
               <ResourceExplorer
                 notes={notes}
                 busy={busy}
@@ -815,20 +821,15 @@ useEffect(() => {
             </div>
           </Bar>
 
-          <div
-            className="app-sidebar-resizer"
-            onPointerDown={startResize}
-            title={collapsed ? '拖拽展开侧边栏' : '拖拽调整侧边栏宽度'}
-          />
+          <MainArea onLayoutChange={persistLayout}>
+            {pluginView && (
+              <Bar id="plugin" title="插件" onClose={() => setPluginView(false)}>
+                <PluginCenter tab={pluginTab} onTab={setPluginTab} onNotify={notify} />
+              </Bar>
+            )}
 
-          {pluginView && (
-            <Bar id="plugin" title="插件" onClose={() => setPluginView(false)}>
-              <PluginCenter tab={pluginTab} onTab={setPluginTab} onNotify={notify} />
-            </Bar>
-          )}
-
-          {activeTab && (
-            <Bar id="editor">
+            {activeTab && (
+              <Bar id="editor">
               <div className="editor-tabs" role="tablist">
                 {tabs.map((t) => (
                   <div
@@ -929,56 +930,57 @@ useEffect(() => {
             </Bar>
           )}
 
-          {subOpen && (
-            <Bar id="settings" title="设置" onClose={() => setSubOpen(false)}>
-              <div className="sub-panel">
-                <div className="sub-nav" role="tablist">
-                  {SUB_NAV.map((item) => (
-                    <button
-                      key={item.id}
-                      role="tab"
-                      aria-selected={view === item.id}
-                      className={view === item.id ? 'active' : ''}
-                      onClick={() => setView(item.id)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
+            {subOpen && (
+              <Bar id="settings" title="设置" onClose={() => setSubOpen(false)}>
+                <div className="sub-panel">
+                  <div className="sub-nav" role="tablist">
+                    {SUB_NAV.map((item) => (
+                      <button
+                        key={item.id}
+                        role="tab"
+                        aria-selected={view === item.id}
+                        className={view === item.id ? 'active' : ''}
+                        onClick={() => setView(item.id)}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="sub-body">
+                    {view === 'workspace' && (
+                      <WorkspacePanel
+                        status={status}
+                        notes={notes}
+                        busy={busy}
+                        onRefresh={handleRefresh}
+                        onLogin={openLogin}
+                      />
+                    )}
+
+                    {view === 'history' && (
+                      <OperationHistory
+                        authenticated={authenticated}
+                        onLogin={openLogin}
+                        onNotify={notify}
+                        onRefresh={handleRefresh}
+                      />
+                    )}
+
+                    {view === 'settings' && (
+                      <FileSettingsPanel
+                        autoSave={autoSave}
+                        onToggleAutoSave={setAutoSave}
+                      />
+                    )}
+
+                    {view === 'views' && <CoreViewPanel onOpen={openResource} onNotify={notify} />}
+
+                    {view === 'graph' && <GraphView onOpen={openResource} onNotify={notify} />}
+                  </div>
                 </div>
-                <div className="sub-body">
-                  {view === 'workspace' && (
-                    <WorkspacePanel
-                      status={status}
-                      notes={notes}
-                      busy={busy}
-                      onRefresh={handleRefresh}
-                      onLogin={openLogin}
-                    />
-                  )}
-
-                  {view === 'history' && (
-                    <OperationHistory
-                      authenticated={authenticated}
-                      onLogin={openLogin}
-                      onNotify={notify}
-                      onRefresh={handleRefresh}
-                    />
-                  )}
-
-                  {view === 'settings' && (
-                    <FileSettingsPanel
-                      autoSave={autoSave}
-                      onToggleAutoSave={setAutoSave}
-                    />
-                  )}
-
-                  {view === 'views' && <CoreViewPanel onOpen={openResource} onNotify={notify} />}
-
-                  {view === 'graph' && <GraphView onOpen={openResource} onNotify={notify} />}
-                </div>
-              </div>
-            </Bar>
-          )}
+              </Bar>
+            )}
+          </MainArea>
         </BarArea>
 
         {message && (

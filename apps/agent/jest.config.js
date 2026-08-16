@@ -12,5 +12,5 @@ module.exports = {
     '/docs/',
     '/src/renderer/',
   ],
-  moduleFileExtensions: ['cjs', 'js'],
+  moduleFileExtensions: ['mjs', 'cjs', 'js'],
 };

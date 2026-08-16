@@ -754,5 +754,33 @@ describe('LoCoreService', () => {
       expect(res.ok).toBe(false);
       expect(res.message).toContain('configure');
     });
+  describe('loadLayout / saveLayout（P0：布局持久化）', () => {
+    it('loadLayout：config 无 layout 时返回 null', () => {
+      const service = new LoCoreService({ loadConfig: () => ({ host: 'h' }) });
+      expect(service.loadLayout()).toEqual({ ok: true, layout: null });
+    });
+
+    it('loadLayout：返回 config.layout', () => {
+      const layout = { version: 1, sidebar: { visible: false, size: 300 } };
+      const service = new LoCoreService({ loadConfig: () => ({ host: 'h', layout }) });
+      expect(service.loadLayout().layout).toEqual(layout);
+    });
+
+    it('saveLayout：合并写入 config 且不丢其他字段', () => {
+      let saved = null;
+      const service = new LoCoreService({
+        loadConfig: () => ({ host: 'h', port: 8765 }),
+        saveConfig: (cfg) => {
+          saved = cfg;
+        },
+      });
+      const layout = { version: 1, sidebar: { visible: true, size: 220 }, panels: {} };
+      const res = service.saveLayout(layout);
+      expect(res.ok).toBe(true);
+      expect(saved.host).toBe('h');
+      expect(saved.layout).toEqual(layout);
+    });
+  });
+
   });
 });

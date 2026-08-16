@@ -15,6 +15,8 @@ function makeService() {
     logout: jest.fn(() => ({ ok: true })),
     subscribeEvents: jest.fn(() => ({ ok: true })),
     unsubscribeEvents: jest.fn(() => ({ ok: true })),
+        loadLayout: jest.fn(() => ({ ok: true, layout: null })),
+    saveLayout: jest.fn((layout) => ({ ok: true, layout })),
     listOperations: jest.fn(async (q) => ({ ok: true, data: [] })),
     undoOperation: jest.fn(async (id) => ({ ok: true, data: { operationId: id } })),
     listViews: jest.fn(async (q) => ({ ok: true, data: [] })),
@@ -65,7 +67,9 @@ describe('registerLoCoreIpc', () => {
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.MODES_RESOLVE, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.VIEWERS_LIST, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.SEARCH, expect.any(Function));
-    expect(ipcMain.handle.mock.calls.length).toBe(27);
+    expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.LAYOUT_LOAD, expect.any(Function));
+    expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.LAYOUT_SAVE, expect.any(Function));
+    expect(ipcMain.handle.mock.calls.length).toBe(29);
   });
 
   it('Repository 通道委托 service（info / resolveLocation）', async () => {
@@ -286,5 +290,31 @@ describe('registerLoCoreIpc', () => {
     const byChannel = (ch) => ipcMain.handle.mock.calls.find(([c]) => c === ch)[1];
     await byChannel(CHANNELS.EVENTS_UNSUBSCRIBE)();
     expect(service.unsubscribeEvents).toHaveBeenCalled();
+  });
+
+  it('布局通道 load 委托 service.loadLayout', async () => {
+    const ipcMain = { handle: jest.fn() };
+    const service = makeService();
+    registerLoCoreIpc(ipcMain, service);
+
+    const byChannel = (ch) => ipcMain.handle.mock.calls.find(([c]) => c === ch)[1];
+    const res = await byChannel(CHANNELS.LAYOUT_LOAD)();
+    expect(service.loadLayout).toHaveBeenCalled();
+    expect(res).toEqual({ ok: true, layout: null });
+  });
+
+  it('布局通道 save 委托 service.saveLayout（空参给默认对象）', async () => {
+    const ipcMain = { handle: jest.fn() };
+    const service = makeService();
+    registerLoCoreIpc(ipcMain, service);
+
+    const byChannel = (ch) => ipcMain.handle.mock.calls.find(([c]) => c === ch)[1];
+    const layout = { version: 1, sidebar: { visible: true, size: 220 }, panels: {} };
+    const res = await byChannel(CHANNELS.LAYOUT_SAVE)({}, layout);
+    expect(service.saveLayout).toHaveBeenCalledWith(layout);
+    expect(res.ok).toBe(true);
+
+    await byChannel(CHANNELS.LAYOUT_SAVE)({}, undefined);
+    expect(service.saveLayout).toHaveBeenLastCalledWith({});
   });
 });

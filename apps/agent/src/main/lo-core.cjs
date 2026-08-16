@@ -78,6 +78,26 @@ class LoCoreService {
   }
 
   /**
+   * 读取持久化布局（agent 自身 UI 状态：sidebar/面板显隐，存于 config.layout）
+   * @returns {{ ok: true, layout: object|null }}
+   */
+  loadLayout() {
+    const cfg = this._loadConfig() || {};
+    return { ok: true, layout: cfg.layout || null };
+  }
+
+  /**
+   * 保存布局（合并写入 config.layout）
+   * @param {object} layout — 见 renderer layout/paneLayout.js 的 schema
+   * @returns {{ ok: true }}
+   */
+  saveLayout(layout = {}) {
+    const cfg = this._loadConfig() || {};
+    this._saveConfig({ ...cfg, layout });
+    return { ok: true };
+  }
+
+  /**
    * SSH 登录
    * @param {object} [params] — { privateKeyPath?, nonce?, signature?, fingerprint? }
    */

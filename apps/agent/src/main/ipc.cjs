@@ -36,6 +36,8 @@ const CHANNELS = {
   MODES_RESOLVE: 'lo-core:modes-resolve',
   VIEWERS_LIST: 'lo-core:viewers',
   SEARCH: 'lo-core:search',
+  LAYOUT_LOAD: 'agent-layout:load',
+  LAYOUT_SAVE: 'agent-layout:save',
 };
 
 /**
@@ -59,6 +61,8 @@ function registerLoCoreIpc(ipcMain, service) {
   ipcMain.handle(CHANNELS.MODES_RESOLVE, (_event, rid) => service.resolveModes(rid));
   ipcMain.handle(CHANNELS.VIEWERS_LIST, (_event, modeId) => service.getViewers(modeId || null));
   ipcMain.handle(CHANNELS.SEARCH, (_event, q) => service.search(q));
+  ipcMain.handle(CHANNELS.LAYOUT_LOAD, () => service.loadLayout());
+  ipcMain.handle(CHANNELS.LAYOUT_SAVE, (_event, layout) => service.saveLayout(layout || {}));
   ipcMain.handle(CHANNELS.LIST_NOTES, (_event, query) => service.listNotes(query || {}));
   ipcMain.handle(CHANNELS.GET_NOTE, (_event, rid) => service.getNote(rid));
   ipcMain.handle(CHANNELS.CREATE_NOTE, (_event, body) => service.createNote(body || {}));

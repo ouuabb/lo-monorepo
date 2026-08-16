@@ -141,6 +141,19 @@ describe('src/preload/index.cjs', () => {
     expect(mockInvoke).toHaveBeenLastCalledWith('lo-core:viewers', 'reading');
   });
 
+  it('loCore.layout.load/save 经白名单通道透传', async () => {
+    require('../../src/preload/index.cjs');
+    const { mockExposeInMainWorld, mockInvoke } = require('electron').__mocks;
+    const api = mockExposeInMainWorld.mock.calls[0][1];
+    mockInvoke.mockResolvedValue({ ok: true, layout: null });
+
+    await api.loCore.layout.load();
+    expect(mockInvoke).toHaveBeenLastCalledWith('agent-layout:load');
+
+    await api.loCore.layout.save({ version: 1 });
+    expect(mockInvoke).toHaveBeenLastCalledWith('agent-layout:save', { version: 1 });
+  });
+
   it('loCore.search 经白名单通道透传（wikilink 补全数据源）', async () => {
     require('../../src/preload/index.cjs');
     const { mockExposeInMainWorld, mockInvoke } = require('electron').__mocks;

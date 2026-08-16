@@ -43,6 +43,7 @@
     "@lo/agent-plugins-sdk": "workspace:*",
     "@lo/client": "workspace:*",
     "@lo/editor-assist": "workspace:*",
+    "allotment": "^1.20.5",
     "d3": "^7.9.0",
     "monaco-editor": "^0.56.0",
     "react": "^19.2.8",

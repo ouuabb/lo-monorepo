@@ -5,6 +5,17 @@
   --border-strong: #d1d5db;
   --text: #1a1a1a;
   --muted: #6b7280;
+  /* allotment 主题对齐 */
+  --separator-border: var(--border);
+  --sash-size: 5px;
+  --sash-hover-size: 3px;
+  --focus-border: var(--border-strong);
+}
+
+/* allotment sash 悬停反馈（对齐现有 border-strong 语义） */
+.allotment-split-view > .allotment-sash-container > .allotment-sash:active,
+.allotment-split-view > .allotment-sash-container > .allotment-sash:hover {
+  background: var(--border-strong);
 }
 
 * {
@@ -211,16 +222,16 @@ body {
 .bar-area {
   flex: 1;
   min-width: 0;
-  display: flex;
-  align-items: stretch;
   overflow: hidden;
 }
 
 .bar {
   display: flex;
   flex-direction: column;
+  height: 100%;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .bar-header {
@@ -503,28 +514,7 @@ body {
   margin-bottom: 4px;
 }
 
-body.no-select {
-  user-select: none;
-}
 
-.app-sidebar-resizer {
-  flex: none;
-  width: 4px;
-  margin: 0 -2px;
-  cursor: col-resize;
-  background: transparent;
-  z-index: 1;
-}
-
-.app-sidebar-resizer:hover,
-.app-shell.resizing .app-sidebar-resizer {
-  background: #9b9b9b;
-}
-
-.app-shell.resizing {
-  cursor: col-resize;
-  user-select: none;
-}
 
 .sidebar-brand {
   padding: 20px 18px 16px;
