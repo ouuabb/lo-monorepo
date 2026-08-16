@@ -1,22 +1,24 @@
 const { registerPluginIpc, CHANNELS } = require('../../src/main/plugin/plugin-ipc.cjs');
 
-function makeRegistry(commands, views = [], panels = [], editors = [], services = []) {
+function makeRegistry(commands, views = [], panels = [], editors = [], services = [], viewers = []) {
   return {
     listCommands: jest.fn(() => commands),
     listViews: jest.fn(() => views),
     listPanels: jest.fn(() => panels),
     listEditors: jest.fn(() => editors),
     listServices: jest.fn(() => services),
+    listViewers: jest.fn(() => viewers),
   };
 }
 
-function makePluginManager(commands = [], views = [], panels = [], editors = [], services = []) {
+function makePluginManager(commands = [], views = [], panels = [], editors = [], services = [], viewers = []) {
   const pm = {
-    extensionRegistry: makeRegistry(commands, views, panels, editors, services),
+    extensionRegistry: makeRegistry(commands, views, panels, editors, services, viewers),
     executeCommand: jest.fn(),
     renderView: jest.fn(),
     renderPanel: jest.fn(),
     renderEditor: jest.fn(),
+    renderViewer: jest.fn(),
     getUiModule: jest.fn(),
     invokePluginUiCtx: jest.fn(),
     listForUi: jest.fn(() => []),
@@ -51,6 +53,12 @@ function makePluginManager(commands = [], views = [], panels = [], editors = [],
     title: 'Editor',
     resourceType: 'note',
     html: '<p>editor</p>',
+  }));
+  pm.renderViewer.mockImplementation(async (viewerId) => ({
+    pluginId: 'demo',
+    viewerId,
+    label: 'Viewer',
+    html: '<p>viewer</p>',
   }));
   return pm;
 }
@@ -300,6 +308,45 @@ describe('registerPluginIpc', () => {
     const res = await handler({}, 'nope', {});
     expect(res.ok).toBe(false);
     expect(res.error).toBe('编辑器不存在: nope');
+  });
+
+  it('LIST_VIEWERS 返回 Usage Viewer 清单（viewerId/label/pluginId，无 render）', async () => {
+    const ipcMain = { handle: jest.fn() };
+    const pm = makePluginManager([], [], [], [], [], [
+      { viewerId: 'viewer.epub-reader', label: 'EPUB 阅读器', pluginId: 'demo-pv', render: () => {} },
+    ]);
+    registerPluginIpc(ipcMain, pm);
+    const handler = ipcMain.handle.mock.calls.find(([c]) => c === CHANNELS.LIST_VIEWERS)[1];
+
+    const res = await handler();
+    expect(res.ok).toBe(true);
+    expect(res.viewers).toEqual([
+      { viewerId: 'viewer.epub-reader', label: 'EPUB 阅读器', pluginId: 'demo-pv' },
+    ]);
+  });
+
+  it('RENDER_VIEWER 委托 pluginManager.renderViewer 并返回 HTML', async () => {
+    const ipcMain = { handle: jest.fn() };
+    const pm = makePluginManager();
+    registerPluginIpc(ipcMain, pm);
+    const handler = ipcMain.handle.mock.calls.find(([c]) => c === CHANNELS.RENDER_VIEWER)[1];
+
+    const res = await handler({}, 'viewer.epub-reader', { rid: 'res_epub' });
+    expect(pm.renderViewer).toHaveBeenCalledWith('viewer.epub-reader', { rid: 'res_epub' });
+    expect(res.ok).toBe(true);
+    expect(res.viewer).toEqual({ pluginId: 'demo', viewerId: 'viewer.epub-reader', label: 'Viewer', html: '<p>viewer</p>' });
+  });
+
+  it('RENDER_VIEWER Viewer 不存在时返回错误', async () => {
+    const ipcMain = { handle: jest.fn() };
+    const pm = makePluginManager();
+    pm.renderViewer.mockRejectedValue(new Error('Viewer 不存在: nope'));
+    registerPluginIpc(ipcMain, pm);
+    const handler = ipcMain.handle.mock.calls.find(([c]) => c === CHANNELS.RENDER_VIEWER)[1];
+
+    const res = await handler({}, 'nope', {});
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe('Viewer 不存在: nope');
   });
 
   it('GET_UI_MODULE 返回渲染端入口源码 + worldId', async () => {

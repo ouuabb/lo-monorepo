@@ -446,6 +446,54 @@ describe('PluginManager', () => {
     await expect(pm.renderEditor('demo-pe.note', {})).rejects.toThrow(/编辑器不存在/);
   });
 
+  it('Usage Viewer（U3）：registerViewer 注册，renderViewer 渲染桥，disable 清理', async () => {
+    const dir = makePluginsDir();
+    writePlugin(dir, 'demo-pv', `
+      const { AgentPlugin } = require(${JSON.stringify(SDK_INDEX)});
+      class P extends AgentPlugin {
+        manifest() {
+          return {
+            id: 'demo-pv', name: 'Demo PV', version: '0.1.0', main: 'index.cjs',
+            contributes: { viewers: [{ viewerId: 'viewer.epub-reader', label: 'EPUB 阅读器' }] },
+          };
+        }
+        async activate(ctx) {
+          ctx.extensions.registerViewer({
+            viewerId: 'viewer.epub-reader',
+            label: 'EPUB 阅读器',
+            render: async (context, cmdCtx) => '<div class="reader">' + (context.rid || '') + ':' + (context.modeId || '') + '</div>',
+          });
+        }
+      }
+      module.exports = P;
+    `);
+    const reg = new ExtensionRegistry();
+    const pm = new PluginManager({
+      pluginsDir: dir,
+      hostRequireBase: path.join(__dirname, '..', '..', 'src', 'main'),
+      loCore: makeLoCore(),
+      extensionRegistry: reg,
+    });
+    await pm.initialize();
+    await pm.activate('demo-pv');
+
+    const viewer = reg.getViewer('viewer.epub-reader');
+    expect(viewer).toMatchObject({ viewerId: 'viewer.epub-reader', pluginId: 'demo-pv', label: 'EPUB 阅读器' });
+    expect(reg.listViewers()).toHaveLength(1);
+
+    const res = await pm.renderViewer('viewer.epub-reader', { rid: 'res_epub', modeId: 'reading' });
+    expect(res).toMatchObject({ pluginId: 'demo-pv', viewerId: 'viewer.epub-reader', label: 'EPUB 阅读器' });
+    expect(res.html).toContain('res_epub');
+    expect(res.html).toContain('reading');
+
+    await expect(pm.renderViewer('viewer.missing', {})).rejects.toThrow(/Viewer 不存在/);
+
+    // 未激活时渲染报错；disable 清理
+    await pm.disable('demo-pv');
+    expect(reg.getViewer('viewer.epub-reader')).toBeNull();
+    await expect(pm.renderViewer('viewer.epub-reader', {})).rejects.toThrow(/Viewer 不存在/);
+  });
+
   it('渲染端 UI：getUiModule 读 ui 源码 + worldId 分配 + invokePluginUiCtx 代理 ctx', async () => {
     const dir = makePluginsDir();
     writePlugin(dir, 'demo-um', `

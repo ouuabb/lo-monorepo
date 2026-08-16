@@ -54,7 +54,7 @@ class EpubReaderPlugin extends Plugin {
   }
 
   /**
-   * 注册阶段：注册 importers、CLI commands、HTTP 端点
+   * 注册阶段：注册 importers、CLI commands、HTTP 端点、Mode/Viewer 贡献
    */
   register(context) {
     super.register(context);
@@ -74,6 +74,55 @@ class EpubReaderPlugin extends Plugin {
 
     // ③ HTTP 端点：lo serve 挂载 Web 阅读器
     this._registerHttpEndpoints(extRegistry, context);
+
+    // ④ Mode/Viewer 贡献（U3）：
+    //    reading 为 Core builtin（U1，已覆盖 epub），不重复注册；
+    //    annotating/metadata 由本插件贡献；viewer.epub-reader 声明 supports modes:[reading]
+    this._registerUsageContributions(context);
+  }
+
+  /**
+   * 注册 Usage Mode/Viewer 贡献（U3；经 ctx.modes/ctx.viewers 门面写入 Core 表）
+   * annotating 只是使用上下文，不吸收标注数据模型（标注仍走 Operation + note + source-of）
+   * metadata 只是使用方式声明，metadata 操作仍走既有 Operation/Resource/Schema
+   */
+  async _registerUsageContributions(context) {
+    if (!context.modes || typeof context.modes.register !== 'function') return;
+    let validateModeDef = null;
+    let validateViewerDef = null;
+    try {
+      ({ validateModeDef, validateViewerDef } = require('@lo/plugins-sdk/PluginContext'));
+    } catch {}
+    if (context.modes && typeof context.modes.register === 'function') {
+      const annotating = {
+        modeId: 'annotating',
+        semantics: '以标注方式使用（创建笔记/高亮/书签）',
+        applicableTo: { types: ['epub'] },
+        rules: { writable: true, interactive: true },
+      };
+      const metadata = {
+        modeId: 'metadata',
+        semantics: '以元数据方式使用（查看/管理书籍元数据）',
+        applicableTo: { types: ['epub'] },
+        rules: { writable: false, interactive: false },
+      };
+      if (validateModeDef) {
+        validateModeDef(annotating);
+        validateModeDef(metadata);
+      }
+      await context.modes.register(annotating);
+      await context.modes.register(metadata);
+    }
+    if (context.viewers && typeof context.viewers.register === 'function') {
+      const epubViewer = {
+        viewerId: 'viewer.epub-reader',
+        label: 'EPUB 阅读器',
+        semantics: 'EPUB 阅读（Web 阅读器承载）',
+        supports: { modes: ['reading'] },
+      };
+      if (validateViewerDef) validateViewerDef(epubViewer);
+      await context.viewers.register(epubViewer);
+    }
   }
 
   /**

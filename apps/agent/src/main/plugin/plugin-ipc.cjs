@@ -18,6 +18,8 @@ const CHANNELS = {
   RENDER_PANEL: 'agent-plugins:render-panel',
   LIST_EDITORS: 'agent-plugins:list-editors',
   RENDER_EDITOR: 'agent-plugins:render-editor',
+  LIST_VIEWERS: 'agent-plugins:list-viewers',
+  RENDER_VIEWER: 'agent-plugins:render-viewer',
   LIST_SERVICES: 'agent-plugins:list-services',
   GET_UI_MODULE: 'agent-plugins:get-ui-module',
   CTX: 'agent-plugins:ctx',
@@ -116,6 +118,26 @@ function registerPluginIpc(ipcMain, pluginManager) {
       if (!pluginManager) throw new Error('插件系统未初始化');
       const result = await pluginManager.renderEditor(editorId, context || {});
       return { ok: true, editor: result };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+
+  // 列出已注册 Usage Viewer（供 Session.viewerId 渲染桥：viewerId / label / pluginId）
+  ipcMain.handle(CHANNELS.LIST_VIEWERS, () => {
+    if (!pluginManager || !pluginManager.extensionRegistry) return { ok: true, viewers: [] };
+    const viewers = pluginManager.extensionRegistry
+      .listViewers()
+      .map((v) => ({ viewerId: v.viewerId, label: v.label, pluginId: v.pluginId }));
+    return { ok: true, viewers };
+  });
+
+  // 渲染 Usage Viewer → HTML（交付渲染进程承载）
+  ipcMain.handle(CHANNELS.RENDER_VIEWER, async (_event, viewerId, context) => {
+    try {
+      if (!pluginManager) throw new Error('插件系统未初始化');
+      const result = await pluginManager.renderViewer(viewerId, context || {});
+      return { ok: true, viewer: result };
     } catch (e) {
       return { ok: false, error: e.message };
     }

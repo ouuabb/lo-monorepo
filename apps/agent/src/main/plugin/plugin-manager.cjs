@@ -370,6 +370,7 @@ class PluginManager {
         registerView: (defs) => this._registerViews(entry.id, defs),
         registerPanel: (def) => this._registerPanels(entry.id, def ? [def] : []),
         registerEditor: (def) => this._registerEditors(entry.id, def ? [def] : []),
+        registerViewer: (def) => this._registerViewers(entry.id, def ? [def] : []),
         registerService: (defs) => this._registerServices(entry.id, defs),
         getService: (id) => this.getService(id),
         listServices: () => this.listServices(),
@@ -563,6 +564,18 @@ class PluginManager {
   }
 
   /**
+   * 将插件的 Usage Viewer 注册到 ExtensionRegistry（U3：Session.viewerId → 渲染）
+   * @param {string} pluginId
+   * @param {Array} defs — [{ viewerId, label?, render }]
+   */
+  _registerViewers(pluginId, defs) {
+    if (!this.extensionRegistry) {
+      throw new Error(`[plugin] Viewer 注册失败：extensionRegistry 未注入 (${pluginId})`);
+    }
+    return this.extensionRegistry.registerViewers(pluginId, defs);
+  }
+
+  /**
    * 查找能力；缺失时按触发点懒激活匹配插件后重试（延迟激活支持）
    * @param {(id: string) => object|null} getter
    * @param {'onCommand'|'onView'|'onPanel'|'onEditor'} prefix
@@ -602,8 +615,7 @@ class PluginManager {
   }
 
   /** 渲染插件编辑器（同视图渲染快照模型：render 返回 HTML，经 IPC 交付渲染进程） */
-  async renderEditor(editorId, context = {}) {
-    if (!this.extensionRegistry) {
+  async renderEditor(editorId, context = {}) {    if (!this.extensionRegistry) {
       throw new Error('extensionRegistry 未注入，无法渲染编辑器');
     }
     const editor = await this._findOrTrigger(
@@ -629,6 +641,33 @@ class PluginManager {
       resourceType: editor.resourceType,
       html,
     };
+  }
+
+  /**
+   * 渲染插件 Usage Viewer（U3：Session.viewerId 指向插件 Viewer 时经此桥渲染）
+   * render 返回 HTML 字符串，经白名单 IPC 交付渲染进程（同 editors 快照模型）
+   * @param {string} viewerId — viewerId（如 'viewer.epub-reader'）
+   * @param {object} [context] — 传给 render 的上下文（如 { rid, modeId }）
+   * @returns {Promise<{ pluginId, viewerId, label, html }>}
+   */
+  async renderViewer(viewerId, context = {}) {
+    if (!this.extensionRegistry) {
+      throw new Error('extensionRegistry 未注入，无法渲染 Viewer');
+    }
+    // Viewer 贡献插件需处于激活态（懒激活前缀不为此扩展；不提前设计 onViewer 触发点）
+    const viewer = this.extensionRegistry.getViewer(viewerId);
+    if (!viewer) {
+      throw new Error(`Viewer 不存在: ${viewerId}`);
+    }
+    const entry = this._registry.get(viewer.pluginId);
+    if (!entry) {
+      throw new Error(`插件未加载: ${viewer.pluginId}`);
+    }
+    if (entry.state !== 'activated') {
+      throw new Error(`插件未激活: ${viewer.pluginId}`);
+    }
+    const html = await viewer.render(context || {}, entry.plugin.context);
+    return { pluginId: viewer.pluginId, viewerId, label: viewer.label, html };
   }
 
   /**

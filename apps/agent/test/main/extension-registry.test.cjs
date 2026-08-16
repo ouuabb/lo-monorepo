@@ -252,4 +252,30 @@ describe('ExtensionRegistry', () => {
     expect(reg.listEditors()).toHaveLength(0);
     expect(reg.count()).toBe(0);
   });
+
+  it('registerViewers 注册 Usage Viewer（U3：viewerId + render）', () => {
+    const reg = new ExtensionRegistry();
+    const render = jest.fn(() => '<div>reader</div>');
+    const registered = reg.registerViewers('demo', [
+      { viewerId: 'viewer.epub-reader', label: 'EPUB 阅读器', render },
+      { viewerId: 'viewer.bad', render: 'not-fn' }, // 缺 render → 跳过
+    ]);
+    expect(registered).toHaveLength(1);
+
+    const viewer = reg.getViewer('viewer.epub-reader');
+    expect(viewer).toMatchObject({ viewerId: 'viewer.epub-reader', pluginId: 'demo', label: 'EPUB 阅读器' });
+    expect(typeof viewer.render).toBe('function');
+    expect(reg.getViewer('viewer.bad')).toBeNull();
+    expect(reg.listViewers()).toHaveLength(1);
+  });
+
+  it('registerViewers 重复 viewerId 跳过；unregisterByPlugin 清理', () => {
+    const reg = new ExtensionRegistry();
+    reg.registerViewers('a', [{ viewerId: 'viewer.epub-reader', render: () => 1 }]);
+    const reg2 = reg.registerViewers('b', [{ viewerId: 'viewer.epub-reader', render: () => 2 }]);
+    expect(reg2).toHaveLength(0);
+    expect(reg.getViewer('viewer.epub-reader').pluginId).toBe('a');
+    reg.unregisterByPlugin('a');
+    expect(reg.getViewer('viewer.epub-reader')).toBeNull();
+  });
 });

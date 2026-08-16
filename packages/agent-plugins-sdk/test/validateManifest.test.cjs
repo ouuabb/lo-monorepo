@@ -195,6 +195,27 @@ describe('manifest 扩展字段', () => {
     expect(bad.errors.join()).toContain('unknownType');
   });
 
+  it('contributes.viewers（U3）合法声明通过；缺 viewerId 拒绝', () => {
+    expect(
+      validateManifest({
+        ...base,
+        contributes: { viewers: [{ viewerId: 'viewer.epub-reader', label: 'EPUB 阅读器' }] },
+      }).ok,
+    ).toBe(true);
+    expect(
+      validateManifest({
+        ...base,
+        contributes: { viewers: [{ label: '缺 viewerId' }] },
+      }).ok,
+    ).toBe(false);
+    expect(
+      validateManifest({
+        ...base,
+        contributes: { viewers: 'bad' },
+      }).ok,
+    ).toBe(false);
+  });
+
   it('permissions.lo 只允许已知能力', () => {
     expect(
       validateManifest({ ...base, permissions: { lo: ['operations.read', 'health.read'] } }).ok,

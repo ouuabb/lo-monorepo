@@ -32,6 +32,7 @@ describe('extensions-facade', () => {
       'registerView',
       'registerPanel',
       'registerEditor',
+      'registerViewer',
       'registerService',
       'getService',
       'listServices',

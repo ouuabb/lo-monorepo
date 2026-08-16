@@ -49,6 +49,9 @@ class PluginContext {
     this._relationService = services.relationService || null;
     // P0: 写配置闭包（由 PluginManager 注入，委托 pm.setPluginConfig 落库）
     this._setConfigFn = services.setConfigFn || null;
+    // U3: Mode/Viewer 注册/解析（由 PluginManager 注入；缺省 noop）
+    this._modes = services.modes || null;
+    this._viewers = services.viewers || null;
   }
 
   // ── SDK 风格 getter（新插件推荐） ──
@@ -135,6 +138,31 @@ class PluginContext {
       this._relationFacade = createNoopRelationFacade();
     }
     return this._relationFacade;
+  }
+
+  /** Mode 门面（U3）：注册/解析 Usage Mode（注入缺省时 noop 安全默认） */
+  get modes() {
+    return this._modes || {
+      async register() {
+        throw new Error(
+          `[PluginContext] modes.register 未注入（插件 '${this._pluginId}'）：请在 lo 仓库中运行插件`,
+        );
+      },
+      async resolve() {
+        return { ok: true, modes: [] };
+      },
+    };
+  }
+
+  /** Viewer 门面（U3）：注册插件 Viewer（注入缺省时 noop 安全默认） */
+  get viewers() {
+    return this._viewers || {
+      async register() {
+        throw new Error(
+          `[PluginContext] viewers.register 未注入（插件 '${this._pluginId}'）：请在 lo 仓库中运行插件`,
+        );
+      },
+    };
   }
 
   // ── 旧版 API（向后兼容） ──

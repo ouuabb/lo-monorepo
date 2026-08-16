@@ -37,10 +37,31 @@ function getDataDir(ctx) {
  */
 function getEpubFilePath(ctx, resource) {
   if (!resource) throw new Error('资源不存在');
-  if (resource.type !== 'epub') throw new Error(`资源类型不是 epub: ${resource.type}`);
   const filePath = resource.path || resource.filePath || '';
   if (!filePath) throw new Error('资源缺少文件路径');
   return path.isAbsolute(filePath) ? filePath : path.join(ctx.repoPath, filePath);
+}
+
+/**
+ * 命令域校验（U3）：命令可用性以「当前使用上下文（Mode）」为准，而非资源类型。
+ * 经 ctx.modes.resolve 解析资源可用 Mode；其中包含任一所需 Mode 才放行。
+ * @param {object} ctx — PluginContext facade
+ * @param {string} rid — 资源 rid
+ * @param {string[]} requiredModes — 命令所需的 Mode 列表（如 ['reading'] / ['annotating']）
+ * @returns {Promise<object>} 资源（getByRid 结果）
+ */
+async function requireMode(ctx, rid, requiredModes) {
+  const resource = await ctx.resources.getByRid(rid);
+  if (!resource) throw new Error('错误: 资源不存在');
+  const resolved = await ctx.modes.resolve(rid);
+  const modes = resolved && resolved.ok ? resolved.modes : [];
+  const modeIds = modes.map((m) => m.modeId);
+  if (!requiredModes.some((m) => modeIds.includes(m))) {
+    throw new Error(
+      `错误: 该资源不处于允许此命令的 Mode（需要 ${requiredModes.join('/')}，实际 ${modeIds.join(', ') || '无'}; 可用 Mode 由资源使用方式决定）`,
+    );
+  }
+  return resource;
 }
 
 // ── epub:info — 显示元信息 ──
@@ -53,9 +74,11 @@ async function info(args, ctx) {
     return;
   }
 
-  const resource = await ctx.resources.getByRid(rid);
-  if (!resource) {
-    logger.info('错误: 资源不存在');
+  let resource;
+  try {
+    resource = await requireMode(ctx, rid, ['reading']);
+  } catch (e) {
+    logger.info(e.message);
     return;
   }
   const filePath = getEpubFilePath(ctx, resource);
@@ -108,10 +131,12 @@ async function note(args, ctx) {
   const quote = quoteIdx >= 0 ? args[quoteIdx + 1] : '';
   const location = locIdx >= 0 ? args[locIdx + 1] : '';
 
-  // 确认 EPUB 资源存在
-  const epubResource = await ctx.resources.getByRid(rid);
-  if (!epubResource) {
-    logger.info('错误: EPUB 资源不存在');
+  // 确认资源处于标注上下文（annotating Mode；资源类型不参与判定）
+  let epubResource;
+  try {
+    epubResource = await requireMode(ctx, rid, ['annotating']);
+  } catch (e) {
+    logger.info(e.message);
     return;
   }
 
@@ -179,6 +204,13 @@ async function notes(args, ctx) {
     return;
   }
 
+  try {
+    await requireMode(ctx, rid, ['reading']);
+  } catch (e) {
+    logger.info(e.message);
+    return;
+  }
+
   // 通过 relations facade 查找 source-of 关系的笔记
   const noteRelations = await ctx.relations.getByFromRidAndType(rid, 'source-of');
 
@@ -214,6 +246,13 @@ async function highlight(args, ctx) {
     return;
   }
 
+  try {
+    await requireMode(ctx, rid, ['annotating']);
+  } catch (e) {
+    logger.info(e.message);
+    return;
+  }
+
   const store = createStore(getDataDir(ctx));
   const entry = await store.addHighlight(rid, { location, text });
   logger.info(`高亮已添加: ${entry.id}`);
@@ -228,6 +267,13 @@ async function highlights(args, ctx) {
   const rid = args[0];
   if (!rid) {
     logger.info('用法: lo ext epub:highlights <rid>');
+    return;
+  }
+
+  try {
+    await requireMode(ctx, rid, ['reading']);
+  } catch (e) {
+    logger.info(e.message);
     return;
   }
 
@@ -262,6 +308,13 @@ async function bookmark(args, ctx) {
     return;
   }
 
+  try {
+    await requireMode(ctx, rid, ['annotating']);
+  } catch (e) {
+    logger.info(e.message);
+    return;
+  }
+
   const store = createStore(getDataDir(ctx));
   const entry = await store.addBookmark(rid, { location, title });
   logger.info(`书签已添加: ${entry.id}`);
@@ -276,6 +329,13 @@ async function bookmarks(args, ctx) {
   const rid = args[0];
   if (!rid) {
     logger.info('用法: lo ext epub:bookmarks <rid>');
+    return;
+  }
+
+  try {
+    await requireMode(ctx, rid, ['reading']);
+  } catch (e) {
+    logger.info(e.message);
     return;
   }
 
@@ -317,14 +377,12 @@ async function open(args, ctx) {
     return;
   }
 
-  // 确认资源存在
-  const resource = await ctx.resources.getByRid(rid);
-  if (!resource) {
-    logger.info('错误: 资源不存在');
-    return;
-  }
-  if (resource.type !== 'epub') {
-    logger.info(`错误: 资源类型不是 epub: ${resource.type}`);
+  // 确认资源处于阅读上下文（reading Mode；资源类型不参与判定）
+  let resource;
+  try {
+    resource = await requireMode(ctx, rid, ['reading']);
+  } catch (e) {
+    logger.info(e.message);
     return;
   }
 
@@ -363,4 +421,4 @@ const commands = {
   'epub:bookmarks': { run: bookmarks,  description: '列出书签' },
 };
 
-module.exports = { commands, getDataDir, getEpubFilePath };
+module.exports = { commands, getDataDir, getEpubFilePath, requireMode };

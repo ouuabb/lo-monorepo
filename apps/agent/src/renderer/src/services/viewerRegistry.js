@@ -1,8 +1,11 @@
 /**
- * viewerRegistry.js —— Agent 侧 Viewer 渲染注册表（U2）
+ * viewerRegistry.js —— Agent 侧 Viewer 渲染注册表（U2/U3）
  *
- * 根据 session.viewerId 选择 renderer；builtin 注册表（U3 起插件可扩展）。
- * Viewer 自行声明 supports.modes（与 Core 双向解耦）；组件按 viewer 语义渲染。
+ * 根据 session.viewerId 选择 renderer；内置注册表 + 插件贡献合并（U3）：
+ *   内置 Viewer → React 组件直接渲染；
+ *   插件 Viewer（manifest contributes.viewers / ctx.extensions.registerViewer）
+ *   → 经 agent-plugins:render-viewer 渲染桥（HTML 快照，同 editors 模型）。
+ * Viewer 自行声明 supports.modes（与 Core 双向解耦）。
  */
 import NoteEditor from '../editor/NoteEditor.jsx';
 
@@ -19,10 +22,15 @@ const VIEWERS = {
 };
 
 /**
- * 解析 viewerId → { component, readOnly? }；未注册返回 null（由调用方处理）
+ * 解析 viewerId → 渲染描述
+ * 内置：{ component, readOnly? }；插件：{ plugin: { viewerId, label, pluginId } }；未注册：null
  * @param {string} viewerId
+ * @param {Array<{ viewerId: string, label: string, pluginId: string }>} [pluginViewers]
  */
-export function resolveViewerComponent(viewerId) {
+export function resolveViewerComponent(viewerId, pluginViewers = []) {
   if (!viewerId) return null;
-  return VIEWERS[viewerId] || null;
+  if (VIEWERS[viewerId]) return VIEWERS[viewerId];
+  const plugin = (pluginViewers || []).find((v) => v.viewerId === viewerId);
+  if (plugin) return { plugin };
+  return null;
 }

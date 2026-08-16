@@ -35,6 +35,7 @@ class ExtensionRegistry {
     this._panels = new Map();
     /** @type {Map<string, object>} editorId → { id, pluginId, title, resourceType, render } */
     this._editors = new Map();
+    this._viewers = new Map();
   }
 
   // ── 扩展点声明（纯数据） ──
@@ -111,6 +112,11 @@ class ExtensionRegistry {
     for (const [editorId, editor] of this._editors) {
       if (editor.pluginId === pluginId) {
         this._editors.delete(editorId);
+      }
+    }
+    for (const [viewerId, viewer] of this._viewers) {
+      if (viewer.pluginId === pluginId) {
+        this._viewers.delete(viewerId);
       }
     }
   }
@@ -340,6 +346,48 @@ class ExtensionRegistry {
     return Array.from(this._editors.values());
   }
 
+  // ── Usage Viewer 渲染器（U3：Session.viewerId → 插件渲染，同 editors 快照模型） ──
+
+  /**
+   * 注册可渲染 Usage Viewer（viewerId 对应 Core viewer_definitions 注册的 Viewer）
+   * @param {string} pluginId — 来源插件 ID
+   * @param {Array<{ viewerId: string, label?: string, render: Function }>} defs
+   * @returns {object[]} 注册成功的 viewer
+   */
+  registerViewers(pluginId, defs = []) {
+    const registered = [];
+    for (const def of defs) {
+      if (!def || typeof def.viewerId !== 'string' || !def.viewerId) continue;
+      if (typeof def.render !== 'function') {
+        console.error(`[extension-registry] Viewer 缺少 render: ${pluginId}:viewers:${def.viewerId}`);
+        continue;
+      }
+      if (this._viewers.has(def.viewerId)) {
+        console.error(`[extension-registry] Viewer 已存在: ${def.viewerId}`);
+        continue;
+      }
+      const viewer = {
+        viewerId: def.viewerId,
+        pluginId,
+        label: def.label || def.viewerId,
+        render: def.render,
+      };
+      this._viewers.set(def.viewerId, viewer);
+      registered.push(viewer);
+    }
+    return registered;
+  }
+
+  /** 获取 Viewer 渲染器（含 render） */
+  getViewer(viewerId) {
+    return this._viewers.get(viewerId) || null;
+  }
+
+  /** 列出全部 Viewer */
+  listViewers() {
+    return Array.from(this._viewers.values());
+  }
+
   /** 统计 */
   count() {
     return (
@@ -348,7 +396,8 @@ class ExtensionRegistry {
       this._views.size +
       this._services.size +
       this._panels.size +
-      this._editors.size
+      this._editors.size +
+      this._viewers.size
     );
   }
 
@@ -361,6 +410,7 @@ class ExtensionRegistry {
     this._services.clear();
     this._panels.clear();
     this._editors.clear();
+    this._viewers.clear();
   }
 
   /** 按类型列出扩展点 */

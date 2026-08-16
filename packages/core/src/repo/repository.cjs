@@ -1674,6 +1674,66 @@ class Repository {
     }));
   }
 
+  /**
+   * 注册插件 Mode（U3 写入路径：mode_definitions 表）
+   * builtin 冲突抛错（U1 已定：同 modeId 插件注册抛错）
+   * @param {{ modeId: string, semantics: string, applicableTo: object, rules: object }} def
+   * @param {string} pluginId
+   */
+  async registerPluginMode(def, pluginId) {
+    if (!def || typeof def.modeId !== 'string' || !def.modeId) {
+      throw new Error('[modes.register] Mode 定义缺少 modeId');
+    }
+    if (modeRegistry.BUILTIN_MODES.some((m) => m.modeId === def.modeId)) {
+      throw new Error(`Mode 冲突: ${def.modeId} 为 builtin Mode，插件不得重复注册`);
+    }
+    try {
+      await this.db.run(
+        'INSERT INTO mode_definitions (mode_id, semantics, applies_to, rules, plugin_id) VALUES (?, ?, ?, ?, ?)',
+        [
+          def.modeId,
+          def.semantics,
+          JSON.stringify(def.applicableTo || {}),
+          JSON.stringify(def.rules || {}),
+          pluginId,
+        ],
+      );
+    } catch (e) {
+      throw new Error(`Mode 注册失败: ${def.modeId}（${e.message}）`);
+    }
+    return { modeId: def.modeId, pluginId };
+  }
+
+  /**
+   * 注册插件 Viewer（U3 写入路径：viewer_definitions 表）
+   * builtin 冲突抛错
+   * @param {{ viewerId: string, label: string, semantics: string, supports: object }} def
+   * @param {string} pluginId
+   */
+  async registerPluginViewer(def, pluginId) {
+    if (!def || typeof def.viewerId !== 'string' || !def.viewerId) {
+      throw new Error('[viewers.register] Viewer 定义缺少 viewerId');
+    }
+    if (viewerRegistry.BUILTIN_VIEWERS.some((v) => v.viewerId === def.viewerId)) {
+      throw new Error(`Viewer 冲突: ${def.viewerId} 为 builtin Viewer，插件不得重复注册`);
+    }
+    try {
+      await this.db.run(
+        'INSERT INTO viewer_definitions (viewer_id, label, semantics, supports, plugin_id) VALUES (?, ?, ?, ?, ?)',
+        [
+          def.viewerId,
+          def.label,
+          def.semantics,
+          JSON.stringify(def.supports || {}),
+          pluginId,
+        ],
+      );
+    } catch (e) {
+      throw new Error(`Viewer 注册失败: ${def.viewerId}（${e.message}）`);
+    }
+    return { viewerId: def.viewerId, pluginId };
+  }
+
   async getResourceByPath(filePath) {
     return this.resourceService.getByPath(filePath);
   }

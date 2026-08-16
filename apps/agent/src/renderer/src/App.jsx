@@ -60,6 +60,7 @@ const [repoCtx, setRepoCtx] = useState(null);
   const [ctxMenu, setCtxMenu] = useState(null);
   const readOnlyOverridesRef = useRef(new Set());
   const [autoSave, setAutoSave] = useState(false);
+  const [pluginViewers, setPluginViewers] = useState([]);
   const discardKeyRef = useRef(null);
   const deleteRidRef = useRef(null);
   const toastTimerRef = useRef(null);
@@ -657,6 +658,24 @@ useEffect(() => {
     };
   }, [authenticated, handleRefresh]);
 
+  // U3：登录后拉取插件贡献的 Usage Viewer（Session.viewerId → 渲染桥）
+  useEffect(() => {
+    if (!api || !authenticated || !api.plugins || !api.plugins.viewers) {
+      return undefined;
+    }
+    let cancelled = false;
+    api.plugins.viewers
+      .list()
+      .then((res) => {
+        if (cancelled) return;
+        if (res && res.ok) setPluginViewers(res.viewers || []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated]);
+
   const winBtn = (action, label, children) => (
     <button
       type="button"
@@ -870,7 +889,11 @@ useEffect(() => {
                 </div>
 
                 <div className="editor-body">
-                  <EditorRenderer tab={activeTab} onChange={setActiveText} />
+                  <EditorRenderer
+                    tab={activeTab}
+                    onChange={setActiveText}
+                    pluginViewers={pluginViewers}
+                  />
                 </div>
 
                 <div className="editor-statusbar">
@@ -1048,17 +1071,29 @@ const PLUGIN_STATE_LABEL = {
 };
 
 /**
- * EditorRenderer —— 按 session.viewerId 选择 renderer（U2）
+ * EditorRenderer —— 按 session.viewerId 选择 renderer（U2/U3）
  * session.state.readOnly 是只读状态唯一运行态来源；
  * viewer 自身的只读限制（如 generic-preview）与其取并集。
+ * 内置 Viewer → React 组件；插件 Viewer → PluginViewerHost（render-viewer 桥）。
  */
-function EditorRenderer({ tab, onChange }) {
-  const viewer = resolveViewerComponent(tab.session.viewerId);
+function EditorRenderer({ tab, onChange, pluginViewers }) {
+  const viewer = resolveViewerComponent(tab.session.viewerId, pluginViewers);
   if (!viewer) {
     return (
       <div className="editor-body-empty">
         无可用的 Viewer：{tab.session.viewerId}（插件贡献的 Viewer 未安装）
       </div>
+    );
+  }
+  if (viewer.plugin) {
+    return (
+      <PluginViewerHost
+        key={tab.key}
+        viewerId={tab.session.viewerId}
+        rid={tab.rid}
+        modeId={tab.session.modeId}
+        readOnly={tab.session.state.readOnly}
+      />
     );
   }
   const ViewerComponent = viewer.component;
@@ -1068,6 +1103,53 @@ function EditorRenderer({ tab, onChange }) {
       value={tab.text}
       onChange={onChange}
       readOnly={tab.session.state.readOnly || !!viewer.readOnly}
+    />
+  );
+}
+
+/**
+ * PluginViewerHost —— 插件 Viewer 渲染桥（U3）
+ * 经 agent-plugins:render-viewer 白名单通道取 HTML 快照（同 editors 模型），
+ * 不建立 iframe/WebView；错误/未安装态给明确提示。
+ */
+function PluginViewerHost({ viewerId, rid, modeId, readOnly }) {
+  const [html, setHtml] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    const pluginsApi = window.loAgent && window.loAgent.plugins;
+    if (!pluginsApi || !pluginsApi.viewers || !pluginsApi.viewers.render) {
+      setError('插件系统未就绪，无法渲染 Viewer');
+      return undefined;
+    }
+    setHtml('');
+    setError('');
+    pluginsApi.viewers
+      .render(viewerId, { rid, modeId, readOnly })
+      .then((res) => {
+        if (cancelled) return;
+        if (res && res.ok && res.viewer) {
+          setHtml(res.viewer.html || '');
+        } else {
+          setError((res && res.error) || 'Viewer 渲染失败');
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setError(`Viewer 渲染失败: ${e.message || e}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewerId, rid, modeId, readOnly]);
+
+  if (error) {
+    return <div className="editor-body-empty">{error}</div>;
+  }
+  return (
+    <div
+      className="editor-plugin-viewer"
+      dangerouslySetInnerHTML={html ? { __html: html } : undefined}
     />
   );
 }

@@ -71,6 +71,9 @@ describe('src/preload/index.cjs', () => {
     expect(api.plugins.views.render).toBeDefined();
     expect(api.plugins.panels).toBeDefined();
     expect(api.plugins.editors).toBeDefined();
+    expect(api.plugins.viewers).toBeDefined();
+    expect(api.plugins.viewers.list).toBeDefined();
+    expect(api.plugins.viewers.render).toBeDefined();
     expect(api.plugins.services).toBeDefined();
     expect(api.plugins.services.list).toBeDefined();
     expect(api.plugins.getUi).toBeDefined();
@@ -136,6 +139,21 @@ describe('src/preload/index.cjs', () => {
 
     await api.loCore.viewers.list('reading');
     expect(mockInvoke).toHaveBeenLastCalledWith('lo-core:viewers', 'reading');
+  });
+
+  it('plugins.viewers 经白名单通道透传（U3：viewer 渲染桥）', async () => {
+    require('../../src/preload/index.cjs');
+    const { mockExposeInMainWorld, mockInvoke } = require('electron').__mocks;
+    const api = mockExposeInMainWorld.mock.calls[0][1];
+    mockInvoke.mockResolvedValue({ ok: true, viewers: [] });
+
+    await api.plugins.viewers.list();
+    expect(mockInvoke).toHaveBeenLastCalledWith('agent-plugins:list-viewers');
+
+    mockInvoke.mockResolvedValue({ ok: true, viewer: { html: '<p>x</p>' } });
+    const res = await api.plugins.viewers.render('viewer.epub-reader', { rid: 'res_1' });
+    expect(mockInvoke).toHaveBeenLastCalledWith('agent-plugins:render-viewer', 'viewer.epub-reader', { rid: 'res_1' });
+    expect(res.viewer.html).toBe('<p>x</p>');
   });
 
   it('pluginUi 桥暴露 mount/render/dispose（isolated world）', () => {

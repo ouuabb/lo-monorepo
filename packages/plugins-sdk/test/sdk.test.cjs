@@ -150,6 +150,67 @@ describe('PluginContext', () => {
     expect(ctx.config('concurrency')).toBe(4);
     expect(ctx.config('unknown', 'fallback')).toBe('fallback');
   });
+
+  test('modes/viewers 默认 noop（register 抛错提示未注入；resolve 空结果）', async () => {
+    const ctx = new PluginContext();
+    await expect(ctx.modes.register({ modeId: 'x', semantics: 's', applicableTo: { types: ['epub'] }, rules: { writable: true, interactive: true } }))
+      .rejects.toThrow(/modes.register 未注入/);
+    await expect(ctx.viewers.register({ viewerId: 'viewer.x', label: 'l', semantics: 's', supports: { modes: ['reading'] } }))
+      .rejects.toThrow(/viewers.register 未注入/);
+    await expect(ctx.modes.resolve('res_1')).resolves.toEqual({ ok: true, modes: [] });
+  });
+
+  test('modes.register 校验：applicableTo.types 缺失/为空拒绝', async () => {
+    const ctx = new PluginContext();
+    await expect(ctx.modes.register({ modeId: 'x', semantics: 's', applicableTo: {}, rules: { writable: true, interactive: true } }))
+      .rejects.toThrow(/applicableTo\.types/);
+  });
+
+  test('modes.register 校验：rules 仅允许 writable/interactive（禁入 operations/permission/schema）', async () => {
+    const { validateModeDef } = require('../src/PluginContext.cjs');
+    expect(() => validateModeDef({
+      modeId: 'x', semantics: 's', applicableTo: { types: ['epub'] },
+      rules: { writable: true, interactive: true, operations: ['read'] },
+    })).toThrow(/禁止字段 "operations"/);
+    expect(() => validateModeDef({
+      modeId: 'x', semantics: 's', applicableTo: { types: ['epub'] },
+      rules: { writable: true, interactive: true, permission: ['x'] },
+    })).toThrow(/禁止字段 "permission"/);
+    expect(() => validateModeDef({
+      modeId: 'x', semantics: 's', applicableTo: { types: ['epub'] },
+      rules: { writable: true, interactive: true, schema: {} },
+    })).toThrow(/禁止字段 "schema"/);
+    // 合法定义通过
+    expect(() => validateModeDef({
+      modeId: 'x', semantics: 's', applicableTo: { types: ['epub'] },
+      rules: { writable: true, interactive: true },
+    })).not.toThrow();
+  });
+
+  test('viewers.register 校验：supports.modes 非空数组', async () => {
+    const { validateViewerDef } = require('../src/PluginContext.cjs');
+    expect(() => validateViewerDef({ viewerId: 'viewer.x', label: 'l', semantics: 's', supports: {} }))
+      .toThrow(/supports\.modes/);
+    expect(() => validateViewerDef({ viewerId: 'viewer.x', label: 'l', semantics: 's', supports: { modes: [] } }))
+      .toThrow(/supports\.modes/);
+    expect(() => validateViewerDef({ viewerId: 'viewer.x', label: 'l', semantics: 's', supports: { modes: ['reading'] } }))
+      .not.toThrow();
+  });
+
+  test('注入的 modes/viewers 实现可被调用（契约透传）', async () => {
+    const modesImpl = {
+      register: jest.fn(async () => ({ modeId: 'm1' })),
+      resolve: jest.fn(async () => ({ ok: true, modes: [{ modeId: 'reading' }] })),
+    };
+    const viewersImpl = { register: jest.fn(async () => ({ viewerId: 'viewer.x' })) };
+    const ctx = new PluginContext({ pluginId: 'p', modes: modesImpl, viewers: viewersImpl });
+    await ctx.modes.register({ modeId: 'm1' });
+    await ctx.modes.resolve('res_1');
+    await ctx.viewers.register({ viewerId: 'viewer.x' });
+    expect(modesImpl.register).toHaveBeenCalled();
+    expect(modesImpl.resolve).toHaveBeenCalledWith('res_1');
+    expect(viewersImpl.register).toHaveBeenCalled();
+  });
 });
 
 /* ─────────────────────────────────── 4. ResourceBuilder ──────────────────────────────── */

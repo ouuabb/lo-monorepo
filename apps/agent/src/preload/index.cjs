@@ -42,6 +42,8 @@ const CHANNEL = {
   PLUGINS_RENDER_PANEL: 'agent-plugins:render-panel',
   PLUGINS_EDITORS: 'agent-plugins:list-editors',
   PLUGINS_RENDER_EDITOR: 'agent-plugins:render-editor',
+  PLUGINS_VIEWERS: 'agent-plugins:list-viewers',
+  PLUGINS_RENDER_VIEWER: 'agent-plugins:render-viewer',
   PLUGINS_SERVICES: 'agent-plugins:list-services',
   PLUGINS_GET_UI: 'agent-plugins:get-ui-module',
   PLUGINS_CTX: 'agent-plugins:ctx',
@@ -126,6 +128,11 @@ contextBridge.exposeInMainWorld('loAgent', {
       list: () => ipcRenderer.invoke(CHANNEL.PLUGINS_EDITORS),
       render: (editorId, context) =>
         ipcRenderer.invoke(CHANNEL.PLUGINS_RENDER_EDITOR, editorId, context),
+    },
+    viewers: {
+      list: () => ipcRenderer.invoke(CHANNEL.PLUGINS_VIEWERS),
+      render: (viewerId, context) =>
+        ipcRenderer.invoke(CHANNEL.PLUGINS_RENDER_VIEWER, viewerId, context),
     },
     services: {
       list: () => ipcRenderer.invoke(CHANNEL.PLUGINS_SERVICES),

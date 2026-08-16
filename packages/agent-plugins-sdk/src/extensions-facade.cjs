@@ -18,6 +18,7 @@ const EXTENSIONS_METHODS = [
   'registerView',
   'registerPanel',
   'registerEditor',
+  'registerViewer',
   'registerService',
   'getService',
   'listServices',

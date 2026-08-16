@@ -32,6 +32,8 @@ class PluginContext {
     this._resources = injections.resources || createNoopResources();
     this._relations = injections.relations || createNoopRelations();
     this._repoPath = injections.repoPath || null;
+    this._modes = injections.modes || createNoopModes();
+    this._viewers = injections.viewers || createNoopViewers();
   }
 
   /**
@@ -92,6 +94,20 @@ class PluginContext {
   /** Relation Facade */
   get relations() {
     return this._relations;
+  }
+
+  /**
+   * Mode 门面（U3）：注册/解析 Usage Mode
+   * register：插件贡献 Mode（落 mode_definitions 表；builtin 冲突抛错）
+   * resolve：解析资源可用 Mode（builtin ∪ 插件表）
+   */
+  get modes() {
+    return this._modes;
+  }
+
+  /** Viewer 门面（U3）：注册插件 Viewer（落 viewer_definitions 表；builtin 冲突抛错） */
+  get viewers() {
+    return this._viewers;
   }
 }
 
@@ -158,4 +174,95 @@ function createNoopRelations() {
   };
 }
 
+/**
+ * 校验 Mode 定义（U3 契约边界，U0 §6）：
+ *   modeId 非空；semantics 非空；applicableTo.types 非空数组；
+ *   rules 仅允许 { writable, interactive }——禁止塞入 operations/permission/schema 等
+ * @param {object} def
+ * @throws {Error}
+ */
+function validateModeDef(def) {
+  if (!def || typeof def.modeId !== 'string' || !def.modeId) {
+    throw new Error('[modes.register] Mode 定义缺少 modeId');
+  }
+  if (typeof def.semantics !== 'string' || !def.semantics) {
+    throw new Error(`[modes.register] Mode ${def.modeId} 缺少 semantics`);
+  }
+  if (
+    !def.applicableTo ||
+    !Array.isArray(def.applicableTo.types) ||
+    def.applicableTo.types.length === 0
+  ) {
+    throw new Error(`[modes.register] Mode ${def.modeId} 缺少 applicableTo.types（非空数组）`);
+  }
+  if (!def.rules || typeof def.rules !== 'object') {
+    throw new Error(`[modes.register] Mode ${def.modeId} 缺少 rules`);
+  }
+  const allowedRuleKeys = ['writable', 'interactive'];
+  for (const key of Object.keys(def.rules)) {
+    if (!allowedRuleKeys.includes(key)) {
+      throw new Error(
+        `[modes.register] Mode ${def.modeId} 的 rules 含禁止字段 "${key}"` +
+          `（仅允许 writable/interactive；operations/permission/schema 不并入 Mode）`,
+      );
+    }
+  }
+}
+
+/**
+ * 校验 Viewer 定义（U3 契约边界，U0 §6）：
+ *   viewerId 非空；label 非空；supports.modes 非空数组
+ * @param {object} def
+ * @throws {Error}
+ */
+function validateViewerDef(def) {
+  if (!def || typeof def.viewerId !== 'string' || !def.viewerId) {
+    throw new Error('[viewers.register] Viewer 定义缺少 viewerId');
+  }
+  if (typeof def.label !== 'string' || !def.label) {
+    throw new Error(`[viewers.register] Viewer ${def.viewerId} 缺少 label`);
+  }
+  if (
+    !def.supports ||
+    !Array.isArray(def.supports.modes) ||
+    def.supports.modes.length === 0
+  ) {
+    throw new Error(`[viewers.register] Viewer ${def.viewerId} 缺少 supports.modes（非空数组）`);
+  }
+}
+
+function createNoopModes() {
+  return {
+    /**
+     * 注册 Mode（写入 mode_definitions 表）
+     * 契约校验始终执行（applicableTo.types 非空、rules 仅 writable/interactive）；
+     * 校验通过后若无注入实现则抛错（真实实现由 lo Core 注入）
+     */
+    async register(def) {
+      validateModeDef(def);
+      throw new Error(
+        '[PluginContext] modes.register 未注入，请在 lo 仓库中运行插件',
+      );
+    },
+    /** 解析资源可用 Mode（builtin ∪ 插件表）；默认安全空结果 */
+    async resolve() {
+      return { ok: true, modes: [] };
+    },
+  };
+}
+
+function createNoopViewers() {
+  return {
+    /** 注册 Viewer（写入 viewer_definitions 表）；契约校验后若无注入实现则抛错 */
+    async register(def) {
+      validateViewerDef(def);
+      throw new Error(
+        '[PluginContext] viewers.register 未注入，请在 lo 仓库中运行插件',
+      );
+    },
+  };
+}
+
 module.exports = PluginContext;
+module.exports.validateModeDef = validateModeDef;
+module.exports.validateViewerDef = validateViewerDef;

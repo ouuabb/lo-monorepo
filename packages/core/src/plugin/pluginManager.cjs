@@ -751,6 +751,17 @@ class PluginManager {
       relationService: this._baseServices.repository
         ? this._baseServices.repository.relationService
         : null,
+      // U3：Mode/Viewer 注册与解析（写入 mode_definitions/viewer_definitions 表）
+      modes: {
+        register: (def) => this._baseServices.repository.registerPluginMode(def, id),
+        resolve: async (rid) => {
+          const modes = await this._baseServices.repository.resolveModes(rid);
+          return { ok: true, modes };
+        },
+      },
+      viewers: {
+        register: (def) => this._baseServices.repository.registerPluginViewer(def, id),
+      },
     };
     const context = new PluginContext(services);
 
@@ -768,7 +779,8 @@ class PluginManager {
     this.lifecycle.setState(id, "loaded");
     plugin.state = "loaded";
 
-    plugin.register(context);
+    // U3：register 可能含异步注册（ctx.modes/viewers.register）；await 兼容同步/异步
+    await plugin.register(context);
     this.extensions.registerAll(id, plugin.contributes);
 
     // 注册插件声明的自定义 metadata 字段（contributes.resourceTypes[].metadataSchema）

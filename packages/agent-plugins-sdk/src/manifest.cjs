@@ -20,7 +20,7 @@ const REQUIRED_FIELDS = ['id', 'name', 'version', 'main'];
 const ID_PATTERN = /^[a-z][a-z0-9-]*$/;
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+$/;
 
-const CONTRIBUTE_TYPES = ['commands', 'views', 'panels', 'editors', 'services'];
+const CONTRIBUTE_TYPES = ['commands', 'views', 'panels', 'editors', 'viewers', 'services'];
 const PERMISSION_LO_CAPABILITIES = [
   'operations.read',
   'operations.write',
@@ -110,6 +110,11 @@ const manifestSchema = {
         },
         panels: { type: 'array', items: { type: 'object', required: ['id'] } },
         editors: { type: 'array', items: { type: 'object', required: ['id'] } },
+        viewers: {
+          type: 'array',
+          items: { type: 'object', required: ['viewerId'], properties: { viewerId: { type: 'string' }, label: { type: 'string' } } },
+          description: 'Usage Viewer 渲染贡献（U3）：viewerId 对应 Core viewer_definitions 注册的 Viewer',
+        },
         services: {
           type: 'array',
           items: { type: 'object', required: ['id'], properties: { id: { type: 'string' }, title: { type: 'string' } } },
@@ -208,6 +213,18 @@ function validateManifest(manifest) {
       for (const key of Object.keys(manifest.contributes)) {
         if (!CONTRIBUTE_TYPES.includes(key)) {
           errors.push(`manifest.contributes 含未知类型 "${key}"（支持: ${CONTRIBUTE_TYPES.join(', ')}）`);
+        }
+      }
+      if (manifest.contributes.viewers !== undefined) {
+        if (!Array.isArray(manifest.contributes.viewers)) {
+          errors.push('manifest.contributes.viewers 必须是数组');
+        } else {
+          for (const v of manifest.contributes.viewers) {
+            if (!v || typeof v.viewerId !== 'string' || !v.viewerId.trim()) {
+              errors.push('manifest.contributes.viewers 每项必须含 viewerId（对应 Core viewer_definitions 注册的 Viewer）');
+              break;
+            }
+          }
         }
       }
     }

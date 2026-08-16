@@ -5,10 +5,13 @@
  *   epub:open / epub:info / epub:note / epub:notes
  *   epub:highlight / epub:highlights / epub:bookmark / epub:bookmarks
  *
+ * U3 命令域：命令可用性以「使用上下文（Mode）」为准（ctx.modes.resolve），
+ * 不再使用 resource.type !== 'epub' 守卫。
+ *
  * Mock 策略：
  *   - store.cjs 的 createStore → 内存假 store
  *   - epubParser.cjs 的 parseEpub → 假 book
- *   - ctx（SDK PluginContext facade）: resources / relations / config / repoPath / logger
+ *   - ctx（SDK PluginContext facade）: resources / relations / modes / config / repoPath / logger
  *   - child_process.exec → jest.fn 假对象
  */
 
@@ -26,7 +29,7 @@ jest.mock('../src/epubParser.cjs', () => ({
   parseEpub: jest.fn(),
 }));
 
-const { commands, getDataDir, getEpubFilePath } = require('../src/commands.cjs');
+const { commands, getDataDir, getEpubFilePath, requireMode } = require('../src/commands.cjs');
 const store = require('../src/store.cjs');
 const { parseEpub } = require('../src/epubParser.cjs');
 const childProcess = require('child_process');
@@ -85,17 +88,22 @@ function createMockStore() {
  *   ctx.logger / ctx.config / ctx.repoPath
  *   ctx.resources.{getByRid, create}
  *   ctx.relations.{create, getByFromRidAndType}
+ *   ctx.modes.resolve（U3 命令域：Mode 上下文解析）
  */
 function createMockCtx(overrides = {}) {
   const resources = overrides._resources || new Map();
   const relations = overrides._relations || [];
   const config = overrides._config || {};
+  const modeIds = overrides._modeIds || ['reading', 'annotating', 'metadata'];
 
   const ctx = {
     repoPath: path.join('C:', 'test', 'lo-repo'),
     logger: createMockLogger(),
     config(key, defaultValue) {
       return config[key] !== undefined ? config[key] : defaultValue;
+    },
+    modes: {
+      resolve: jest.fn(async () => ({ ok: true, modes: modeIds.map((modeId) => ({ modeId })) })),
     },
     resources: {
       getByRid: jest.fn(async (rid) => resources.get(rid) || null),
@@ -207,8 +215,8 @@ describe('getDataDir / getEpubFilePath', () => {
     expect(() => getEpubFilePath(ctx, undefined)).toThrow('资源不存在');
   });
 
-  test('getEpubFilePath: 非 epub 类型抛错', () => {
-    expect(() => getEpubFilePath(ctx, { type: 'note', path: 'x' })).toThrow('资源类型不是 epub');
+  test('getEpubFilePath: 不再校验资源类型（type 守卫已删除）', () => {
+    expect(() => getEpubFilePath(ctx, { type: 'note', path: 'x.md' })).not.toThrow();
   });
 
   test('getEpubFilePath: 缺少文件路径抛错', () => {
@@ -293,12 +301,13 @@ describe('epub:open', () => {
     expect(ctx.logger.info).toHaveBeenCalledWith('错误: 资源不存在');
   });
 
-  test('非 epub 类型时报错', async () => {
-    const resources = new Map([['res-1', { rid: 'res-1', type: 'note' }]]);
-    const ctx = createMockCtx({ _resources: resources });
+  test('非阅读 Mode 上下文时报错（Mode 守卫替代类型守卫）', async () => {
+    const resources = new Map([['res-1', { rid: 'res-1', type: 'epub' }]]);
+    const ctx = createMockCtx({ _resources: resources, _modeIds: ['preview'] });
     await commands['epub:open'].run(['res-1'], ctx);
 
-    expect(ctx.logger.info).toHaveBeenCalledWith(expect.stringContaining('资源类型不是 epub'));
+    expect(ctx.logger.info).toHaveBeenCalledWith(expect.stringContaining('不处于允许此命令的 Mode'));
+    expect(ctx.modes.resolve).toHaveBeenCalledWith('res-1');
   });
 
   test('有效资源时调用浏览器打开', async () => {
@@ -365,7 +374,20 @@ describe('epub:note', () => {
     await p;
     stdinMock.restore();
 
-    expect(ctx.logger.info).toHaveBeenCalledWith('错误: EPUB 资源不存在');
+    expect(ctx.logger.info).toHaveBeenCalledWith('错误: 资源不存在');
+    expect(ctx.resources.create).not.toHaveBeenCalled();
+  });
+
+  test('非 annotating Mode 上下文时拒绝创建笔记', async () => {
+    const resources = new Map([['res-1', epubResource()]]);
+    const ctx = createMockCtx({ _resources: resources, _modeIds: ['reading'] });
+    const stdinMock = setupNonTTYStdin('笔记内容');
+    const p = commands['epub:note'].run(['res-1'], ctx);
+    stdinMock.feed();
+    await p;
+    stdinMock.restore();
+
+    expect(ctx.logger.info).toHaveBeenCalledWith(expect.stringContaining('不处于允许此命令的 Mode'));
     expect(ctx.resources.create).not.toHaveBeenCalled();
   });
 
@@ -466,7 +488,7 @@ describe('epub:notes', () => {
 
   test('无 source-of 关系时提示暂无笔记', async () => {
     const relations = [{ id: '1', from_rid: 'res-1', to_rid: 'note-x', type: 'highlight-of' }];
-    const ctx = createMockCtx({ _relations: relations });
+    const ctx = createMockCtx({ _relations: relations, _resources: new Map([['res-1', epubResource()]]) });
     await commands['epub:notes'].run(['res-1'], ctx);
 
     expect(ctx.logger.info).toHaveBeenCalledWith('暂无关联笔记');
@@ -474,10 +496,13 @@ describe('epub:notes', () => {
 
   test('列出关联笔记', async () => {
     const relations = [{ id: '1', from_rid: 'res-1', to_rid: 'note-1', type: 'source-of', metadata: {} }];
-    const resources = new Map([[
-      'note-1',
-      { rid: 'note-1', title: '笔记标题', metadata: { quote: '引用原文内容', location: 'epubcfi(2!/2:0,/2:0)' }, updatedAt: '2026-01-01T00:00:00.000Z' },
-    ]]);
+    const resources = new Map([
+      ['res-1', epubResource()],
+      [
+        'note-1',
+        { rid: 'note-1', title: '笔记标题', metadata: { quote: '引用原文内容', location: 'epubcfi(2!/2:0,/2:0)' }, updatedAt: '2026-01-01T00:00:00.000Z' },
+      ],
+    ]);
     const ctx = createMockCtx({ _relations: relations, _resources: resources });
 
     await commands['epub:notes'].run(['res-1'], ctx);
@@ -490,7 +515,7 @@ describe('epub:notes', () => {
 
   test('笔记资源已删除时显示 (已删除)', async () => {
     const relations = [{ id: '1', from_rid: 'res-1', to_rid: 'note-gone', type: 'source-of' }];
-    const ctx = createMockCtx({ _relations: relations });
+    const ctx = createMockCtx({ _relations: relations, _resources: new Map([['res-1', epubResource()]]) });
 
     await commands['epub:notes'].run(['res-1'], ctx);
 
@@ -509,7 +534,7 @@ describe('epub:highlight', () => {
   });
 
   test('添加高亮', async () => {
-    const ctx = createMockCtx();
+    const ctx = createMockCtx({ _resources: new Map([['res-1', epubResource()]]) });
     createMockStore();
 
     await commands['epub:highlight'].run(['res-1', 'epubcfi(2!/2:0,/2:0)', '高亮文本'], ctx);
@@ -531,7 +556,7 @@ describe('epub:highlights', () => {
   });
 
   test('无高亮时提示', async () => {
-    const ctx = createMockCtx();
+    const ctx = createMockCtx({ _resources: new Map([['res-1', epubResource()]]) });
     createMockStore();
 
     await commands['epub:highlights'].run(['res-1'], ctx);
@@ -540,7 +565,7 @@ describe('epub:highlights', () => {
   });
 
   test('列出高亮', async () => {
-    const ctx = createMockCtx();
+    const ctx = createMockCtx({ _resources: new Map([['res-1', epubResource()]]) });
     const storeMock = createMockStore();
     storeMock._data.highlights = [
       { id: 'h1', location: 'loc-1', text: '文本内容', note: '', createdAt: '2026-01-01T00:00:00.000Z' },
@@ -565,7 +590,7 @@ describe('epub:bookmark', () => {
   });
 
   test('添加书签', async () => {
-    const ctx = createMockCtx();
+    const ctx = createMockCtx({ _resources: new Map([['res-1', epubResource()]]) });
     createMockStore();
 
     await commands['epub:bookmark'].run(['res-1', 'epubcfi(2!/2:0,/2:0)', '我的书签'], ctx);
@@ -586,7 +611,7 @@ describe('epub:bookmarks', () => {
   });
 
   test('无书签时提示', async () => {
-    const ctx = createMockCtx();
+    const ctx = createMockCtx({ _resources: new Map([['res-1', epubResource()]]) });
     createMockStore();
 
     await commands['epub:bookmarks'].run(['res-1'], ctx);
@@ -595,7 +620,7 @@ describe('epub:bookmarks', () => {
   });
 
   test('列出书签', async () => {
-    const ctx = createMockCtx();
+    const ctx = createMockCtx({ _resources: new Map([['res-1', epubResource()]]) });
     const storeMock = createMockStore();
     storeMock._data.bookmarks = [
       { id: 'b1', location: 'loc-1', title: '章节标题', createdAt: '2026-01-01T00:00:00.000Z' },
@@ -606,6 +631,34 @@ describe('epub:bookmarks', () => {
     expect(ctx.logger.info).toHaveBeenCalledWith(expect.stringContaining('书签列表 (1 个)'));
     expect(ctx.logger.info).toHaveBeenCalledWith(expect.stringContaining('[b1] loc-1'));
     expect(ctx.logger.info).toHaveBeenCalledWith(expect.stringContaining('章节标题'));
+  });
+});
+
+// ── requireMode（U3 命令域校验） ──
+
+describe('requireMode（U3：Mode 上下文命令域）', () => {
+  test('资源处于所需 Mode 时放行并返回资源', async () => {
+    const resources = new Map([['res-1', epubResource()]]);
+    const ctx = createMockCtx({ _resources: resources, _modeIds: ['reading', 'annotating'] });
+
+    const resource = await requireMode(ctx, 'res-1', ['reading']);
+    expect(resource.rid).toBe('res-1');
+    expect(ctx.modes.resolve).toHaveBeenCalledWith('res-1');
+  });
+
+  test('annotating 上下文不满足 reading 要求时拒绝', async () => {
+    const resources = new Map([['res-1', epubResource()]]);
+    const ctx = createMockCtx({ _resources: resources, _modeIds: ['annotating'] });
+
+    await expect(requireMode(ctx, 'res-1', ['reading'])).rejects.toThrow(
+      /不处于允许此命令的 Mode/,
+    );
+  });
+
+  test('资源不存在时拒绝', async () => {
+    const ctx = createMockCtx();
+    await expect(requireMode(ctx, 'res-1', ['reading'])).rejects.toThrow('错误: 资源不存在');
+    expect(ctx.modes.resolve).not.toHaveBeenCalled();
   });
 });
 
