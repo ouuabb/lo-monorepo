@@ -19,7 +19,10 @@ module.exports = async function newResource(argv) {
     await repo.open({ skipAuth: true });
 
     // 校验名称全局唯一，同名时自动入栈（layer >= 1）
-    const activeByName = await repo.resourceService.getByName(slug);
+    // 018：name 为 canonical（normalize 后），同名检查用同一规范化入口
+    const activeByName = await repo.resourceService.getByName(
+      StringUtils.normalizeResourceName(name),
+    );
     if (activeByName) {
       Logger.warn(`资源名称 "${slug}" 已存在活跃层（rid: ${activeByName.rid}），新文件将在提交时自动入栈。`);
       Logger.info('提示: 使用 lo stack list 查看栈中资源，lo stack promote <rid> 可提升为活跃层。');
