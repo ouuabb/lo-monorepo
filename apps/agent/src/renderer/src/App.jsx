@@ -282,6 +282,12 @@ const [repoCtx, setRepoCtx] = useState(null);
     [api, groups],
   );
 
+  // P0：layout 恢复 effect 不得依赖 openIntoGroup（其 deps 含 groups），
+  // 否则恢复过程 setGroups → openIntoGroup 引用变化 → effect 重跑 → 无限恢复循环。
+  // 经 ref 取最新引用：恢复只执行一次，切 tab/切组不再触发恢复。
+  const openIntoGroupRef = useRef(null);
+  openIntoGroupRef.current = openIntoGroup;
+
   /** 打开到当前焦点 group（无 group 时创建默认组） */
   const openResource = useCallback(
     async (n) => {
@@ -709,8 +715,12 @@ useEffect(() => {
     [relationsOpen, subOpen, pluginView],
   );
 
+  // P0：布局恢复只执行一次（mount-once + authenticated 边界），
+  // 不依赖 openIntoGroup/groups（否则恢复 setGroups → effect 重跑 → 无限循环 → 持续闪）。
+  // 仅登录态翻转（false→true）时执行一次恢复；登出（true→false）时 guard 直接返回。
   useEffect(() => {
     if (!api || !api.layout || typeof api.layout.load !== 'function') return;
+    if (!authenticated) return;
     let cancelled = false;
     api.layout
       .load()
@@ -730,7 +740,7 @@ useEffect(() => {
           setActiveGroupId(app.editor[0].id);
           for (const g of app.editor) {
             for (const rid of g.tabs) {
-              await openIntoGroup(
+              await openIntoGroupRef.current(
                 { rid, type: 'note', name: rid },
                 g.id,
                 { makeActive: rid === g.active },
@@ -745,7 +755,7 @@ useEffect(() => {
     return () => {
       cancelled = true;
     };
-  }, [openIntoGroup]);
+  }, [api, authenticated]);
 
   const persistLayout = useCallback(() => {
     if (!api || !api.layout || typeof api.layout.save !== 'function') return;
