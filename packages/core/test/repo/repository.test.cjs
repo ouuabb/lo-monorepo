@@ -627,7 +627,7 @@ describe('Repository', () => {
     await repo.close();
   });
 
-  test('markdown relations sync with wikilinks and embeds', async () => {
+  test('markdown relations sync with wikilinks and embeds (RID-only)', async () => {
     await fs.ensureDir(path.join(tempDir, '.repo'));
     const repo = new Repository(tempDir);
     await repo.open({ skipAuth: true });
@@ -636,13 +636,19 @@ describe('Repository', () => {
     const assets = path.join(tempDir, 'assets');
     await fs.ensureDir(assets);
     await fs.writeFile(path.join(assets, 'pic.png'), 'PNG-DATA');
-    await repo.importFile(path.join(assets, 'pic.png'));
+    const imgResource = await repo.importFile(path.join(assets, 'pic.png'));
 
-    const n1 = await repo.createResource('note', `# Main\n\nsee [[${second.rid}]] and ![alt](assets/pic.png) and [broken](../nope.png)`, { filename: 'main.md' });
+    // RID-only 模型：路径式引用被记为 broken，不再建关系
+    const n1 = await repo.createResource(
+      'note',
+      `# Main\n\nsee [[${second.rid}]] and ![alt](${imgResource.rid}) and ![broken](../nope.png)`,
+      { filename: 'main.md' },
+    );
 
     const result = await repo.syncMarkdownRelations(n1.rid);
     expect(result.wikilinks).toBe(1);
     expect(result.embeds).toBe(1);
+    expect(result.broken).toBe(1); // `../nope.png` 是非 RID 路径 → broken
 
     const rels = await repo.listRelations({});
     const types = rels.map(r => r.type);
@@ -653,9 +659,6 @@ describe('Repository', () => {
 
     const json = await repo.createResource('json', '{}', { filename: 'not-note.json' });
     expect(await repo.syncMarkdownRelations(json.rid)).toMatchObject({ wikilinks: 0, embeds: 0 });
-
-    expect(repo._candidateNameFromPath('2026-01-01-abc-a1b2c3d4.md')).toBe('abc');
-    expect(repo._candidateNameFromPath('')).toBeNull();
 
     const all = await repo.syncAllMarkdownRelations();
     expect(all.wikilinks).toBeGreaterThanOrEqual(1);

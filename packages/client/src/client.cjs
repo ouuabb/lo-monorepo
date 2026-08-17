@@ -60,6 +60,7 @@ class LoClient {
     this.operations = createOperationsApi(this);
     this.events = createEventsApi(this);
     this.repository = createRepositoryApi(this);
+    this.resources = createResourcesApi(this);
     this.modes = createModesApi(this);
     this.viewers = createViewersApi(this);
   }
@@ -209,6 +210,44 @@ function createRepositoryApi(client) {
     resolveLocation(rid) {
       const encoded = encodeURIComponent(rid);
       return client.get(`/api/resources/${encoded}/location`).then((r) => r.body);
+    },
+  };
+}
+
+function createResourcesApi(client) {
+  return {
+    /**
+     * 从内存 Buffer 导入 Resource（不依赖磁盘已有文件）
+     *
+     * 用途：lo-agent 编辑器粘贴/拖拽图片过来时，bytes 已存在于渲染端，
+     * 不需要先把 bytes 写到磁盘再走 importFile。
+     *
+     * 内部走 POST /api/resources/import (JSON base64) → resource.create operation
+     *
+     * @param {object} params
+     * @param {Buffer|Uint8Array} params.buffer - 文件二进制
+     * @param {string} params.filename - 原始文件名（带扩展名）
+     * @param {object} [params.metadata] - 额外 metadata
+     * @param {string} [params.type] - 显式类型（默认按扩展名 ResourceType.fromPath）
+     * @returns {Promise<object>} Resource（含 rid）
+     */
+    import({ buffer, filename, metadata = {}, type = null }) {
+      if (!buffer) {
+        return Promise.reject(new Error("client.resources.import: buffer 必填"));
+      }
+      if (!filename) {
+        return Promise.reject(new Error("client.resources.import: filename 必填"));
+      }
+      const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+      const base64 = buf.toString("base64");
+      return client
+        .post("/api/resources/import", {
+          buffer: base64,
+          filename,
+          metadata,
+          type,
+        })
+        .then((r) => r.body);
     },
   };
 }

@@ -550,6 +550,101 @@ class Repository {
     return resource;
   }
 
+  /**
+   * 从内存 Buffer 直接导入 Resource（不依赖磁盘已有文件）
+   *
+   * 主要用途：lo-agent 编辑器粘贴/拖拽图片过来时，bytes 已存在于渲染端，
+   * 不需要先把 bytes 写到磁盘再走 importFile。
+   *
+   * 流程：
+   *   1. 推导名称（filename → canonical name，剥日期前缀/随机后缀/扩展名）
+   *   2. 选/生成 location（resources/<name>）
+   *   3. 写 buffer 到磁盘
+   *   4. 走 resource.create operation（经 Operation Engine，含 before/after 快照）
+   *   5. 记录 syncOps
+   *
+   * @param {object} params
+   * @param {Buffer} params.buffer - 文件二进制
+   * @param {string} params.filename - 用户提供的原始文件名（带扩展名）
+   * @param {object} [params.metadata] - 额外 metadata
+   * @param {string} [params.type] - 显式类型（默认按扩展名 ResourceType.fromPath）
+   * @returns {Promise<object>} Resource（含 rid）
+   */
+  async importBuffer({ buffer, filename, metadata = {}, type = null } = {}) {
+    if (!buffer || !Buffer.isBuffer(buffer)) {
+      throw new Error("importBuffer: buffer 必须是非空 Buffer");
+    }
+    if (!filename || typeof filename !== "string") {
+      throw new Error("importBuffer: filename 必须是非空字符串");
+    }
+
+    // 类型认定
+    const finalType = type || ResourceType.fromPath(filename) || "image";
+    const ext =
+      ResourceType.getExtensions(finalType)[0] ||
+      path.extname(filename) ||
+      ".bin";
+
+    // 名称规范化：剥目录、剥扩展名、剥日期前缀、剥随机后缀
+    const basename = path.basename(filename, path.extname(filename));
+    const baseName = basename
+      .replace(/^\d{4}-\d{2}-\d{2}-/, "")
+      .replace(/-[a-f0-9]{8}$/, "");
+    // 8 hex 随机后缀避免重名
+    const rand = Math.random().toString(16).slice(2, 10);
+    const finalName = `${baseName}-${rand}${ext}`;
+
+    const filePath = path.join(this.repoPath, "resources", finalName);
+    const loc = this.resourceService.locationFromPath(filePath);
+
+    await fs.ensureDir(path.dirname(filePath));
+
+    // 写文件（不加密；导入的图片通常不加密）
+    await fs.writeFile(filePath, buffer);
+
+    // 走 resource.create operation
+    const createParams = {
+      type: finalType,
+      location_kind: loc.kind,
+      location: loc.value,
+      name: finalName,
+      metadata: {
+        ...metadata,
+        // 记录原始 filename 与 size 便于回溯
+        ...(metadata.originalFilename ? {} : { originalFilename: filename }),
+        size: buffer.length,
+      },
+    };
+
+    const { result: resource } = await this.operationEngine.execute(
+      "resource.create",
+      createParams,
+    );
+
+    // 记录操作日志
+    if (this.syncOps && resource) {
+      const relPath =
+        resource.location_kind === 'local' ? resource.location : '';
+      await this.syncOps.recordOp(
+        SyncOpsEngine.OP_TYPES.RESOURCE_CREATED,
+        resource.rid,
+        {
+          name: resource.name,
+          layer: resource.layer || 0,
+          type: resource.type,
+          path: relPath,
+          hash: resource.hash,
+          metadata: resource.metadata,
+          encrypted: resource.encrypted,
+          created: resource.created,
+          updated: resource.updated,
+        },
+      );
+    }
+
+    return resource;
+  }
+
   async importDirectory(dirPath, type = null) {
     const relDir = path.relative(this.repoPath, path.resolve(dirPath));
     const patterns = ResourceType.getExtensions(type || "note").map(
@@ -4217,12 +4312,22 @@ class Repository {
           }
         }
 
-        // 创建新的 embed 关系
+        // 创建新的 embed 关系（RID-only resolution）：
+        //   - target_path === 'res_xxx' 且命中 → 建关系
+        //   - 路径式引用（./foo.png、foo.png）→ broken++（不入关系）
+        //   - 远程 URL / data: → broken 不计数（Markdown 原生外部引用，不归 lo 管）
         let embedCount = 0;
         let brokenCount = 0;
         for (const emb of embeds) {
+          // 远程 URL / data: 不计入 broken（语义上不归 lo 资源关系管）
+          if (
+            /^https?:/i.test(emb.target_path) ||
+            /^data:/i.test(emb.target_path)
+          ) {
+            continue;
+          }
           const targetRid = await this._resolveImageResource(
-            resource,
+            null,
             emb.target_path,
           );
           if (!targetRid) {
@@ -4259,75 +4364,31 @@ class Repository {
 
   /**
    * 将 Markdown 中的图片引用解析为目标资源 RID
-   * 复用 resolveResource，优先 RID → 路径上下文匹配 → name 匹配
-   * @param {object} sourceResource - Markdown 资源对象（用于路径上下文解析）
-   * @param {string} targetPath - Markdown 中的图片路径或 RID
-   * @returns {Promise<string|null>} 目标资源 RID，找不到返回 null
+   * 仅接受 RID 形式（`res_xxx`）；其他形态视为 Markdown 外部引用或非 RID 路径，
+   * 不进入 lo Resource 关系（broken++）。
+   *
+   * 设计原则（RID 一等公民）：
+   * - Markdown embedding 唯一合法身份引用 = `res_xxx`
+   * - `./assets/photo.png`、`photo.png` 等路径不再被猜测式匹配
+   * - `https://...` / `data:...` 视为 Markdown 原生外部引用，保留 Markdown 渲染器处理
+   *
+   * @param {object} _sourceResource - Markdown 资源对象（保留签名；RID-only 下不再使用）
+   * @param {string} targetPath - Markdown 中的图片引用（必须为 `res_xxx`，否则返回 null）
+   * @returns {Promise<string|null>} 目标资源 RID，找不到或非 RID 形态返回 null
    */
-  async _resolveImageResource(sourceResource, targetPath) {
+  async _resolveImageResource(_sourceResource, targetPath) {
+    if (!targetPath || typeof targetPath !== "string") return null;
+
+    // 远程 URL / data: 协议 → Markdown 原生外部引用，不进入 lo 关系
     if (/^https?:/i.test(targetPath) || /^data:/i.test(targetPath)) {
       return null;
     }
 
-    // 1. 如果是 RID 格式，直接用 resolveResource 查找
-    if (targetPath.startsWith("res_")) {
-      const resource = await this.resolveResource(targetPath);
-      return resource ? resource.rid : null;
-    }
+    // 仅接受 RID 形态
+    if (!targetPath.startsWith("res_")) return null;
 
-    // 2. 尝试基于 source resource 的路径上下文解析
-    //    notes/test.md 引用 ./assets/photo.png
-    //    → 拼接为 notes/assets/photo.png → resolveResource
-    if (sourceResource && sourceResource.location_kind === 'local' && sourceResource.location) {
-      const sourceDir = sourceResource.location.replace(/[^/\\]*$/, "");
-      const combinedPath = sourceDir + targetPath.replace(/^\.\/?/);
-      const resource = await this.resolveResource(combinedPath);
-      if (resource) return resource.rid;
-    }
-
-    // 3. 退而求其次：按文件名候选查找（018 §3：入口自定候选 → resolveResource 统一 normalize）
-    //    ./assets/img.png → basename 剥离 → resolveResource
-    const candidate = this._candidateNameFromPath(targetPath);
-    if (!candidate) return null;
-
-    const resource = await this.resolveResource(candidate);
+    const resource = await this.resolveResource(targetPath);
     return resource ? resource.rid : null;
-  }
-
-  /**
-   * 从文件路径提取候选 name（embed 图片解析专用候选来源；018 §3）
-   * 提取文件名（不含扩展名）、去除日期前缀、随机后缀——与创建链路的
-   * filename 候选规则一致；最终由 resolveResource 统一 normalize。
-   * @param {string} filePath - 文件路径或资源引用
-   * @returns {string|null} 候选名称
-   */
-  _candidateNameFromPath(filePath) {
-    if (!filePath) return null;
-
-    // 提取文件名部分（去除目录）
-    // ./assets/img.png → img.png, ../photo.jpg → photo.jpg
-    let fileName = filePath;
-    const lastSlash = Math.max(
-      filePath.lastIndexOf("/"),
-      filePath.lastIndexOf("\\"),
-    );
-    if (lastSlash !== -1) {
-      fileName = filePath.substring(lastSlash + 1);
-    }
-
-    // 去除扩展名
-    // img.png → img, photo.jpg → photo
-    const lastDot = fileName.lastIndexOf(".");
-    if (lastDot !== -1) {
-      fileName = fileName.substring(0, lastDot);
-    }
-
-    // 去除日期前缀: YYYY-MM-DD-xxx → xxx
-    fileName = fileName.replace(/^\d{4}-\d{2}-\d{2}-/, "");
-    // 去除随机后缀: xxx-xxxxxxxx → xxx
-    fileName = fileName.replace(/-[a-f0-9]{8}$/, "");
-
-    return fileName || null;
   }
 
   async getRelations(rid) {

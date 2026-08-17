@@ -69,7 +69,7 @@ describe('registerLoCoreIpc', () => {
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.SEARCH, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.LAYOUT_LOAD, expect.any(Function));
     expect(ipcMain.handle).toHaveBeenCalledWith(CHANNELS.LAYOUT_SAVE, expect.any(Function));
-    expect(ipcMain.handle.mock.calls.length).toBe(29);
+    expect(ipcMain.handle.mock.calls.length).toBe(31);
   });
 
   it('Repository 通道委托 service（info / resolveLocation）', async () => {

@@ -1,25 +1,39 @@
 # Markdown 图片引用关系功能 — 完整实现文档
 
 > 本文档记录实现细节、设计决策、已知约束，供未来评估与维护参考。
-> 最后更新：2026-07-30
+> 最后更新：2026-08-17（RID-only 模型收敛）
 
 ---
 
 ## 1. 概述
 
-为 lo 系统增加 **Markdown 文件中图片引用的关系解析能力**。当 Markdown 资源中包含 `![alt](path)` 或 `<img src="path">` 形式的图片引用时，系统自动将其解析为 Resource 间的 `embed` 类型关系。
+为 lo 系统增加 **Markdown 文件中图片引用的关系解析能力**。当 Markdown 资源中包含 `![alt](rid)` 或 `<img src="rid">` 形式的图片引用时，系统自动将其解析为 Resource 间的 `embed` 类型关系。
 
 ### 核心价值
 
-- 图片引用成为一等公民：Markdown 中的图片不再只是裸路径，而是被解析为可查询、可追踪的 Resource Relation
+- 图片引用成为一等公民：Markdown 中的图片引用 RID，是可查询、可追踪的 Resource Relation
 - 复用现有架构：图片仍是普通 Resource，不引入独立图片模型或存储体系
 - 派生关系自动化：Relation 由内容解析派生，Markdown 内容是唯一真相来源
+
+### RID-only 决议（2026-08-17 收敛）
+
+**Markdown embedding 唯一合法身份引用 = `res_xxx`**。
+
+```markdown
+![alt](res_xxx)         ← lo Resource 引用（RID 唯一身份）
+![alt](https://example.com/a.png)  ← Markdown 原生外部引用（不进入 lo 关系）
+![alt](data:image/png;base64,...) ← Markdown 原生外部引用（不进入 lo 关系）
+![alt](./photo.png)     ← 非 RID 路径，不视为 lo Resource 引用（不入关系）
+```
+
+非 RID 路径引用（含 `./photo.png`、`photo.png`、`../assets/p.png`、`foo.png`）不再被猜测式匹配为某个 image Resource；保存时若目标资源不存在，记为 `broken++`，由用户主动选择 Import / 删除。
 
 ### 技术约束
 
 | 约束 | 说明 |
 |------|------|
-| **RID 优先** | 所有资源查找通过 RID 或 name，不依赖文件路径做资源匹配 |
+| **RID 一等公民** | Markdown 引用目标 = rid；其他形态视为 Markdown 原生或显式 broken |
+| **不引入路径兜底** | 删除原 L2/L3 路径/名称回退机制；运行时无兼容层 |
 | **不侵入 Core** | 图片解析逻辑独立于 Resource 生命周期管理 |
 | **事务原子性** | 关系重建在 SQLite 事务中执行，保证删除+创建的原子性 |
 | **向后兼容** | 旧 wikilink（无 origin 字段）可被正确清理 |
@@ -30,12 +44,14 @@
 
 | # | 原则 | 说明 |
 |---|------|------|
-| 1 | RID 优先架构 | 所有资源查询使用 RID 或 name。路径仅用于文件系统 IO |
-| 2 | 图片资源统一管理 | 图片复用 Resource 生命周期。禁止创建 `ImageResource` 特殊模型 |
-| 3 | 派生关系隔离 | `embed` / `wikilink`（解析产生）vs `reference`（用户创建）通过 `metadata.origin` 隔离 |
-| 4 | Markdown 内容是真相来源 | Relation 数据库是索引结果，Markdown 文件内容才是最终事实 |
-| 5 | 全量重建策略 | 每次解析先删后建，避免状态不一致 |
-| 6 | 不侵入 Resource Core | 解析逻辑独立于 Resource 生命周期管理 |
+| 1 | **RID 一等公民** | Markdown 引用目标 = `res_xxx`；路径/名称不参与身份解析 |
+| 2 | **Parser 保持纯函数** | `MarkdownParser.parse` 无副作用；不创建资源、不解析路径 |
+| 3 | **图片资源统一管理** | 图片复用 Resource 生命周期。禁止创建 `ImageResource` 特殊模型 |
+| 4 | **派生关系隔离** | `embed` / `wikilink`（解析产生）vs `reference`（用户创建）通过 `metadata.origin` 隔离 |
+| 5 | **Markdown 内容是真相来源** | Relation 数据库是索引结果，Markdown 文件内容才是最终事实 |
+| 6 | **全量重建策略** | 每次解析先删后建，避免状态不一致 |
+| 7 | **不侵入 Resource Core** | 解析逻辑独立于 Resource 生命周期管理 |
+| 8 | **Candidate Image ≠ Resource** | 待导入图片属于 Agent 编辑器交互状态，不进入 lo Core |
 
 ---
 
@@ -52,28 +68,58 @@
 │                                                              │
 │  src/utils/markdownImageParser.cjs  图片引用解析器（核心）  │
 │  ├── parse(markdown)            → EmbedRef[]                │
+│  │   - 接受三种 target: res_xxx / https?:// / data:        │
+│  │   - 路径式引用（./photo.png）与其他形态一视同仁          │
 │  ├── parsePaths(markdown)      → string[]                  │
 │  └── _extractUrlPart(text)    → {urlPart, rest}            │
 │                                                              │
-│  src/utils/wikilinkParser.cjs    (已有，未修改)           │
+│  src/utils/wikilinkParser.cjs    (已有，RID-only)           │
 └───────────────────────┬─────────────────────────────────────┘
                         │ 被调用
 ┌───────────────────────▼─────────────────────────────────────┐
 │                     Repository Layer                         │
 │  src/repo/repository.cjs                                    │
 │                                                              │
-│  新增方法:                                                   │
+│  方法:                                                       │
 │  ├── syncMarkdownRelations(rid)   单资源关系同步 [事务]    │
 │  ├── syncAllMarkdownRelations()   全量重建                │
-│  ├── _resolveImageResource(res, path)  三级路径解析       │
-│  ├── _resolveWikiLinkTarget(target)    Wikilink 解析       │
-│  └── _extractResourceName(filePath)  名称提取工具         │
+│  ├── _resolveImageResource(_unused, targetPath)  RID-only  │
+│  │   - 拒绝 https?:/data: → null                            │
+│  │   - 非 res_ 前缀 → null                                  │
+│  │   - rid 直接 resolveResource                             │
+│  └── _resolveWikiLinkTarget(target)    Wikilink 解析       │
 │                                                              │
 │  src/repo/relationService.cjs                               │
-│                                                              │
-│  新增方法:                                                   │
-│  ├── removeByFromRidAndType(fromRid, type, origin) 按源删除 │
+│  └── removeByFromRidAndType(fromRid, type, origin) 按源删除 │
 └─────────────────────────────────────────────────────────────┘
+```
+
+### 3.1 创建链路（Agent 层 → Core 层）
+
+```
+Editor (paste/drop/file select)
+    │
+    ▼
+Agent CandidateImageStore (内存，不落盘)
+    │
+    │ 用户在 CandidateImagePanel 中选择「导入」
+    ▼
+lo-core:import-resource (IPC)
+    │
+    ▼
+@lo/client → POST /api/resources/import
+    │
+    ▼
+Repository.importBuffer({buffer, filename, metadata})
+    │
+    ▼
+resource.create operation (经 Operation Engine)
+    │
+    ▼
+image Resource → rid=res_xxx
+    │
+    ▼
+Agent editor.insertText(`![${alt}](${rid})`)
 ```
 
 ---
@@ -84,18 +130,32 @@
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| `src/utils/markdownImageParser.cjs` | ~130 | Markdown 图片引用解析器 |
+| `src/utils/markdownImageParser.cjs` | ~130 | Markdown 图片引用解析器（语法层） |
 | `src/utils/markdownParser.cjs` | ~55 | 统一解析入口，聚合 wikilink + embed |
-| `test/repo/embedRelations.test.cjs` | ~150 | 10 个集成测试用例 |
+| `test/repo/embedRelations.test.cjs` | ~150 | RID-only 集成测试用例 |
 | `test/utils/markdownImageParser.test.cjs` | ~110 | 21 个解析器单元测试 |
+| `src/repo/importBuffer.cjs` | ~80 | Resource 导入能力（buffer → Resource） |
+| `apps/agent/src/renderer/src/services/candidateImageStore.mjs` | ~100 | Agent 候选图片内存存储 |
+| `apps/agent/src/renderer/src/components/CandidateImagePanel.jsx` | ~150 | 候选图片 UI |
+| `apps/agent/src/renderer/src/components/MarkdownImage.jsx` | ~80 | RID → data URL → `<img>` |
+| `scripts/lo-embed-migrate.cjs` | 一次性 | 旧仓库 path 引用 → RID 迁移脚本 |
 
 ### 4.2 修改文件
 
 | 文件 | 变更类型 | 具体变更 |
 |------|----------|----------|
-| `src/repo/repository.cjs` | 新增方法 | `syncMarkdownRelations`、`syncAllMarkdownRelations`、`_resolveImageResource`、`_resolveWikiLinkTarget`、`_extractResourceName` |
-| `src/repo/repository.cjs` | 修改调用点 | `importFile`、`sync`、`_handleFileEvent` 中插入 `syncMarkdownRelations` 调用；`path.toLowerCase().endsWith('.md')` → `type === 'note'` |
+| `src/repo/repository.cjs` | **简化** | `_resolveImageResource` 改为 RID-only；删除 `_candidateNameFromPath` |
+| `src/repo/repository.cjs` | 修改调用点 | `syncMarkdownRelations` embed 分支：远程 / data: 跳过，非 RID 路径 broken++ |
 | `src/repo/relationService.cjs` | 新增方法 | `removeByFromRidAndType(fromRid, type, origin)` |
+| `src/commands/serve.cjs` | 新增路由 | `POST /api/resources/import` |
+| `src/repo/resourceService.cjs` | 新增方法 | `importBuffer({buffer, filename, metadata})` |
+| `packages/client/src/client.cjs` | 新增命名空间 | `client.resources.import` |
+| `apps/agent/src/preload/index.cjs` | 新增 IPC | `lo-core:import-resource`、`lo-core:resource-binary` |
+| `apps/agent/src/main/ipc.cjs` | 新增通道 | `lo-core:import-resource`、`lo-core:resource-binary` |
+| `apps/agent/src/main/lo-core.cjs` | 新增方法 | `importResource`、`getResourceBinary` |
+| `apps/agent/src/renderer/src/editor/NoteEditor.jsx` | 新增监听 | paste / drop 图像 → candidate |
+| `apps/agent/src/renderer/src/App.jsx` | 新增 UI | 候选图片面板 |
+| `apps/agent/src/renderer/src/services/viewerRegistry.js` | 新增 viewer | `viewer.markdown-preview` |
 
 ---
 
@@ -180,70 +240,64 @@ Layer 2 (事务内): try-catch
 
 ---
 
-## 6. 路径解析三级回退策略
+## 6. RID-only 解析模型
 
-### 6.1 问题背景
+### 6.1 决策背景
 
-Markdown 中的图片引用路径（如 `./assets/photo.png`）需要映射到系统 Resource。直接用文件名查找在多目录场景下会产生冲突。
+**2026-08-17 收敛**：原三级回退（`RID → 路径上下文 → name 规范化`）存在以下问题：
 
-### 6.2 三级回退流程
+1. **身份层与存储层耦合**：路径是 Storage Concern，把它当作 Identity 兜底是范畴错误。
+2. **wikilink 已 RID-only**：embed 仍走路径兜底造成内部不一致。
+3. **L3 猜测机制**：`_extractResourceName` 剥扩展名/日期/随机后缀 → 命中错误资源时用户无法察觉。
+4. **隐式 broken 比猜测命中更安全**：RID-only 强制 broken 显式化，提示用户修复。
 
-```
-_resolveImageResource(sourceResource, targetPath)
-│
-├── Guard: 远程 URL / data: 协议 → 返回 null
-│
-├── Level 1: RID 直接匹配
-│   条件: targetPath.startsWith('res_')
-│   操作: resolveResource(targetPath) → getByRid
-│   用途: 用户显式使用 RID 引用，100% 准确
-│   例: ![photo](res_abc123)
-│
-├── Level 2: 路径上下文拼接
-│   条件: sourceResource.path 存在
-│   操作:
-│     sourceDir = sourceResource.path.replace(/[^/\\]*$/, '')
-│     combinedPath = sourceDir + targetPath.replace(/^\.\/?/)
-│     resolveResource(combinedPath)
-│   用途: 基于 Markdown 文件所在目录解析相对路径
-│   例: notes/test.md 引用 ./assets/photo.png
-│       → notes/assets/photo.png
-│
-└── Level 3: 纯文件名查找（最后兜底）
-    条件: Level 1 和 Level 2 均未命中
-    操作:
-      name = _extractResourceName(targetPath)
-      resolveResource(name) → getByName
-    用途: 全局唯一文件名的快速匹配
-    例: assets/img.png → img
-```
-
-### 6.3 路径上下文拼接详解
+### 6.2 RID-only 解析流程
 
 ```javascript
-// sourceResource.path = "notes/my-notes.md"
-// targetPath = "./assets/photo.png"
+async _resolveImageResource(_sourceResource, targetPath) {
+  if (!targetPath || typeof targetPath !== "string") return null;
 
-const sourceDir = sourceResource.path.replace(/[^/\\]*$/, '');
-// → "notes/"
+  // 远程 URL / data: 协议 → Markdown 原生外部引用，不进入 lo 关系
+  if (/^https?:/i.test(targetPath) || /^data:/i.test(targetPath)) {
+    return null;
+  }
 
-const combinedPath = sourceDir + targetPath.replace(/^\.\/?/);
-// → "notes/assets/photo.png"
+  // 仅接受 RID 形态
+  if (!targetPath.startsWith("res_")) return null;
 
-// 特殊情况: targetPath = "../assets/photo.png"
-// → "notes/" + "../assets/photo.png" = "notes/../assets/photo.png"
-// resolveResource 内部会处理路径归一化
+  const resource = await this.resolveResource(targetPath);
+  return resource ? resource.rid : null;
+}
 ```
 
-### 6.4 三级回退的设计理由
+### 6.3 行为对照表
 
-| 级别 | 精确性 | 性能 | 适用场景 |
-|------|--------|------|----------|
-| Level 1 (RID) | 100% | O(1) | 显式 RID 引用 |
-| Level 2 (路径) | 高 | O(log n) | 同项目内相对路径 |
-| Level 3 (name) | 低 | O(log n) | 全局唯一文件名兜底 |
+| target_path 形态 | 解析结果 | broken 计数 | 关系建立 |
+|---|---|---|---|
+| `res_xxx` (命中) | imageRid | 0 | ✓ |
+| `res_xxx` (资源不存在) | null | 1 | ✗ |
+| `./photo.png` | null | 1 | ✗ |
+| `photo.png` | null | 1 | ✗ |
+| `assets/photo.png` | null | 1 | ✗ |
+| `../assets/photo.png` | null | 1 | ✗ |
+| `https://example.com/a.png` | null | 0（语义外） | ✗ |
+| `data:image/png;base64,xxx` | null | 0（语义外） | ✗ |
 
-Level 2 是核心方案，Level 3 是兼容兜底。当 Level 2 能正确处理时，同名资源冲突的概率极低。
+### 6.4 删除项
+
+- ❌ `_resolveImageResource` L2 路径上下文拼接分支
+- ❌ `_resolveImageResource` L3 name 规范化兜底分支
+- ❌ `_candidateNameFromPath` 私有辅助函数（已删除）
+- ❌ 运行时长期兼容层（feature flag、双格式解析、legacy parser）
+
+### 6.5 与 wikilink 的一致性
+
+Wikilink 早已在 `wikilinkParser.cjs:32` 强制 RID 校验。RID-only 后的 embed 与 wikilink 形成一致：
+
+- `[[res_xxx]]` → wikilink 关系
+- `![alt](res_xxx)` → embed 关系
+
+二者皆以 RID 为唯一身份引用，路径/名称不参与身份解析。
 
 ---
 

@@ -18,6 +18,8 @@ const CHANNELS = {
   UPDATE_NOTE: 'lo-core:update-note',
   REMOVE_NOTE: 'lo-core:remove-note',
   UPLOAD_NOTES: 'lo-core:upload-notes',
+  IMPORT_RESOURCE: 'lo-core:import-resource',
+  RESOURCE_BINARY: 'lo-core:resource-binary',
   LOGOUT: 'lo-core:logout',
   RELATIONS: 'lo-core:relations',
   OPERATIONS: 'lo-core:operations',
@@ -70,6 +72,12 @@ function registerLoCoreIpc(ipcMain, service) {
   ipcMain.handle(CHANNELS.REMOVE_NOTE, (_event, rid) => service.removeNote(rid));
   ipcMain.handle(CHANNELS.UPLOAD_NOTES, (_event, files, options) =>
     service.uploadNotes(files || [], options || {}),
+  );
+  ipcMain.handle(CHANNELS.IMPORT_RESOURCE, (_event, params) =>
+    service.importResource(params || {}),
+  );
+  ipcMain.handle(CHANNELS.RESOURCE_BINARY, (_event, rid) =>
+    service.getResourceBinary(rid),
   );
   ipcMain.handle(CHANNELS.LOGOUT, () => service.logout());
   ipcMain.handle(CHANNELS.RELATIONS, (_event, rid) => service.getRelations(rid));

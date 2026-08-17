@@ -13,9 +13,27 @@
  * 避免把 Error 实例直接抛给 IPC。
  */
 const { LoClient, LoApiError, LoHttpError } = require('@lo/client');
+const fsp = require('fs').promises;
+const path = require('path');
 
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 8765;
+
+/**
+ * 扩展名 → MIME（仅图片类型，本地预览用）
+ */
+function extToMime(ext) {
+  switch (ext) {
+    case '.png': return 'image/png';
+    case '.jpg':
+    case '.jpeg': return 'image/jpeg';
+    case '.gif': return 'image/gif';
+    case '.webp': return 'image/webp';
+    case '.svg': return 'image/svg+xml';
+    case '.bmp': return 'image/bmp';
+    default: return 'application/octet-stream';
+  }
+}
 
 class LoCoreService {
   /**
@@ -287,6 +305,98 @@ class LoCoreService {
       this._ensureClient();
       const data = await this.client.notes.upload(files, options);
       return { ok: true, data };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
+  /**
+   * 从内存 Buffer 导入 Resource（不依赖磁盘已有文件）
+   *
+   * 用途：lo-agent 编辑器粘贴/拖拽图片过来时，bytes 已存在于渲染端，
+   * 不需要先把 bytes 写到磁盘再走 importFile。
+   *
+   * 内部走 POST /api/resources/import (JSON base64) → resource.create operation
+   *
+   * @param {object} params
+   * @param {Buffer} params.buffer - 二进制
+   * @param {string} params.filename - 文件名（含扩展名）
+   * @param {object} [params.metadata]
+   * @param {string} [params.type]
+   * @returns {Promise<{ok: boolean, data?: object, error?: string, code?: string}>}
+   */
+  async importResource({ buffer, filename, metadata = {}, type = null } = {}) {
+    try {
+      this._ensureClient();
+      if (!buffer) throw new Error('buffer 必填');
+      if (!filename) throw new Error('filename 必填');
+      const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+      const data = await this.client.resources.import({
+        buffer: buf,
+        filename,
+        metadata,
+        type,
+      });
+      return { ok: true, data };
+    } catch (e) {
+      return this._toError(e);
+    }
+  }
+
+  /**
+   * 读取 Resource 二进制（用于渲染图片）
+   *
+   * @param {string} rid
+   * @returns {Promise<{ok: boolean, data?: { buffer: string, mime: string, rid: string }, error?: string}>}
+   *   - buffer: base64 编码
+   *   - mime: MIME 类型
+   */
+  async getResourceBinary(rid) {
+    try {
+      this._ensureClient();
+      if (!rid) throw new Error('rid 必填');
+
+      // 通过 SDK 拿到 Resource 信息（location/metadata）
+      const apiResource = await this.client.notes.get(rid).catch(() => null);
+      // notes.get 失败时回退到 repository.resolveLocation
+      let locationInfo;
+      let mime = 'application/octet-stream';
+      try {
+        locationInfo = await this.client.repository.resolveLocation(rid);
+      } catch (e) {
+        // ignore
+      }
+
+      let metadata = {};
+      if (apiResource && apiResource.metadata) {
+        metadata = apiResource.metadata;
+      }
+
+      // 决定 MIME：从 metadata.mimetype 或按扩展名推断
+      if (metadata.mimetype) {
+        mime = metadata.mimetype;
+      } else if (locationInfo && locationInfo.kind === 'local') {
+        const ext = path.extname(locationInfo.absolutePath || '').toLowerCase();
+        mime = extToMime(ext);
+      } else if (apiResource && apiResource.type === 'image') {
+        mime = 'image/png';
+      }
+
+      if (!locationInfo || !locationInfo.resolved || !locationInfo.absolutePath) {
+        return { ok: false, error: `Resource location not resolved: ${rid}` };
+      }
+
+      // 读取文件（主进程不受沙箱限制）
+      const fileBuffer = await fsp.readFile(locationInfo.absolutePath);
+      return {
+        ok: true,
+        data: {
+          rid,
+          mime,
+          buffer: fileBuffer.toString('base64'),
+          size: fileBuffer.length,
+        },
+      };
     } catch (e) {
       return this._toError(e);
     }

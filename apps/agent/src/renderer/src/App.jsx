@@ -15,6 +15,7 @@ import GraphView from './views/GraphView.jsx';
 import { revealFeedback } from './services/revealFeedback.mjs';
 import { createSession, toggleReadOnly as toggleSessionReadOnly, resolveReadOnly } from './services/SessionService.mjs';
 import { resolveViewerComponent } from './services/viewerRegistry.js';
+import CandidateImagePanel from './components/CandidateImagePanel.jsx';
 import './App.css';
 
 const api = window.loAgent && window.loAgent.loCore;
@@ -557,6 +558,30 @@ const [repoCtx, setRepoCtx] = useState(null);
     [api, handleRefresh],
   );
 
+  /**
+   * 候选图片导入成功 → 在当前活动 tab 的文本中插入 `![alt](res_xxx)`
+   *
+   * 触发：由 CandidateImagePanel 的「导入」按钮回调
+   * 语义：把 RID 引用追加到当前 note 末尾；后续 saveActiveTab 触发持久化
+   */
+  const handleCandidateImport = useCallback(({ rid, alt, filename }) => {
+    if (!activeTab) {
+      notify('请先打开一个笔记');
+      return;
+    }
+    if (activeTab.session.state.readOnly) {
+      notify('只读模式下不能插入图片');
+      return;
+    }
+    const safeAlt = (alt || filename || 'image').replace(/[\[\]]/g, '');
+    const snippet = `![${safeAlt}](${rid})`;
+    const next = activeTab.text
+      ? `${activeTab.text.trimEnd()}\n\n${snippet}\n`
+      : `${snippet}\n`;
+    patchRidText(activeTab.rid, next);
+    notify(`已导入 ${filename || rid}`);
+  }, [activeTab, notify, patchRidText]);
+
   const requestDeleteNote = useCallback((rid) => {
     const target = rid || (activeTab && activeTab.rid);
     if (!target) return;
@@ -1081,6 +1106,9 @@ useEffect(() => {
                           onChange={(text) => patchRidText(tab.rid, text)}
                           pluginViewers={pluginViewers}
                         />
+                        {tab.meta.type === 'note' && (
+                          <CandidateImagePanel onImport={handleCandidateImport} />
+                        )}
                       </div>
 
                       <div className="editor-statusbar">

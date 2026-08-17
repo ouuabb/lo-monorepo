@@ -61,6 +61,12 @@ const BUILTIN_VIEWERS = [
     semantics: '通用只读呈现',
     supports: { modes: ['reading', 'preview'] },
   },
+  {
+    viewerId: 'viewer.markdown-preview',
+    label: 'Markdown 预览',
+    semantics: 'Markdown 只读预览（含 RID-embed 图片渲染）',
+    supports: { modes: ['reading', 'preview'] },
+  },
 ];
 
 function createBuiltinViewerRegistry() {

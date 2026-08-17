@@ -8,6 +8,7 @@
  * Viewer 自行声明 supports.modes（与 Core 双向解耦）。
  */
 import NoteEditor from '../editor/NoteEditor.jsx';
+import MarkdownPreview from '../components/MarkdownPreview.jsx';
 
 const VIEWERS = {
   'viewer.markdown-editor': {
@@ -17,6 +18,11 @@ const VIEWERS = {
   'viewer.generic-preview': {
     component: NoteEditor,
     // 通用只读呈现：只读 Monaco
+    readOnly: true,
+  },
+  'viewer.markdown-preview': {
+    component: MarkdownPreview,
+    // Markdown 只读预览：含 RID-embed 图片渲染（极简内联解析）
     readOnly: true,
   },
 };

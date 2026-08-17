@@ -59,10 +59,14 @@ describe('ViewerRegistry', () => {
     expect(() => registry.register(BUILTIN_VIEWERS[0])).toThrow(/已注册/);
   });
 
-  it('builtin 注册表含 2 个 Viewer', () => {
+  it('builtin 注册表含 3 个 Viewer', () => {
     const registry = createBuiltinViewerRegistry();
     const ids = registry.list().map((v) => v.viewerId);
-    expect(ids).toEqual(['viewer.markdown-editor', 'viewer.generic-preview']);
+    expect(ids).toEqual([
+      'viewer.markdown-editor',
+      'viewer.generic-preview',
+      'viewer.markdown-preview',
+    ]);
   });
 });
 
@@ -147,14 +151,20 @@ describe('resolveViewers', () => {
     expect(viewers.map((v) => v.viewerId)).toEqual(['viewer.markdown-editor']);
   });
 
-  it('viewers(reading) → [viewer.generic-preview]', () => {
+  it('viewers(reading) → [viewer.generic-preview, viewer.markdown-preview]', () => {
     const viewers = resolveViewers('reading');
-    expect(viewers.map((v) => v.viewerId)).toEqual(['viewer.generic-preview']);
+    expect(viewers.map((v) => v.viewerId)).toEqual([
+      'viewer.generic-preview',
+      'viewer.markdown-preview',
+    ]);
   });
 
-  it('viewers(preview) → [viewer.generic-preview]', () => {
+  it('viewers(preview) → [viewer.generic-preview, viewer.markdown-preview]', () => {
     const viewers = resolveViewers('preview');
-    expect(viewers.map((v) => v.viewerId)).toEqual(['viewer.generic-preview']);
+    expect(viewers.map((v) => v.viewerId)).toEqual([
+      'viewer.generic-preview',
+      'viewer.markdown-preview',
+    ]);
   });
 
   it('未支持 mode → []；空 modeId → []', () => {
@@ -175,6 +185,7 @@ describe('resolveViewers', () => {
     const viewers = resolveViewers('reading', pluginViewers);
     expect(viewers.map((v) => v.viewerId)).toEqual([
       'viewer.generic-preview',
+      'viewer.markdown-preview',
       'viewer.epub-reader',
     ]);
 

@@ -497,6 +497,63 @@ route("POST", "/api/notes/upload", async (req, res, { repo }) => {
   );
 });
 
+/**
+ * POST /api/resources/import
+ * Body (JSON):
+ *   {
+ *     "buffer": "<base64>",   // 文件二进制（base64 编码）
+ *     "filename": "photo.png", // 原始文件名（带扩展名）
+ *     "metadata": { ... },    // 可选
+ *     "type": "image"          // 可选，默认按扩展名 ResourceType.fromPath
+ *   }
+ *
+ * 与 /api/notes/upload 的区别：
+ *   - 上传走 multipart（适合 CLI / 大文件 / 批量）
+ *   - import 走 JSON base64（适合 Electron renderer 的小图片粘贴/拖拽）
+ *
+ * 流程：写文件 → resource.create operation → 记录 syncOps
+ */
+route("POST", "/api/resources/import", async (req, res, { repo }) => {
+  let body;
+  try {
+    body = await readBody(req);
+  } catch (e) {
+    return badRequest(res, e.message);
+  }
+
+  const { buffer, filename, metadata = {}, type = null } = body || {};
+
+  if (!buffer || typeof buffer !== "string") {
+    return badRequest(res, 'Missing "buffer" field (base64 编码)');
+  }
+  if (!filename || typeof filename !== "string") {
+    return badRequest(res, 'Missing "filename" field');
+  }
+
+  let bufferObj;
+  try {
+    bufferObj = Buffer.from(buffer, "base64");
+  } catch (e) {
+    return badRequest(res, `buffer base64 解码失败: ${e.message}`);
+  }
+  if (bufferObj.length === 0) {
+    return badRequest(res, "buffer is empty");
+  }
+
+  try {
+    const result = await repo.importBuffer({
+      buffer: bufferObj,
+      filename,
+      metadata,
+      type,
+    });
+    jsonOk(res, toApiResource(result), 201);
+  } catch (e) {
+    if (e.code === "RESOURCE_EXISTS") return conflict(res, e.message);
+    serverError(res, e.message);
+  }
+});
+
 route("POST", "/api/notes", async (req, res, { repo }) => {
   let body;
   try {

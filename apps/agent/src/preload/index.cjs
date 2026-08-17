@@ -17,6 +17,8 @@ const CHANNEL = {
   UPDATE_NOTE: 'lo-core:update-note',
   REMOVE_NOTE: 'lo-core:remove-note',
   UPLOAD_NOTES: 'lo-core:upload-notes',
+  IMPORT_RESOURCE: 'lo-core:import-resource',
+  RESOURCE_BINARY: 'lo-core:resource-binary',
   LOGOUT: 'lo-core:logout',
   RELATIONS: 'lo-core:relations',
   OPERATIONS: 'lo-core:operations',
@@ -95,6 +97,8 @@ contextBridge.exposeInMainWorld('loAgent', {
     updateNote: (rid, body) => ipcRenderer.invoke(CHANNEL.UPDATE_NOTE, rid, body),
     removeNote: (rid) => ipcRenderer.invoke(CHANNEL.REMOVE_NOTE, rid),
     uploadNotes: (files, options) => ipcRenderer.invoke(CHANNEL.UPLOAD_NOTES, files, options),
+    importResource: (params) => ipcRenderer.invoke(CHANNEL.IMPORT_RESOURCE, params),
+    getResourceBinary: (rid) => ipcRenderer.invoke(CHANNEL.RESOURCE_BINARY, rid),
     logout: () => ipcRenderer.invoke(CHANNEL.LOGOUT),
     relations: {
       list: (rid) => ipcRenderer.invoke(CHANNEL.RELATIONS, rid),

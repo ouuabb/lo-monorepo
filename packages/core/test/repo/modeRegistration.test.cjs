@@ -106,6 +106,7 @@ describe('U3 插件 Mode/Viewer 注册', () => {
     const readers = await repo.listViewers('reading');
     expect(readers.map((v) => v.viewerId)).toEqual([
       'viewer.generic-preview',
+      'viewer.markdown-preview',
       'viewer.epub-reader',
     ]);
 

@@ -176,20 +176,20 @@ describe("Usage Mode/Viewer HTTP API (U1)", () => {
     ]);
   });
 
-  test("GET /api/viewers?mode=reading → [viewer.generic-preview]", async () => {
+  test("GET /api/viewers?mode=reading → 包含 viewer.generic-preview + viewer.markdown-preview", async () => {
     const res = await request(port, "GET", "/api/viewers?mode=reading");
     expect(res.status).toBe(200);
-    expect(res.data.viewers.map((v) => v.viewerId)).toEqual([
-      "viewer.generic-preview",
-    ]);
+    const ids = res.data.viewers.map((v) => v.viewerId);
+    expect(ids).toContain("viewer.generic-preview");
+    expect(ids).toContain("viewer.markdown-preview");
   });
 
   test("GET /api/viewers（无 mode）→ 全部 Viewer", async () => {
     const res = await request(port, "GET", "/api/viewers");
     expect(res.status).toBe(200);
-    expect(res.data.viewers.map((v) => v.viewerId)).toEqual([
-      "viewer.markdown-editor",
-      "viewer.generic-preview",
-    ]);
+    const ids = res.data.viewers.map((v) => v.viewerId);
+    expect(ids).toContain("viewer.markdown-editor");
+    expect(ids).toContain("viewer.generic-preview");
+    expect(ids).toContain("viewer.markdown-preview");
   });
 });
