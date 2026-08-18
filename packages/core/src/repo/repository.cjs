@@ -603,15 +603,19 @@ class Repository {
     await fs.writeFile(filePath, buffer);
 
     // 走 resource.create operation
+    // metadata 白名单：仅保留 Core 合法字段（title/category/mimetype 等）；
+    // 调用方可能传入 source/originalFilename 等 UI 上下文，非资源元数据，须剥离
+    const meta = { ...metadata };
+    delete meta.source;
+    delete meta.originalFilename;
+    delete meta.filename;
     const createParams = {
       type: finalType,
       location_kind: loc.kind,
       location: loc.value,
       name: finalName,
       metadata: {
-        ...metadata,
-        // 记录原始 filename 与 size 便于回溯
-        ...(metadata.originalFilename ? {} : { originalFilename: filename }),
+        ...meta,
         size: buffer.length,
       },
     };

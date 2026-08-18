@@ -285,4 +285,48 @@ describe('syncMarkdownRelations (RID-only embed)', () => {
     expect(result.broken).toBe(0);
     expect(result.embeds).toBe(0);
   });
+
+  test('importBuffer：上传 Image Resource 不修改 Markdown、不自动建 embed relation', async () => {
+    const img = await repo.importBuffer({
+      buffer: Buffer.from('fake-png-bytes'),
+      filename: 'clipboard.png',
+      type: 'image',
+    });
+    expect(img).not.toBeNull();
+    expect(img.type).toBe('image');
+
+    // 上传本身不写任何 Markdown、不产生任何 embed relation
+    const embeds = await repo.relationService.getByType('embed');
+    expect(embeds.length).toBe(0);
+
+    // 未引用图片仍作为独立 Image Resource 存在
+    const stillExists = await repo.resourceService.getByRid(img.rid);
+    expect(stillExists).not.toBeNull();
+  });
+
+  test('importBuffer → Markdown 引用 RID → 建立 embed relation（仅引用后才建）', async () => {
+    await fs.ensureDir(path.join(tempDir, 'resources', 'images'));
+    await fs.ensureDir(path.join(tempDir, 'resources', 'notes'));
+
+    const img = await repo.importBuffer({
+      buffer: Buffer.from('fake-png-bytes'),
+      filename: 'pasted.png',
+      type: 'image',
+    });
+    expect(img).not.toBeNull();
+
+    // 引用前：无 embed
+    const before = await repo.relationService.getByType('embed');
+    expect(before.length).toBe(0);
+
+    // 插入 RID 引用到 Markdown → 保存触发同步 → 建立 embed
+    const mdContent = `# Test\n\n![pasted](${img.rid})`;
+    await fs.writeFile(path.join(tempDir, 'resources', 'notes', 'test.md'), mdContent);
+    const mdResource = await repo.importFile(path.join(tempDir, 'resources', 'notes', 'test.md'));
+
+    const embeds = await repo.relationService.getByFromRidAndType(mdResource.rid, 'embed');
+    expect(embeds.length).toBe(1);
+    expect(embeds[0].to_rid).toBe(img.rid);
+    expect(embeds[0].metadata.alt).toBe('pasted');
+  });
 });
