@@ -6,10 +6,15 @@
  * 避免加载其余语言服务，减小体积；worker 通过 Vite `?worker` 加载。
  *
  * 候选图片（来自 2026-08-17 Markdown 图片架构重构）：
- *   - 监听 paste / drop 图像 → 写入 CandidateImageStore（不直接创建 Resource）
- *   - 由 CandidateImagePanel 触发导入 → 调 lo-core:import-resource → 插入 RID Markdown
+ *   - DOM 层监听 paste / drop 图像 → 写入 CandidateImageStore（不直接创建 Resource）
+ *   - CandidateImagePanel 导入拿到 RID 后，经 ref.insertImage 在当前光标处插入
+ *     `![alt](res_xxx)`（renderer 层完成，Core / IPC 不参与光标管理）
+ *
+ * 浏览器环境约束（renderer 不接触 Node）：
+ *   - 图片字节只以 Uint8Array 流转（new Uint8Array(buf)），不依赖 Node Buffer
+ *   - paste/drop 采集唯一路径为 DOM 事件监听（domNode paste/drop）
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import * as monaco from 'monaco-editor/editor/editor.api';
 import 'monaco-editor/languages/definitions/markdown/register';
 import 'monaco-editor/editor/contrib/suggest/browser/suggestController.js';
@@ -27,7 +32,8 @@ if (!self.MonacoEnvironment) {
 const loCore = (typeof window !== 'undefined' && window.loAgent && window.loAgent.loCore) || null;
 registerWikilinkCompletion(loCore);
 
-export default function NoteEditor({ value, onChange, readOnly = false, rid = null }) {
+const NoteEditor = forwardRef(
+  ({ value, onChange, readOnly = false, rid = null }, ref) => {
   const containerRef = useRef(null);
   const editorRef = useRef(null);
 
@@ -61,19 +67,7 @@ export default function NoteEditor({ value, onChange, readOnly = false, rid = nu
       if (onChange) onChange(editor.getValue());
     });
 
-    // P2: 监听 paste / drop 图像 → 写入 CandidateImageStore
-    const disposablePaste = editor.onDidPaste((e) => {
-      // 仅在粘贴内容含图像时走候选逻辑
-      try {
-        const model = editor.getModel();
-        if (!model) return;
-        // Monaco 不直接暴露 paste 内容，但 onDidPaste 后可通过 clipboard API 主动询问
-        // 简化：仅给出 hook；用户也可以从 drag/drop 路径触发
-      } catch (err) {
-        // ignore
-      }
-    });
-
+    // paste / drop 图像采集（唯一路径：DOM 事件监听）→ 写入 CandidateImageStore
     const domNode = editor.getDomNode();
     let pasteHandler = null;
     let dropHandler = null;
@@ -89,7 +83,7 @@ export default function NoteEditor({ value, onChange, readOnly = false, rid = nu
             if (!file) continue;
             file.arrayBuffer().then((buf) => {
               candidateImageStore.add({
-                buffer: Buffer.from(buf),
+                bytes: new Uint8Array(buf),
                 mime: ci.type,
                 filename: file.name || `pasted-${Date.now()}.${mimeExt(ci.type)}`,
                 source: 'paste',
@@ -107,7 +101,7 @@ export default function NoteEditor({ value, onChange, readOnly = false, rid = nu
           if (!file.type || !SUPPORTED_MIMES.has(file.type.toLowerCase())) continue;
           file.arrayBuffer().then((buf) => {
             candidateImageStore.add({
-              buffer: Buffer.from(buf),
+              bytes: new Uint8Array(buf),
               mime: file.type,
               filename: file.name || `dropped-${Date.now()}.${mimeExt(file.type)}`,
               source: 'drop',
@@ -122,7 +116,6 @@ export default function NoteEditor({ value, onChange, readOnly = false, rid = nu
 
     return () => {
       sub.dispose();
-      disposablePaste.dispose();
       if (domNode) {
         if (pasteHandler) domNode.removeEventListener('paste', pasteHandler);
         if (dropHandler) domNode.removeEventListener('drop', dropHandler);
@@ -146,8 +139,40 @@ export default function NoteEditor({ value, onChange, readOnly = false, rid = nu
     }
   }, [value]);
 
+  // 最小 imperative bridge：CandidateImagePanel 导入拿到 RID 后，
+  // 在当前 cursor / selection 处插入 `![alt](res_xxx)`。
+  // 插入发生在 renderer / editor 层；Core / IPC 不参与光标管理。
+  useImperativeHandle(
+    ref,
+    () => ({
+      insertImage(rid, alt = '') {
+        const ed = editorRef.current;
+        if (!ed) return false;
+        const model = ed.getModel();
+        if (!model) return false;
+        if (ed.getOption(monaco.editor.EditorOption.readOnly)) return false;
+        const sel = ed.getSelection() || model.getFullModelRange();
+        const safeAlt = String(alt || 'image').split('[').join('').split(']').join('');
+        const snippet = `![${safeAlt}](${rid})`;
+        ed.executeEdits('candidate-image', [
+          { range: sel, text: snippet, forceMoveMarkers: true },
+        ]);
+        // 光标移到插入文本之后（便于继续输入）
+        const pos = sel.isEmpty()
+          ? { lineNumber: sel.startLineNumber, column: sel.startColumn + snippet.length }
+          : { lineNumber: sel.endLineNumber, column: sel.endColumn + snippet.length };
+        ed.setPosition(pos);
+        ed.focus();
+        return true;
+      },
+    }),
+    [],
+  );
+
   return <div className="note-editor-host" ref={containerRef} />;
-}
+});
+
+NoteEditor.displayName = 'NoteEditor';
 
 function mimeExt(mime) {
   switch (mime.toLowerCase()) {
@@ -161,3 +186,5 @@ function mimeExt(mime) {
     default: return 'bin';
   }
 }
+
+export default NoteEditor;

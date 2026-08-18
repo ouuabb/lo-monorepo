@@ -13,14 +13,17 @@
  * @param {{ rid: string, type?: string }} n — 资源信息（rid 必需；type 仅展示）
  * @param {object} api — preload loCore（modes.resolve / viewers.list）
  * @param {Set<string>} [globalOverrides] — App 级只读覆盖集合（已存在的 override 合并进 Session）
+ * @param {string|null} [preferredViewerId] — 指定 viewerId（须在该 Mode 可用 Viewer 列表内，
+ *   否则回退首个）；null 时取首个。Session 同时携带 availableViewers 供 UI 切换。
  * @returns {Promise<Session>}
  * Session = {
  *   resourceRid, modeId, viewerId, writable,
+ *   availableViewers: Array<{ viewerId, label, semantics, supports }>,
  *   state: { readOnly, dirty, scroll },
  *   overrides: Set<string>,
  * }
  */
-export async function createSession(n, api, globalOverrides = new Set()) {
+export async function createSession(n, api, globalOverrides = new Set(), preferredViewerId = null) {
   const modesRes = await api.modes.resolve(n.rid);
   if (!modesRes || !modesRes.ok) {
     throw new Error((modesRes && modesRes.message) || '解析 Mode 失败');
@@ -38,13 +41,18 @@ export async function createSession(n, api, globalOverrides = new Set()) {
   if (!viewersRes.viewers || viewersRes.viewers.length === 0) {
     throw new Error(`Mode ${mode.modeId} 无可用的 Viewer`);
   }
-  const viewer = viewersRes.viewers[0];
+  const availableViewers = viewersRes.viewers;
+  const viewer =
+    (preferredViewerId &&
+      availableViewers.find((v) => v.viewerId === preferredViewerId)) ||
+    availableViewers[0];
   const writable = !!(mode.rules && mode.rules.writable);
 
   return {
     resourceRid: n.rid,
     modeId: mode.modeId,
     viewerId: viewer.viewerId,
+    availableViewers,
     writable,
     state: {
       readOnly: !writable || overrides.has(n.rid),

@@ -69,6 +69,16 @@ const [repoCtx, setRepoCtx] = useState(null);
   const toastTimerRef = useRef(null);
   const autoSaveTimerRef = useRef(null);
   const layoutTimerRef = useRef(null);
+  /** tab.id → NoteEditor 实例 ref（CandidateImagePanel 插入图片用） */
+  const editorRefsRef = useRef(new Map());
+  const getTabEditorRef = useCallback((tabId) => {
+    let r = editorRefsRef.current.get(tabId);
+    if (!r) {
+      r = { current: null };
+      editorRefsRef.current.set(tabId, r);
+    }
+    return r;
+  }, []);
   const [toastCopied, setToastCopied] = useState(false);
 
   // tab/group 实例 id（同 rid 可在多个 group 双开，实例独立）
@@ -416,6 +426,24 @@ const [repoCtx, setRepoCtx] = useState(null);
     );
   }, []);
 
+  /** 切换 tab 的 Session Viewer（仅更新该 tab 的 session.viewerId；不重构 Viewer 系统） */
+  const setTabViewer = useCallback((groupId, tabId, viewerId) => {
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.id !== groupId
+          ? g
+          : {
+              ...g,
+              tabs: g.tabs.map((t) =>
+                t.id === tabId
+                  ? { ...t, session: { ...t.session, viewerId } }
+                  : t,
+              ),
+            },
+      ),
+    );
+  }, []);
+
   /** 正文变更同步：分屏双开同一 rid 时，text 广播到所有同 rid tab（草稿实时同步） */
   const patchRidText = useCallback((rid, text) => {
     setGroups((prev) =>
@@ -559,28 +587,32 @@ const [repoCtx, setRepoCtx] = useState(null);
   );
 
   /**
-   * 候选图片导入成功 → 在当前活动 tab 的文本中插入 `![alt](res_xxx)`
+   * 候选图片「插入」→ 在当前 tab 的 Monaco 编辑器光标处插入 `![alt](res_xxx)`
    *
-   * 触发：由 CandidateImagePanel 的「导入」按钮回调
-   * 语义：把 RID 引用追加到当前 note 末尾；后续 saveActiveTab 触发持久化
+   * 触发：CandidateImagePanel「插入」按钮（候选已上传，持有 Image Resource rid）
+   * 语义：仅插入 Markdown（renderer/editor 层），Core / IPC 不参与光标管理；
+   *       后续保存触发 Core syncMarkdownRelations 建立 note → image embed relation。
    */
-  const handleCandidateImport = useCallback(({ rid, alt, filename }) => {
-    if (!activeTab) {
-      notify('请先打开一个笔记');
-      return;
-    }
-    if (activeTab.session.state.readOnly) {
-      notify('只读模式下不能插入图片');
-      return;
-    }
-    const safeAlt = (alt || filename || 'image').replace(/[\[\]]/g, '');
-    const snippet = `![${safeAlt}](${rid})`;
-    const next = activeTab.text
-      ? `${activeTab.text.trimEnd()}\n\n${snippet}\n`
-      : `${snippet}\n`;
-    patchRidText(activeTab.rid, next);
-    notify(`已导入 ${filename || rid}`);
-  }, [activeTab, notify, patchRidText]);
+  const handleCandidateInsert = useCallback(
+    (tab, editorRef, { rid, alt, filename }) => {
+      if (!tab) {
+        notify('请先打开一个笔记');
+        return;
+      }
+      const ed = editorRef && editorRef.current;
+      if (!ed || typeof ed.insertImage !== 'function') {
+        notify('当前视图不可插入图片（请使用 Markdown 编辑器）');
+        return;
+      }
+      const ok = ed.insertImage(rid, alt || '');
+      if (!ok) {
+        notify('只读模式下不能插入图片');
+        return;
+      }
+      notify(`已插入 ${filename || rid}`);
+    },
+    [notify],
+  );
 
   const requestDeleteNote = useCallback((rid) => {
     const target = rid || (activeTab && activeTab.rid);
@@ -1105,9 +1137,14 @@ useEffect(() => {
                           tab={tab}
                           onChange={(text) => patchRidText(tab.rid, text)}
                           pluginViewers={pluginViewers}
+                          editorRef={getTabEditorRef(tab.id)}
                         />
                         {tab.meta.type === 'note' && (
-                          <CandidateImagePanel onImport={handleCandidateImport} />
+                          <CandidateImagePanel
+                            onInsert={(res) =>
+                              handleCandidateInsert(tab, getTabEditorRef(tab.id), res)
+                            }
+                          />
                         )}
                       </div>
 
@@ -1118,7 +1155,23 @@ useEffect(() => {
                           Mode {tab.session.modeId}
                         </span>
                         <span className="status-meta">
-                          Viewer {tab.session.viewerId}
+                          <label>
+                            Viewer{' '}
+                            <select
+                              className="status-viewer-select"
+                              value={tab.session.viewerId}
+                              onChange={(e) =>
+                                setTabViewer(group.id, tab.id, e.target.value)
+                              }
+                              aria-label="切换 Viewer"
+                            >
+                              {(tab.session.availableViewers || []).map((v) => (
+                                <option key={v.viewerId} value={v.viewerId}>
+                                  {v.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
                         </span>
                         {tab.meta.schema && (
                           <span className="status-meta">schema {tab.meta.schema}</span>
@@ -1300,7 +1353,7 @@ const PLUGIN_STATE_LABEL = {
  * viewer 自身的只读限制（如 generic-preview）与其取并集。
  * 内置 Viewer → React 组件；插件 Viewer → PluginViewerHost（render-viewer 桥）。
  */
-function EditorRenderer({ tab, onChange, pluginViewers }) {
+function EditorRenderer({ tab, onChange, pluginViewers, editorRef }) {
   const viewer = resolveViewerComponent(tab.session.viewerId, pluginViewers);
   if (!viewer) {
     return (
@@ -1324,6 +1377,7 @@ function EditorRenderer({ tab, onChange, pluginViewers }) {
   return (
     <ViewerComponent
       key={tab.id}
+      ref={editorRef}
       rid={tab.rid}
       value={tab.text}
       onChange={onChange}
