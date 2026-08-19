@@ -83,7 +83,8 @@ function isCurated(file) {
 }
 function scanLinks(file) {
   if (!fs.existsSync(file) || !isCurated(file)) return;
-  const txt = fs.readFileSync(file, 'utf8');
+  // 剔除 markdown 图片语法 `![alt](url)`：图片引用不是文档链接，不参与存在性校验
+  const txt = fs.readFileSync(file, 'utf8').replace(/!\[[^\]]*\]\([^)]*\)/g, '');
   const dir = path.dirname(file);
   let m;
   while ((m = LINK_PATTERN.exec(txt)) !== null) {
