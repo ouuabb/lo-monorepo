@@ -87,6 +87,7 @@ export class LoClient {
   operations: OperationsApi;
   events: EventsApi;
   repository: RepositoryApi;
+  resources: ResourcesApi;
   setAdminToken(token: string): void;
   request(method: string, path: string, query?: object, options?: object): Promise<ApiResponse>;
   get(path: string, query?: object, options?: object): Promise<ApiResponse>;
@@ -311,6 +312,24 @@ export interface RepositoryApi {
   info(): Promise<{ repositoryId: string; path: string }>;
   /** Resource Location 解析（来自 Core，不自行拼接路径） */
   resolveLocation(rid: string): Promise<ResolvedLocation>;
+}
+
+/** 二进制 Resource（图片等）导入与读取；读取解密由 Core 负责 */
+export interface ResourcesApi {
+  /** 导入二进制资源（JSON base64），走 POST /api/resources/import */
+  import(options: {
+    buffer: string;
+    filename: string;
+    metadata?: object;
+    type?: string | null;
+  }): Promise<LoBody>;
+  /** 读取资源原始二进制（Core 侧解密），返回 { rid, mime, buffer(base64), size } */
+  binary(rid: string): Promise<{
+    rid: string;
+    mime: string;
+    buffer: string;
+    size: number;
+  }>;
 }
 
 type LoBody = any;

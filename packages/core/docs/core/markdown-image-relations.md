@@ -1,7 +1,7 @@
 # Markdown 图片引用关系功能 — 完整实现文档
 
 > 本文档记录实现细节、设计决策、已知约束，供未来评估与维护参考。
-> 最后更新：2026-08-17（RID-only 模型收敛）
+> 最后更新：2026-08-20（Image Resource Manager 收敛；RID-only 模型）
 
 ---
 
@@ -26,7 +26,7 @@
 ![alt](./photo.png)     ← 非 RID 路径，不视为 lo Resource 引用（不入关系）
 ```
 
-非 RID 路径引用（含 `./photo.png`、`photo.png`、`../assets/p.png`、`foo.png`）不再被猜测式匹配为某个 image Resource；保存时若目标资源不存在，记为 `broken++`，由用户主动选择 Import / 删除。
+非 RID 路径引用（含 `./photo.png`、`photo.png`、`../assets/p.png`、`foo.png`）不再被猜测式匹配为某个 image Resource；保存时若目标资源不存在，记为 `broken++`，由用户主动导入为 Image Resource / 删除引用。
 
 ### 技术约束
 
@@ -51,7 +51,7 @@
 | 5 | **Markdown 内容是真相来源** | Relation 数据库是索引结果，Markdown 文件内容才是最终事实 |
 | 6 | **全量重建策略** | 每次解析先删后建，避免状态不一致 |
 | 7 | **不侵入 Resource Core** | 解析逻辑独立于 Resource 生命周期管理 |
-| 8 | **Candidate Image ≠ Resource** | 待导入图片属于 Agent 编辑器交互状态，不进入 lo Core |
+| 8 | **Image Resource Manager 收敛** | 图片采集/导入/管理在 lo-agent `image/` 模块，编辑器只做最小 RID 插入；不新增插件契约 |
 
 ---
 
@@ -97,12 +97,14 @@
 ### 3.1 创建链路（Agent 层 → Core 层）
 
 ```
-Editor (paste/drop/file select)
+Image Resource Manager（粘贴 / 拖入 / 文件选择）
     │
     ▼
-Agent CandidateImageStore (内存，不落盘)
+collectImageFiles (纯函数，SUPPORTED_MIMES 过滤)
     │
-    │ 用户在 CandidateImagePanel 中选择「导入」
+    ▼
+imageApi.importImage({bytes, mime, filename})
+    │
     ▼
 lo-core:import-resource (IPC)
     │
@@ -110,17 +112,48 @@ lo-core:import-resource (IPC)
 @lo/client → POST /api/resources/import
     │
     ▼
-Repository.importBuffer({buffer, filename, metadata})
+Repository.importBuffer({buffer, filename, metadata, type:'image'})
     │
     ▼
 resource.create operation (经 Operation Engine)
     │
     ▼
-image Resource → rid=res_xxx
+image Resource → rid=res_xxx → Manager 列表
+    │ 用户主动点「插入」
+    ▼
+App.handleInsertImageToActiveEditor → NoteEditor.insertImage(rid, alt)
     │
     ▼
 Agent editor.insertText(`![${alt}](${rid})`)
 ```
+
+### 3.2 读取链路（预览：Core 侧解密，Agent 不读盘）
+
+**解密唯一由 lo Core 负责**（`repo.cryptoKey`）。Agent 主进程不读资源文件、
+不参与解密；渲染进程只拿 data URL 渲染。
+
+```
+MarkdownImage.jsx → <img> 需要 src
+    │
+    ▼
+imageApi.getBinary(rid) → lo-core:resource-binary (IPC)
+    │
+    ▼
+main LoCoreService.getResourceBinary(rid)
+    │  （不再 fsp.readFile 本地读盘；不解析 location）
+    ▼
+@lo/client → client.resources.binary(rid) → GET /api/resources/:rid/binary
+    │
+    ▼
+serve readResourceBuffer(absPath, repo.cryptoKey)  ← 检测 LOEC → decryptFile
+    │
+    ▼
+{ rid, mime, buffer(base64 明文), size } → data URL → <img>
+```
+
+> 加密仓库（LOEC）下：旧实现 `fsp.readFile` 直读磁盘会拿到密文 → data URL 无法解码 → 图片裂开。
+> 新实现二进制读取收敛到 Core `readResourceBuffer`（保留原始字节，不做 UTF-8 转换；
+> `readResourceContent` 的 `.toString("utf-8")` 会损坏二进制）。
 
 ---
 
@@ -135,8 +168,11 @@ Agent editor.insertText(`![${alt}](${rid})`)
 | `test/repo/embedRelations.test.cjs` | ~150 | RID-only 集成测试用例 |
 | `test/utils/markdownImageParser.test.cjs` | ~110 | 21 个解析器单元测试 |
 | `src/repo/importBuffer.cjs` | ~80 | Resource 导入能力（buffer → Resource） |
-| `apps/agent/src/renderer/src/services/candidateImageStore.mjs` | ~100 | Agent 候选图片内存存储 |
-| `apps/agent/src/renderer/src/components/CandidateImagePanel.jsx` | ~150 | 候选图片 UI |
+| `apps/agent/src/renderer/src/image/imageUtils.mjs` | ~60 | Image Resource Manager 纯工具（SUPPORTED_MIMES / mimeExt / base64ToUint8 / formatSize / altFromFilename） |
+| `apps/agent/src/renderer/src/image/imageImport.mjs` | ~50 | `collectImageFiles` 三入口归一（paste / drop / file-select） |
+| `apps/agent/src/renderer/src/image/imageApi.mjs` | ~80 | `createImageApi` 数据访问层（list / importImage / getBinary / remove） |
+| `apps/agent/src/renderer/src/image/ImageManager.jsx` | ~250 | Image Resource Manager UI（导入 / 列表 / 缩略图 / 预览 / 插入 / 删除） |
+| `apps/agent/src/renderer/src/image/ImagePreviewModal.jsx` | ~80 | 大图预览遮罩 |
 | `apps/agent/src/renderer/src/components/MarkdownImage.jsx` | ~80 | RID → data URL → `<img>` |
 | `scripts/lo-embed-migrate.cjs` | 一次性 | 旧仓库 path 引用 → RID 迁移脚本 |
 
@@ -147,14 +183,14 @@ Agent editor.insertText(`![${alt}](${rid})`)
 | `src/repo/repository.cjs` | **简化** | `_resolveImageResource` 改为 RID-only；删除 `_candidateNameFromPath` |
 | `src/repo/repository.cjs` | 修改调用点 | `syncMarkdownRelations` embed 分支：远程 / data: 跳过，非 RID 路径 broken++ |
 | `src/repo/relationService.cjs` | 新增方法 | `removeByFromRidAndType(fromRid, type, origin)` |
-| `src/commands/serve.cjs` | 新增路由 | `POST /api/resources/import` |
+| `src/commands/serve.cjs` | 新增路由 | `POST /api/resources/import`、`GET /api/resources/:rid/binary`（Core 侧解密） |
 | `src/repo/resourceService.cjs` | 新增方法 | `importBuffer({buffer, filename, metadata})` |
-| `packages/client/src/client.cjs` | 新增命名空间 | `client.resources.import` |
+| `packages/client/src/client.cjs` | 新增命名空间 | `client.resources.import`、`client.resources.binary` |
 | `apps/agent/src/preload/index.cjs` | 新增 IPC | `lo-core:import-resource`、`lo-core:resource-binary` |
 | `apps/agent/src/main/ipc.cjs` | 新增通道 | `lo-core:import-resource`、`lo-core:resource-binary` |
-| `apps/agent/src/main/lo-core.cjs` | 新增方法 | `importResource`、`getResourceBinary` |
-| `apps/agent/src/renderer/src/editor/NoteEditor.jsx` | 新增监听 | paste / drop 图像 → candidate |
-| `apps/agent/src/renderer/src/App.jsx` | 新增 UI | 候选图片面板 |
+| `apps/agent/src/main/lo-core.cjs` | 新增方法 | `importResource`、`getResourceBinary`（经 `client.resources.binary` 走 Core 解密，主进程不读盘） |
+| `apps/agent/src/renderer/src/editor/NoteEditor.jsx` | 简化 | 移除 paste / drop 采集；仅保留最小 `insertImage(rid, alt)` bridge（`executeEdits('insert-image-resource', ...)`） |
+| `apps/agent/src/renderer/src/App.jsx` | 新增 UI | `handleInsertImageToActiveEditor` + rail「图片」按钮 + `<Bar id="image">` 渲染 ImageManager |
 | `apps/agent/src/renderer/src/services/viewerRegistry.js` | 新增 viewer | `viewer.markdown-preview` |
 
 ---
@@ -598,16 +634,22 @@ Step 4: 去除随机后缀
 
 | # | 测试用例 | 验证点 |
 |---|----------|--------|
-| 1 | 同目录图片引用 | `![alt](photo.png)` 创建 embed 关系 |
-| 2 | 子目录图片引用 | `![alt](assets/photo.png)` 路径上下文拼接 |
-| 3 | 上级目录相对路径 | `![alt](../assets/photo.png)` `../` 路径解析 |
-| 4 | broken reference | 图片不存在时 broken 计数 |
-| 5 | 多图片引用 | 同一文件多个 `![alt](...)` |
-| 6 | 排除远程 URL | 远程 URL 不产生关系 |
-| 7 | 重新同步重建 | 删引用后重新同步，旧关系清除 |
-| 8 | HTML img 标签 | `<img src="...">` 创建 embed 关系 |
-| 9 | Wikilink + Embed 混合 | 同时解析两种引用类型 |
-| 10 | 返回计数验证 | 返回值 `{ wikilinks, embeds, broken }` 正确 |
+| 1 | Markdown 引用 RID | `![alt](res_xxx)` 创建 embed 关系（origin=markdown_parser） |
+| 2 | 路径式引用 | `![alt](photo.png)` 不创建关系，`broken++` |
+| 3 | 子目录路径引用 | `![alt](assets/photo.png)` broken |
+| 4 | `../` 相对路径引用 | `![alt](../assets/photo.png)` broken |
+| 5 | 多 RID 引用 | 同一文件多个 `![alt](res_xxx)` 多条 embed |
+| 6 | 排除远程 URL | 远程 URL 不产生关系、不计数 broken |
+| 7 | 排除 data: URL | `data:` 不产生关系、不计数 broken |
+| 8 | 重新同步重建 | 删引用后重新同步，旧关系清除 |
+| 9 | HTML img RID src | `<img src="res_xxx">` 创建 embed |
+| 10 | HTML img 路径 src | `<img src="photo.png">` broken |
+| 11 | Wikilink + Embed 混合 | 同时解析两种引用类型，返回计数正确 |
+| 12 | 返回计数验证 | `{ wikilinks, embeds, broken }` 正确（去重） |
+| 13 | RID 直接解析 | 无需路径上下文，rid 直接 resolve |
+| 14 | HTML img 远程 URL | 不 embed、不 broken |
+| 15 | importBuffer 生命周期 | 上传 Image Resource 不修改 Markdown、不自动建 embed |
+| 16 | importBuffer → 引用 RID | Markdown 引用 RID 保存后才建 embed relation |
 
 ### 13.3 测试结果
 
@@ -626,11 +668,10 @@ Tests:       231 passed, 231 total
 - ✅ 带标题的图片语法 `![alt](path "title")`
 - ✅ HTML `<img>` 标签解析（双引号、单引号）
 - ✅ 路径含括号解析（`state(1).png`）
-- ✅ 相对路径解析（同目录、子目录、`../`）
-- ✅ 路径上下文拼接（基于 source resource 目录）
-- ✅ RID 直接匹配
-- ✅ 远程 URL 排除（http/https）
-- ✅ base64/data 协议排除
+- ✅ RID 直接匹配（`res_xxx`）
+- ✅ 非 RID 路径（含相对/子目录/`../`）→ broken，不猜测匹配
+- ✅ 远程 URL 排除（http/https，语义外不计数）
+- ✅ base64/data 协议排除（语义外不计数）
 - ✅ `<img>` 标签远程 URL / data 排除
 - ✅ 重复引用去重
 - ✅ 全量重建策略
@@ -641,13 +682,14 @@ Tests:       231 passed, 231 total
 - ✅ 与现有 FileWatcher / importFile 集成
 - ✅ 所有调用点使用 `resource.type === 'note'`
 - ✅ 核心解析器 `MarkdownParser` 直接调用
+- ✅ 图片导入/管理收敛在 lo-agent Image Resource Manager（采集/导入/列表/预览/插入/删除），复用 `importBuffer`/`resources.import`，编辑器只做最小 RID 插入
 
 ### 14.2 已知边界
 
 | # | 边界场景 | 当前处理 | 评估 |
 |---|----------|----------|------|
 | 1 | 图片路径含 `)` 以外特殊字符 | 正常处理 | 可接受 |
-| 2 | 同名图片在不同目录 | Level 2 路径上下文可解决大多数场景 | 可接受 |
+| 2 | 同名图片在不同目录 | RID-only，无路径猜测；同名不冲突 | 可接受 |
 | 3 | 超大 Markdown 文件（> 1MB） | 两次遍历，性能可接受 | 未来可合并为单次遍历 |
 | 4 | 嵌套 `<img>` 内联 `<script>` | 正则无法处理，但 Markdown 规范不允许 | 低风险 |
 | 5 | emoji 作为 alt 文本 | 直接作为字符串存储 | 可接受 |
@@ -661,10 +703,11 @@ Tests:       231 passed, 231 total
 | Phase 2 | Orphan image 检测 | 检测无 embed 关系的图片 Resource |
 | Phase 2 | Broken reference 管理 | 提供 broken 引用的查询 API |
 | Phase 2 | 删除保护 | 检查 embed 关系后禁止删除图片 |
-| Phase 3 | 图片浏览视图 | 前端图片预览组件 |
 | Phase 3 | 缩略图生成 | 自动生成缩略图缓存 |
 | Phase 3 | OCR 文字识别 | 提取图片中的文字内容 |
 | Phase 3 | EXIF 信息读取 | 读取图片元数据 |
+
+> 注：图片浏览视图/预览组件已由 lo-agent Image Resource Manager 实现（`image/` 模块：列表 + 缩略图 + 大图预览）。
 
 ---
 

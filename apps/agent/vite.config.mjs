@@ -15,7 +15,7 @@ export default defineConfig({
       transformIndexHtml(html) {
         return html.replace(
           /<meta[\s\S]*?http-equiv="Content-Security-Policy"[\s\S]*?\/?>/,
-          '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; script-src \'self\' \'unsafe-inline\'; style-src \'self\' \'unsafe-inline\'; connect-src \'self\' ws: http://localhost:* https://localhost:*" />'
+          '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; script-src \'self\' \'unsafe-inline\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data: blob:; connect-src \'self\' ws: http://localhost:* https://localhost:*" />'
         );
       },
     },

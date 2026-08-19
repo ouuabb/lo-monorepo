@@ -423,29 +423,28 @@ Wikilink 是 lo 的笔记间双向链接机制。在 `.md` 文件中使用 `[[..
 
 #### 什么是 embed 关系
 
-Markdown 笔记中可以通过 `![alt](path)` 或 `<img>` 标签引用图片。lo 在 `lo sync` 时自动解析这些引用，将其转化为 `embed` 类型的资源关系。
+Markdown 笔记中可以通过 `![alt](res_xxx)` 或 `<img src="res_xxx">` 引用 Image Resource。lo 在 `lo sync` 时自动解析这些引用，将其转化为 `embed` 类型的资源关系。
 
 基本语法：
 
 ```markdown
-![图片描述](./assets/photo.png)
-<img src="./assets/photo.png" alt="图片描述">
+![图片描述](res_xxx)
+<img src="res_xxx" alt="图片描述">
 ```
 
 #### 工作原理
 
 从 Markdown 到数据库的完整流程：
 
-1. **写入** 图片引用语法到 `.md` 文件中
+1. **写入** 图片引用语法到 `.md` 文件中（RID-only：`res_xxx` 是唯一合法身份引用）
 2. **`lo sync`** 触发解析
 3. **正则解析**：
    - Markdown 图片：分两步解析（先匹配 `![alt]`，再用括号计数法提取 URL）
    - HTML img 标签：`<img\s+[^>]*?src=["']([^"']+)["'][^>]*?\/?\s*>`
-4. **三级路径解析**：
-   - Level 1: 路径以 `res_` 开头 → RID 直接匹配
-   - Level 2: 基于 source resource 路径上下文拼接 → `resolveResource`
-   - Level 3: 提取文件名 → `resolveResource(name)` 兜底查找
-   - 未匹配的目标产生 `broken` 引用状态
+4. **RID-only 解析**：
+   - 路径以 `res_` 开头 → `resolveResource(rid)` 直接命中
+   - 远程 URL（`https?:`）/ `data:` → Markdown 原生外部引用，不进入 lo 关系
+   - 其他形态（含相对路径、子目录、`../`、文件名）→ **不猜测匹配**，记为 `broken`
 5. **事务写入**：在 SQLite 事务中先删除旧派生关系，再创建新关系，`metadata.origin = 'markdown_parser'`
 
 关键设计决策：
@@ -454,12 +453,12 @@ Markdown 笔记中可以通过 `![alt](path)` 或 `<img>` 标签引用图片。l
 |------|------|
 | 事务原子性 | 删除+创建在 SQLite 事务中执行，任何步骤失败全部回滚 |
 | 全量重建 | DELETE 旧派生关系再 INSERT 新，保证与文件内容严格一致 |
-| RID 优先 + 路径上下文 | 三级回退策略：RID → 路径上下文拼接 → 文件名查找 |
+| RID-only | 唯一合法引用形态 = `res_xxx`；路径/名称不参与身份解析 |
 | origin 隔离 | wikilink/embed 标记 `origin: 'markdown_parser'`，与用户关系隔离 |
 | 历史兼容 | 无 origin 的旧 wikilink 通过 `IS NULL` 条件一并清理 |
 | 括号计数 | 使用 depth-based matching 替代正则，支持路径含括号（如 `state(1).png`） |
 | 不处理远程 URL | `http://`、`https://`、`data:` 协议的图片不产生关系 |
-| 不创建资源 | 引用的图片文件不存在时不自动创建 Resource，仅标记 broken |
+| 不创建资源 | 引用的图片资源不存在时不自动创建 Resource，仅标记 broken |
 
 #### embed 与 wikilink 的协作
 
@@ -473,7 +472,7 @@ lo sync
 
 | 特性 | wikilink | embed |
 |------|----------|-------|
-| 语法 | `[[标题]]` | `![alt](path)` |
+| 语法 | `[[res_xxx]]` | `![alt](res_xxx)` |
 | 方向 | 双向链接 | 单向引用 |
 | 目标类型 | 仅 note | note/image/pdf/video 等 |
 | origin | `markdown_parser`（新）/ null（旧） | `markdown_parser` |
@@ -482,16 +481,17 @@ lo sync
 
 #### broken 引用处理
 
-当 Markdown 引用的图片资源不存在时：
+当 Markdown 引用的图片资源不存在（非 RID 引用或 RID 指向已删除资源）时：
 
 - 不创建 embed 关系
 - 不自动创建 Resource
 - 下次 `lo sync` 时重试解析
+- 由用户在 lo-agent Image Resource Manager 主动导入为 Image Resource / 删除引用
 
 #### 使用建议
 
-- ✅ 使用相对路径引用同仓库图片
 - ✅ 使用 RID 引用确保唯一匹配：`![描述](res_xxx)`
+- ❌ 使用相对路径 / 文件名引用（不产生关系，记为 broken）
 - ❌ 使用远程 URL（不会产生关系）
 - ❌ 使用 `data:` base64 编码（不会产生关系）
 

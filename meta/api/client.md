@@ -22,6 +22,7 @@ await client.login({ privateKeyPath: '~/.ssh/id_ed25519' });
 |---|---|---|
 | `health` | `ping / stats / tags` |
 | `repository` | `info / resolveLocation(rid)`（Repository Identity + Resolver 三态） |
+| `resources` | `import({buffer, filename, metadata, type}) / binary(rid)`（二进制资源导入与 Core 侧解密读取） |
 | `modes` | `list / resolve(rid)`（U1：Usage Mode 解析） |
 | `viewers` | `list(query) / resolve(modeId)`（U1：Usage Viewer 解析，?mode=） |
 | `notes` | `list / get / create / update / remove / upload` |

@@ -249,6 +249,20 @@ function createResourcesApi(client) {
         })
         .then((r) => r.body);
     },
+    /**
+     * 读取 Resource 原始二进制（Core 侧自动解密）
+     *
+     * 用途：图片等二进制资源预览。解密由 Core 负责（repo.cryptoKey），
+     * 客户端只经 HTTP 获取解密后的 base64，不自行读盘/解密。
+     *
+     * @param {string} rid
+     * @returns {Promise<{ rid: string, mime: string, buffer: string, size: number }>}
+     *   - buffer: 明文 base64 编码
+     */
+    binary(rid) {
+      const encoded = encodeURIComponent(rid);
+      return client.get(`/api/resources/${encoded}/binary`).then((r) => r.body);
+    },
   };
 }
 

@@ -15,7 +15,7 @@ import GraphView from './views/GraphView.jsx';
 import { revealFeedback } from './services/revealFeedback.mjs';
 import { createSession, toggleReadOnly as toggleSessionReadOnly, resolveReadOnly } from './services/SessionService.mjs';
 import { resolveViewerComponent } from './services/viewerRegistry.js';
-import CandidateImagePanel from './components/CandidateImagePanel.jsx';
+import ImageManager from './image/ImageManager.jsx';
 import './App.css';
 
 const api = window.loAgent && window.loAgent.loCore;
@@ -46,6 +46,7 @@ export default function App() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [pluginView, setPluginView] = useState(false);
   const [pluginTab, setPluginTab] = useState('commands');
+  const [imageView, setImageView] = useState(false);
   const [relationsOpen, setRelationsOpen] = useState(true);
   const [config, setConfig] = useState({ host: '127.0.0.1', port: 8765, protocol: 'http' });
   const [privateKeyPath, setPrivateKeyPath] = useState('');
@@ -69,7 +70,7 @@ const [repoCtx, setRepoCtx] = useState(null);
   const toastTimerRef = useRef(null);
   const autoSaveTimerRef = useRef(null);
   const layoutTimerRef = useRef(null);
-  /** tab.id → NoteEditor 实例 ref（CandidateImagePanel 插入图片用） */
+  /** tab.id → NoteEditor 实例 ref（Image Resource Manager 插入图片用） */
   const editorRefsRef = useRef(new Map());
   const getTabEditorRef = useCallback((tabId) => {
     let r = editorRefsRef.current.get(tabId);
@@ -587,19 +588,20 @@ const [repoCtx, setRepoCtx] = useState(null);
   );
 
   /**
-   * 候选图片「插入」→ 在当前 tab 的 Monaco 编辑器光标处插入 `![alt](res_xxx)`
+   * 插入 Image Resource 到当前激活 tab 的编辑器 → `![alt](res_xxx)`
    *
-   * 触发：CandidateImagePanel「插入」按钮（候选已上传，持有 Image Resource rid）
+   * 触发：Image Resource Manager 选中已上传图片（持有 rid）后调用。
    * 语义：仅插入 Markdown（renderer/editor 层），Core / IPC 不参与光标管理；
    *       后续保存触发 Core syncMarkdownRelations 建立 note → image embed relation。
    */
-  const handleCandidateInsert = useCallback(
-    (tab, editorRef, { rid, alt, filename }) => {
+  const handleInsertImageToActiveEditor = useCallback(
+    (rid, alt = '', filename = '') => {
+      const tab = activeTab;
       if (!tab) {
         notify('请先打开一个笔记');
         return;
       }
-      const ed = editorRef && editorRef.current;
+      const ed = getTabEditorRef(tab.id).current;
       if (!ed || typeof ed.insertImage !== 'function') {
         notify('当前视图不可插入图片（请使用 Markdown 编辑器）');
         return;
@@ -611,7 +613,7 @@ const [repoCtx, setRepoCtx] = useState(null);
       }
       notify(`已插入 ${filename || rid}`);
     },
-    [notify],
+    [activeTab, notify],
   );
 
   const requestDeleteNote = useCallback((rid) => {
@@ -1029,6 +1031,18 @@ useEffect(() => {
         <aside className="app-rail">
           <div className="rail-spacer" />
           <button
+            className={`rail-btn ${imageView ? 'active' : ''}`}
+            aria-label="图片资源"
+            title="图片资源"
+            onClick={() => setImageView((v) => !v)}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="M21 15l-5-5L5 21" />
+            </svg>
+          </button>
+          <button
             className={`rail-btn ${pluginView ? 'active' : ''}`}
             aria-label="插件"
             title="插件"
@@ -1079,6 +1093,12 @@ useEffect(() => {
           </Bar>
 
           <MainArea onLayoutChange={persistLayout}>
+            {imageView && (
+              <Bar id="image" title="图片资源" onClose={() => setImageView(false)}>
+                <ImageManager onInsert={handleInsertImageToActiveEditor} />
+              </Bar>
+            )}
+
             {pluginView && (
               <Bar id="plugin" title="插件" onClose={() => setPluginView(false)}>
                 <PluginCenter tab={pluginTab} onTab={setPluginTab} onNotify={notify} />
@@ -1139,13 +1159,6 @@ useEffect(() => {
                           pluginViewers={pluginViewers}
                           editorRef={getTabEditorRef(tab.id)}
                         />
-                        {tab.meta.type === 'note' && (
-                          <CandidateImagePanel
-                            onInsert={(res) =>
-                              handleCandidateInsert(tab, getTabEditorRef(tab.id), res)
-                            }
-                          />
-                        )}
                       </div>
 
                       <div className="editor-statusbar">

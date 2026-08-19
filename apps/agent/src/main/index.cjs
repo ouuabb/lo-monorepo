@@ -100,6 +100,18 @@ function createWindow() {
   win.on('closed', () => {
     if (mainWindow === win) mainWindow = null;
   });
+
+  // DevTools 入口：开发模式自动打开；生产模式注册 F12（默认菜单被移除，无 F12 快捷键）
+  if (RENDERER_URL) {
+    win.webContents.openDevTools({ mode: 'detach' });
+  } else {
+    win.webContents.on('before-input-event', (event, input) => {
+      if (input.type === 'keyDown' && input.key === 'F12') {
+        win.webContents.toggleDevTools();
+        event.preventDefault();
+      }
+    });
+  }
 }
 
 app.whenReady().then(async () => {

@@ -12,7 +12,7 @@
 | 004 | **插件服务**：`registerService`/`getService`/`listServices` 插件间通信；`getService` 同步语义，提供者须已激活，消费判空降级。 | ✅ 已实施 |
 | 005 | **Monorepo 统一**：代码统一到 lo-monorepo（Turborepo + pnpm），跨包 `workspace:*`；文档统一到 `meta/`（唯一 SoT）；展示层 `docs/`（VitePress）。原 8 仓库为只读历史档案。 | ✅ 本次迁移 |
 | 006 | **文档系统 5 原则**：来源导向 / 生成式目录 / 一致性校验 / 分层不重复 / 进度如实。 | ✅ 已实施 |
-| 007 | **图片候选上传/插入闭环**：上传只建 Image Resource（不动 Markdown、不建 embed），用户主动插入才经 `insertImage` 在光标处写 `![alt](res_xxx)`、保存后建 embed；renderer 用 Uint8Array/Blob URL 不依赖 Node Buffer；Viewer 下拉切换。 | ✅ 已实施（dc5f45a + ecd9408） |
+| 007 | **图片管理闭环（Image Resource Manager）**：lo-agent 内置 Image Resource Manager（非 Agent Plugin）为唯一图片管理入口；粘贴/拖入/文件选择 → `collectImageFiles` 过滤 → `importImage` → `lo-core:import-resource` 创建 `type='image'` Resource → 列表 → 用户主动选择「插入」→ `insertImage(rid, alt)` 在光标处写 `![alt](res_xxx)`、保存后建 embed；编辑器不做图片采集/Resource 创建，只保留最小 RID 插入；renderer 用 Uint8Array/Blob URL 不依赖 Node Buffer；复用 Core/Client 现有能力，不新增插件契约。 | ✅ 已实施 |
 
 ## 记录格式建议
 

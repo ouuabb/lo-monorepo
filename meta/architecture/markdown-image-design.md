@@ -1,6 +1,6 @@
-# Markdown 图片架构 — Candidate Image + RID-only Embed
+# Markdown 图片架构 — Image Resource Manager + RID-only Embed
 
-> 状态：已实施（2026-08-17）
+> 状态：已实施（2026-08-20）
 > 范围：`packages/core`、`packages/client`、`apps/agent`、`meta/`
 > 性质：正式架构决策记录
 
@@ -13,9 +13,9 @@
 | **Embed 身份** | `![alt](res_xxx)` **唯一合法身份引用** |
 | **非 RID 路径引用** | 在 `syncMarkdownRelations` 中显式 broken，不进入关系 |
 | **HTTP/HTTPS 图片** | Markdown 原生外部引用，**不进入** lo Resource |
-| **资源创建** | 显式：Editor Assist 调 `lo-core:import-resource` → `resource.create` operation |
-| **Candidate Image** | Agent 内存状态，不进入 `resources` 表，不进入 Core |
-| **自动化** | 编辑器监听 paste/drop → 写入 CandidateImageStore；用户主动选择后才 Import |
+| **图片管理入口** | lo-agent **Image Resource Manager**（独立 `image/` 模块）——唯一入口 |
+| **资源创建** | 显式：粘贴 / 拖入 / 文件选择 → `importImage` → `lo-core:import-resource` → `resource.create` operation |
+| **插入时机** | 先导入 Resource → 出现在 Manager 列表 → 用户**主动选择**「插入」→ 当前 Markdown 光标处写 `![alt](res_xxx)` |
 | **渲染** | Renderer 走 `lo-core:resource-binary` IPC 拿 Buffer → data URL → `<img>` |
 | **二进制通道** | 不走 `file://`（沙箱限制），走 IPC + data URL |
 | **解析器** | 保持纯函数（无副作用，不创建资源） |
@@ -27,7 +27,7 @@
 
 ## 2. 核心问题与决策
 
-### 2.1 图片进入 lo 的两条链路
+### 2.1 图片进入 lo 的链路
 
 ```
 读取链路（已有）：
@@ -35,31 +35,23 @@
     → MarkdownParser（纯）
     → syncMarkdownRelations → RID 命中 → embed 关系
 
-创建链路（新增）：
+创建链路（lo-agent Image Resource Manager）：
   Editor 粘贴/拖拽/选择文件
-    → CandidateImageStore（Agent 内存）
-    → 用户在 CandidateImagePanel 选「导入」
-    → lo-core:import-resource
+    → collectImageFiles（纯函数，过滤非图片）
+    → imageApi.importImage
+    → lo-core:import-resource（preload IPC）
     → Resource.create operation
-    → 返回 RID
-    → 编辑器插入 `![alt](res_xxx)`
+    → 返回 RID → Image Resource 进入 Manager 列表
+    → 用户在 ImageManager 选「插入」
+    → handleInsertImageToActiveEditor → NoteEditor.insertImage(rid, alt)
+    → 编辑器光标处插入 `![alt](res_xxx)`
 ```
 
 **关键不变量**：
-- Candidate Image 从不进入 `resources` 表
+- 图片**先导入为 Resource**，编辑器**只负责最小 RID 插入**，不采集图片、不创建 Resource
 - Parser 从不创建资源
 - Resource 创建经 Operation Engine，含 before/after 快照 + undo
-
-### 2.2 为什么 Candidate ≠ Resource
-
-| 维度 | 直传（粘贴即 Resource） | 候选 + 显式确认 |
-|---|---|---|
-| 临时截图 | 污染资源世界 | 自动丢弃 |
-| 错误粘贴 | 占用 RID | 用户删除即可 |
-| 重复图片 | 多个 Resource | 用户去重 |
-| 一次性图片 | 永久占用 | 不入 |
-
-选择后者：用户**主动决定**图片是否进入 lo 世界。
+- Image Resource Manager 是 lo-agent 内置能力，**不新增 Agent Plugin / agent-plugins-sdk 契约**
 
 ---
 
@@ -82,16 +74,16 @@
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
-│ 创建链路                                                             │
+│ 创建链路（Image Resource Manager）                                   │
 │                                                                      │
-│  Editor paste/drop file                                              │
+│  Editor paste/drop file 或 文件选择                                   │
 │    ↓                                                                 │
-│  NoteEditor onPaste/onDrop handler                                   │
+│  ImageManager onPaste/onDrop/onChange                                │
 │    ↓                                                                 │
-│  CandidateImageStore.add({buffer, mime, filename, source})          │
-│    ↓ (内存 Map，非 Resource)                                         │
-│  CandidateImagePanel UI                                             │
-│    ↓ 用户点击「导入」                                                │
+│  collectImageFiles (纯函数，SUPPORTED_MIMES 过滤)                    │
+│    ↓                                                                 │
+│  imageApi.importImage({bytes, mime, filename})                       │
+│    ↓                                                                 │
 │  lo-core:import-resource (preload IPC)                              │
 │    ↓                                                                 │
 │  [主进程] LoCoreService.importResource                              │
@@ -103,9 +95,11 @@
 │    ├─ operationEngine.execute('resource.create', params)            │
 │    └─ 落 DB + 记录 syncOps                                          │
 │    ↓                                                                 │
-│  Resource { rid: 'res_xxx', type: 'image', ... }                    │
+│  Resource { rid: 'res_xxx', type: 'image', ... } → Manager 列表      │
+│    ↓ 用户主动选「插入」                                              │
+│  App.handleInsertImageToActiveEditor → NoteEditor.insertImage(rid)  │
 │    ↓                                                                 │
-│  Renderer: editor.insertText(`![alt](res_xxx)`)                     │
+│  editor.insertText(`![alt](res_xxx)`)                               │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -118,9 +112,12 @@
 │  lo-core:resource-binary (preload IPC)                              │
 │    ↓                                                                 │
 │  [主进程] LoCoreService.getResourceBinary                            │
-│    ├─ resolveLocation(rid) → 绝对路径                                │
-│    ├─ fs.readFile                                                   │
-│    └─ 返回 { buffer: base64, mime, size }                          │
+│    ↓                                                                 │
+│  @lo/client.resources.binary → GET /api/resources/:rid/binary       │
+│    ↓                                                                 │
+│  [serve.cjs] readResourceBuffer(absPath, repo.cryptoKey)             │
+│    ├─ 检测 LOEC magic → CryptoUtils.decryptFile（Core 侧解密）       │
+│    └─ 返回 { rid, mime, buffer: base64(明文), size }                 │
 │    ↓                                                                 │
 │  Renderer: data:image/png;base64,... → <img src="data:...">          │
 └─────────────────────────────────────────────────────────────────────┘
@@ -135,7 +132,7 @@
 | 文件 | 改动 |
 |---|---|
 | `packages/core/src/repo/repository.cjs` | `_resolveImageResource` 简化为 RID-only；`_candidateNameFromPath` 删除；新增 `importBuffer` |
-| `packages/core/src/commands/serve.cjs` | 新增 `POST /api/resources/import` 路由 |
+| `packages/core/src/commands/serve.cjs` | 新增 `POST /api/resources/import`、`GET /api/resources/:rid/binary` 路由（二进制读取解密收敛 Core） |
 | `packages/core/src/repo/viewerRegistry.cjs` | 新增 builtin `viewer.markdown-preview` |
 | `packages/core/test/repo/embedRelations.test.cjs` | 重写为 RID-only 测试 |
 | `packages/core/test/repo/{modeRegistration,usageResolver}.test.cjs` | 反映新增 viewer |
@@ -146,24 +143,27 @@
 
 | 文件 | 改动 |
 |---|---|
-| `packages/client/src/client.cjs` | 新增 `client.resources.import({buffer, filename, metadata, type})` |
+| `packages/client/src/client.cjs` | 新增 `client.resources.import({buffer, filename, metadata, type})`、`client.resources.binary(rid)` |
 
-### 4.3 Agent 侧
+### 4.3 Agent 侧（Image Resource Manager）
 
 | 文件 | 改动 |
 |---|---|
-| `apps/agent/src/renderer/src/services/candidateImageStore.mjs` | **新增** 候选图片内存存储 |
-| `apps/agent/src/renderer/src/components/CandidateImagePanel.jsx` | **新增** 候选 UI |
-| `apps/agent/src/renderer/src/components/MarkdownImage.jsx` | **新增** RID → data URL 渲染 |
-| `apps/agent/src/renderer/src/components/MarkdownPreview.jsx` | **新增** 只读 Markdown 预览（含 RID-embed） |
-| `apps/agent/src/renderer/src/editor/NoteEditor.jsx` | 注入 paste/drop 监听 |
-| `apps/agent/src/renderer/src/services/viewerRegistry.js` | 注册 `viewer.markdown-preview` |
-| `apps/agent/src/renderer/src/App.jsx` | 集成 CandidateImagePanel + `handleCandidateImport` |
+| `apps/agent/src/renderer/src/image/imageUtils.mjs` | **新增** 纯工具（SUPPORTED_MIMES / mimeExt / base64ToUint8 / formatSize / altFromFilename） |
+| `apps/agent/src/renderer/src/image/imageImport.mjs` | **新增** `collectImageFiles` 三入口归一（paste/drop/file-select） |
+| `apps/agent/src/renderer/src/image/imageApi.mjs` | **新增** `createImageApi` 数据访问层（list / importImage / getBinary / remove） |
+| `apps/agent/src/renderer/src/image/ImageManager.jsx` | **新增** Manager UI（导入 / 列表 / 缩略图 / 预览 / 插入 / 删除） |
+| `apps/agent/src/renderer/src/image/ImagePreviewModal.jsx` | **新增** 大图预览遮罩 |
+| `apps/agent/src/renderer/src/components/MarkdownImage.jsx` | **保留** RID → data URL 渲染 |
+| `apps/agent/src/renderer/src/components/MarkdownPreview.jsx` | **保留** 只读 Markdown 预览（含 RID-embed 渲染） |
+| `apps/agent/src/renderer/src/editor/NoteEditor.jsx` | 仅保留最小 `insertImage(rid, alt)` bridge（`executeEdits('insert-image-resource', ...)`），移除 paste/drop 采集 |
+| `apps/agent/src/renderer/src/App.jsx` | 新增 `handleInsertImageToActiveEditor` + rail「图片」按钮 + `<Bar id="image">` 渲染 ImageManager |
 | `apps/agent/src/preload/index.cjs` | 暴露 `importResource` / `getResourceBinary` |
-| `apps/agent/src/main/ipc.cjs` | 新增 `lo-core:import-resource` / `lo-core:resource-binary` 通道 |
-| `apps/agent/src/main/lo-core.cjs` | 新增 `importResource` / `getResourceBinary` 方法 |
-| `apps/agent/test/renderer/candidateImageStore.test.cjs` | **新增** 单元测试 |
-| `apps/agent/test/main/ipc.test.cjs` | 更新通道数（29 → 31） |
+| `apps/agent/src/main/ipc.cjs` | 通道 `lo-core:import-resource` / `lo-core:resource-binary` |
+| `apps/agent/src/main/lo-core.cjs` | 方法 `importResource` / `getResourceBinary` |
+| `apps/agent/test/renderer/imageUtils.test.cjs` | **新增** 单元测试 |
+| `apps/agent/test/renderer/imageImport.test.cjs` | **新增** 单元测试 |
+| `apps/agent/test/renderer/imageApi.test.cjs` | **新增** 单元测试 |
 
 ### 4.4 一次性迁移
 
@@ -195,7 +195,7 @@ metadata  TEXT DEFAULT '{}'    -- embed 含 {origin: 'markdown_parser', alt, tit
 -- 无新增表 / 无新增字段
 ```
 
-**Candidate Image 不进入任何数据库表**，仅存在于 Agent 渲染进程的 `Map` 内存中。
+**Image Resource 即普通 `type='image'` 资源**，无候选状态、无独立表。
 
 ---
 
@@ -236,8 +236,8 @@ metadata  TEXT DEFAULT '{}'    -- embed 含 {origin: 'markdown_parser', alt, tit
 
 | 路径 | 入口 | 行为 |
 |---|---|---|
-| 用户粘贴/拖拽/选图 | Editor Assist → CandidateImageStore | 内存 |
-| 用户点击「导入」 | CandidateImagePanel → `lo-core:import-resource` | Core `resource.create` op |
+| 粘贴 / 拖入 / 文件选择 | ImageManager → `imageApi.importImage` → `lo-core:import-resource` | 创建 `type='image'` Resource |
+| 用户在 Manager 选「插入」 | ImageManager → `handleInsertImageToActiveEditor` → `insertImage(rid, alt)` | 当前编辑器光标处写 `![alt](res_xxx)` |
 | `lo import <path>` | CLI | `ResourceService.importFile` |
 | `POST /api/notes/upload` | lo-agent / 第三方 | multipart |
 | FileWatcher `add` 事件 | lo serve | 自动 `importFile` |
@@ -245,7 +245,7 @@ metadata  TEXT DEFAULT '{}'    -- embed 含 {origin: 'markdown_parser', alt, tit
 ### 8.2 引用
 
 - 用户在 lo-agent 编辑器**手动**写 `![alt](res_xxx)`
-- 用户**粘贴/拖拽** 图片：Editor Assist 自动生成 `![alt](res_xxx)`
+- 用户在 Image Resource Manager 选中图片后点「插入」：`insertImage(rid, alt)` 自动生成 `![alt](res_xxx)`（编辑器不做图片采集 / Resource 创建）
 - 旧 Markdown 中的 path 引用 → 显式 broken（迁移可选）
 
 ### 8.3 读取
@@ -278,8 +278,7 @@ metadata  TEXT DEFAULT '{}'    -- embed 含 {origin: 'markdown_parser', alt, tit
 ### 8.8 Undo / Redo
 
 - 资源创建 / 更新 / 删除 / 移动均经 Operation Engine，支持 undo
-- Candidate Image 阶段无 Core Operation → undo 不会被污染
-- 导入资源后的 Markdown 插入属 `note.update` 独立操作
+- 图片导入（Resource 创建）与 Markdown 插入（`note.update`）为两个独立操作，各自可 undo
 
 ### 8.9 仓库迁移 / Git
 
@@ -310,22 +309,21 @@ node scripts/lo-embed-migrate.cjs <repo-path> [--dry-run] [--write]
 
 ---
 
-## 10. 边界（Agent / Core / Editor Assist / Plugin）
+## 10. 边界（Agent / Core / Plugin）
 
 | 组件 | 责任 | 明确不做 |
 |---|---|---|
 | **lo Core** | Resource 生命周期、Operation Engine、Markdown 解析、关系、文件存储、查询、加密 | 网络下载、用户交互、自动 Semantic |
-| **lo-agent** | UI 渲染、IPC 桥、Viewer 注册、Renderer | 直接 fs、解析路径 |
-| **Editor Assist**（NoteEditor + 新增监听） | 监听 paste/drop → 写入 Candidate → 触发导入 | 直接写文件、绕过 IPC |
-| **Candidate Image** | Agent 内存（`services/candidateImageStore.mjs`） | Core、表、Resource |
-| **Plugin (Agent)** | `manifest.contributes.viewers` | 创建 Resource（除非 Editor Assist 是它的内嵌功能） |
+| **lo-agent** | UI 渲染、IPC 桥、Viewer 注册、Image Resource Manager | 直接 fs、解析路径 |
+| **Image Resource Manager**（`image/` 模块） | 采集图片（paste/drop/file-select）→ 导入 Resource → 列表 → 预览/删除 → 主动插入当前编辑器 | 自动写 Markdown、绕过 IPC |
+| **Plugin (Agent)** | `manifest.contributes.viewers` | 创建 Resource（除非 Agent 插件显式声明权限） |
 | **Plugin (Core)** | `ctx.resources/ctx.relations` | 自动化文件解析 |
 
 ### 10.1 边界铁律
 
 - Parser 纯函数（无副作用）
 - Resource 创建走 Operation Engine
-- Candidate Image 不进入 Core
+- 编辑器只做最小 RID 插入，**不采集图片 / 不创建 Resource**（采集与导入收敛在 Image Resource Manager）
 - Renderer 不走 `file://`
 - 沙箱铁律（renderer 不接触 Node 与网络 API）
 
@@ -334,15 +332,16 @@ node scripts/lo-embed-migrate.cjs <repo-path> [--dry-run] [--write]
 ## 11. 与历史约束的对照
 
 | 历史约束 | 现状 |
-|---|---|
+|---|---|---|
 | Parser 显式排除 `https?:` / `data:` | **保留**（Markdown 原生外部引用） |
 | `_resolveImageResource` L2/L3 路径兜底 | **删除**（RID-only） |
 | `_candidateNameFromPath` 规范化猜名字 | **删除**（避免猜测命中错资源） |
 | Editor 仅 Monaco | **保留**（编辑态 Monaco） |
 | 新增 `viewer.markdown-preview` 只读预览 | **新增**（含 RID-embed 渲染） |
 | `lo-core:upload-notes` multipart | **保留**（既有上传路径） |
-| 新增 `lo-core:import-resource` JSON | **新增**（buffer → resource） |
+| 新增 `lo-core:import-resource` JSON | **新增**（buffer → resource，Image Resource Manager 入口） |
 | 新增 `lo-core:resource-binary` | **新增**（RID → bytes） |
+| 候选图片链路（CandidateImageStore / CandidateImagePanel / Editor 采集） | **删除**（收敛为 Image Resource Manager） |
 
 ---
 
@@ -352,15 +351,16 @@ node scripts/lo-embed-migrate.cjs <repo-path> [--dry-run] [--write]
 |---|---|---|
 | `@lo/core` | 3772 | ✅ 全绿 |
 | `@lo/client` | 101 | ✅ 全绿 |
-| `lo-agent` | 272 | ✅ 全绿 |
+| `lo-agent` | 275 | ✅ 全绿 |
 
 新增 / 改动测试：
 - `packages/core/test/repo/embedRelations.test.cjs`（重写为 RID-only）
 - `packages/core/test/repo/modeRegistration.test.cjs`（反映新 viewer）
 - `packages/core/test/repo/usageResolver.test.cjs`（反映新 viewer）
 - `packages/core/test/commands/modesHttp.test.cjs`（反映新 viewer）
-- `apps/agent/test/renderer/candidateImageStore.test.cjs`（新增 15 用例）
-- `apps/agent/test/main/ipc.test.cjs`（通道数 29 → 31）
+- `apps/agent/test/renderer/imageUtils.test.cjs`（新增）
+- `apps/agent/test/renderer/imageImport.test.cjs`（新增）
+- `apps/agent/test/renderer/imageApi.test.cjs`（新增）
 
 ---
 
@@ -374,6 +374,7 @@ node scripts/lo-embed-migrate.cjs <repo-path> [--dry-run] [--write]
 - 图片维度识别（width/height metadata）
 - 多文件批量导入
 - clipboard 图像元数据（PNG EXIF 等）
+- Image Manager 内批量删除 / 按名称检索
 
 ---
 
@@ -384,7 +385,7 @@ node scripts/lo-embed-migrate.cjs <repo-path> [--dry-run] [--write]
 | Identity 与 Location 分离 | RID 唯一身份，`location` 仅存 |
 | Core 持有 Resource 生命周期 | 所有 Resource 创建经 Operation Engine |
 | Parser 保持纯 | `MarkdownParser.parse` 无副作用 |
-| 显式动作产生副作用 | 粘贴入候选需用户主动导入 |
-| 编辑器可自动化，不改变 Core 模型 | Editor Assist 通过 IPC 调现有入口 |
+| 显式动作产生副作用 | 图片先显式导入为 Resource，再显式选择插入 |
+| 能力收敛于 Manager | 采集/导入/管理收敛在 Image Resource Manager，编辑器只做最小插入，不新增插件契约 |
 | 引用稳定性优先 | `res_xxx` 在资源移动/重命名后不变 |
 | 不引入云存储复杂度 | 无 HTTP 下载 / 无对象存储 |

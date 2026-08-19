@@ -100,6 +100,21 @@ describe('LoClient 基础', () => {
     expect(calls[0].url).toBe('http://127.0.0.1:8765/api/resources/res_1/location');
   });
 
+  it('resources.binary(rid) 读取 Core 解密后的二进制 base64', async () => {
+    const { client, calls } = makeClient(() =>
+      Promise.resolve({
+        status: 200,
+        body: { rid: 'res_1', mime: 'image/jpeg', buffer: 'cGxh', size: 4 },
+        headers: {},
+      }),
+    );
+    fakeAuthed(client);
+    const bin = await client.resources.binary('res_1');
+    expect(bin).toEqual({ rid: 'res_1', mime: 'image/jpeg', buffer: 'cGxh', size: 4 });
+    expect(calls[0].method).toBe('GET');
+    expect(calls[0].url).toBe('http://127.0.0.1:8765/api/resources/res_1/binary');
+  });
+
   it('GET 带 query 并 encode', async () => {
     const { client, calls } = makeClient(() =>
       Promise.resolve({ status: 200, body: {}, headers: {} }),

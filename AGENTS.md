@@ -27,6 +27,7 @@ lo 生态**统一代码工作区**（Turborepo + pnpm）：
 - 插件权限默认只读，写操作需显式声明于 `manifest.permissions.lo`。
 - mountEl 插件 UI 在 isolated world 执行，只持 `ctx`，不可触达 `window.loAgent.loCore`。
 - **没有用户明确指令，禁止使用任何 git 命令；使用任何 git 命令前必须先向用户确认。**
+- **没有用户明确指令，禁止运行测试（`test`/`lint` 等）；运行任何测试/校验命令前必须先向用户确认。**
 
 完整规范见 **`meta/AGENTS.md`**（§12 为不可触犯边界）。
 

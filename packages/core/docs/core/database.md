@@ -125,7 +125,7 @@ CREATE TABLE relations (
 |------|------|----------|-----------------|
 | wikilink | 笔记间双向链接（`[[...]]` 语法） | `lo sync` 自动解析 | `markdown_parser` |
 | reference | 用户手动建立的引用关系 | `lo relation add` | `user`（默认） |
-| embed | Markdown 内嵌资源（`![alt](path)` 图片引用） | `lo sync` 自动解析 | `markdown_parser` |
+| embed | Markdown 内嵌资源（`![alt](res_xxx)` RID 图片引用） | `lo sync` 自动解析 | `markdown_parser` |
 | attach | 附件关系 | 手动或插件 | 视具体场景 |
 | cite | 引用/引文关系 | 手动或插件 | 视具体场景 |
 

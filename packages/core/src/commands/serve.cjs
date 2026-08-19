@@ -94,6 +94,25 @@ async function readResourceContent(filePath, cryptoKey) {
   return raw.toString("utf-8");
 }
 
+/**
+ * 读取资源原始二进制（自动解密），返回 Buffer（不做 UTF-8 转换）
+ *
+ * 与 readResourceContent 的区别：后者对二进制内容做 .toString("utf-8")
+ * 会损坏数据；本函数保留原始字节，供图片等二进制资源预览使用。
+ */
+async function readResourceBuffer(filePath, cryptoKey) {
+  const raw = await fs.readFile(filePath);
+
+  if (raw.length >= 4 && raw.subarray(0, 4).equals(CryptoUtils.MAGIC)) {
+    if (!cryptoKey) {
+      throw new Error("文件已加密但无法获取解密密钥");
+    }
+    return CryptoUtils.decryptFile(raw, cryptoKey);
+  }
+
+  return raw;
+}
+
 // ---------------------------------------------------------------------------
 // Multipart 解析（文件上传）
 // ---------------------------------------------------------------------------
@@ -678,6 +697,36 @@ route("GET", "/api/resources/:rid/location", async (req, res, { repo, url }) => 
       return notFound(res, "Resource not found");
     }
     jsonOk(res, resolved);
+  } catch (e) {
+    serverError(res, e.message);
+  }
+});
+
+/**
+ * GET /api/resources/:rid/binary
+ * 读取 Resource 原始二进制（自动解密），返回 { rid, mime, buffer(base64), size }
+ *
+ * 用途：图片等二进制资源预览。解密由 Core 负责（repo.cryptoKey），
+ * 外部消费者经 @lo/client 调用，不自行读盘/解密。
+ */
+route("GET", "/api/resources/:rid/binary", async (req, res, { repo, url }) => {
+  const rid = extractResourceRid(url.pathname);
+  if (!rid) return notFound(res, "Invalid rid");
+  try {
+    const resource = await repo.getResource(rid);
+    if (!resource || resource.deleted) return notFound(res, "Resource not found");
+
+    const resolved = await repo.resourceService.resolveResourceLocation(rid);
+    if (!resolved || !resolved.resolved || !resolved.absolutePath) {
+      const reason = resolved && resolved.reason ? resolved.reason : "unresolved";
+      return notFound(res, `Resource location not resolved: ${reason}`);
+    }
+
+    const buffer = await readResourceBuffer(resolved.absolutePath, repo.cryptoKey);
+    const mime =
+      (resource.metadata && resource.metadata.mimetype) ||
+      (resource.type === 'image' ? 'image/png' : 'application/octet-stream');
+    jsonOk(res, { rid, mime, buffer: buffer.toString("base64"), size: buffer.length });
   } catch (e) {
     serverError(res, e.message);
   }
@@ -2955,7 +3004,9 @@ function extractAdminRid(urlPath) {
 }
 
 function extractResourceRid(urlPath) {
-  const match = urlPath.match(/^\/api\/resources\/(res_[a-zA-Z0-9_]+)\/location/);
+  const match = urlPath.match(
+    /^\/api\/resources\/(res_[a-zA-Z0-9_]+)\/(location|binary)/,
+  );
   return match ? match[1] : null;
 }
 
@@ -3089,8 +3140,10 @@ function matchRoute(method, pathname) {
     if (map.has(exactKey)) return map.get(exactKey);
   }
 
-  if (/^\/api\/resources\/[^/]+\/location$/.test(pathname)) {
-    const exactKey = "/api/resources/:rid/location";
+  if (/^\/api\/resources\/[^/]+\/(location|binary)$/.test(pathname)) {
+    const exactKey = pathname.endsWith("/binary")
+      ? "/api/resources/:rid/binary"
+      : "/api/resources/:rid/location";
     if (map.has(exactKey)) return map.get(exactKey);
   }
 

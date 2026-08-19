@@ -82,7 +82,7 @@ COMMIT
 - **幂等**：删除旧 + 建新 = 内容变化后关系与文本始终一致；
 - **origin 标记**：`metadata.origin = 'markdown_parser'` 标识派生来源，可安全全量重建；
 - **无 name 解析**：Wikilink 不再调用 `resolveResource`（旧 `_resolveWikiLinkTarget`
-  已删除）；`resolveResource` 仅保留给通用场景（CLI/automation/embed 图片路径解析）；
+  已删除）；`resolveResource` 仅保留给通用场景（CLI/automation/RID-only embed）；
 - 解析失败（文件读取错误等）返回 `{ error }`，不影响调用方。
 
 ## 4. 与 Relation 的关系（核心结论）

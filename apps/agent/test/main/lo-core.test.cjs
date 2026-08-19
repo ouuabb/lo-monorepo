@@ -12,6 +12,7 @@ function makeMockClient(overrides = {}) {
     relations: { list: jest.fn() },
     events: { subscribe: jest.fn(), history: jest.fn() },
     repository: { info: jest.fn(), resolveLocation: jest.fn() },
+    resources: { import: jest.fn(), binary: jest.fn() },
     admin: { graph: jest.fn(), graphPath: jest.fn() },
     modes: { list: jest.fn(), resolve: jest.fn() },
     viewers: { list: jest.fn(), resolve: jest.fn() },
@@ -320,6 +321,45 @@ describe('LoCoreService', () => {
     const res = await service.getNote('r1');
     expect(res).toEqual({ ok: true, data: { rid: 'r1', content: 'hi' } });
     expect(client.notes.get).toHaveBeenCalledWith('r1');
+  });
+
+  it('getResourceBinary 经 client.resources.binary 获取明文 base64（不本地读盘）', async () => {
+    const client = makeMockClient();
+    client.resources.binary.mockResolvedValue({
+      rid: 'res_1',
+      mime: 'image/png',
+      buffer: 'aGVsbG8=',
+      size: 5,
+    });
+    const service = new LoCoreService({ LoClient: class {} });
+    service.client = client;
+    const res = await service.getResourceBinary('res_1');
+    expect(res).toEqual({
+      ok: true,
+      data: { rid: 'res_1', mime: 'image/png', buffer: 'aGVsbG8=', size: 5 },
+    });
+    expect(client.resources.binary).toHaveBeenCalledWith('res_1');
+    expect(client.repository.resolveLocation).not.toHaveBeenCalled();
+    expect(client.notes.get).not.toHaveBeenCalled();
+  });
+
+  it('未配置时 getResourceBinary 报错提示先 configure', async () => {
+    const service = new LoCoreService({});
+    const res = await service.getResourceBinary('res_1');
+    expect(res.ok).toBe(false);
+    expect(res.message).toContain('configure');
+  });
+
+  it('getResourceBinary 业务错误映射为 api', async () => {
+    const { LoApiError } = require('@lo/client');
+    const client = makeMockClient();
+    client.resources.binary.mockRejectedValue(new LoApiError('not found', { status: 404 }));
+    const service = new LoCoreService({ LoClient: class {} });
+    service.client = client;
+    const res = await service.getResourceBinary('res_1');
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe('api');
+    expect(res.status).toBe(404);
   });
 
   it('updateNote 经 Operation 语义执行并返回更新结果', async () => {

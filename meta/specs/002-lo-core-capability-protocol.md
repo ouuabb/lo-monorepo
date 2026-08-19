@@ -38,7 +38,7 @@ event 注册表 / lo-client-sdk 封装），非凭空设计。
 |---|---|
 | Auth | `POST /api/auth/challenge` · `login` · `reload` |
 | Health | `GET /api/health` · `stats` · `tags` |
-| Notes(Resource) | `GET /api/notes` · `GET /api/notes/:rid` · `POST /api/notes` · `PUT /api/notes/:rid` · `DELETE /api/notes/:rid` · `POST /api/notes/upload` |
+| Notes(Resource) | `GET /api/notes` · `GET /api/notes/:rid` · `POST /api/notes` · `PUT /api/notes/:rid` · `DELETE /api/notes/:rid` · `POST /api/notes/upload` · `POST /api/resources/import` · `GET /api/resources/:rid/location` · `GET /api/resources/:rid/binary` |
 | Search | `GET /api/search` |
 | Schemas | `GET/POST /api/schemas` · `GET/PUT/DELETE /api/schemas/:id` · `POST /api/schemas/:id/attach|detach` |
 | Views | `GET/POST /api/views` · `GET/PUT/DELETE /api/views/:id` · `POST /api/views/:id/run` · `GET /api/views/:id/export` · `POST /api/views/import` |

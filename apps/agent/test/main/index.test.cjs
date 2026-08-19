@@ -18,7 +18,12 @@ jest.mock('electron', () => {
   const mockWindow = {
     loadFile: mockLoadFile,
     loadURL: mockLoadURL,
-    webContents: { setWindowOpenHandler: mockSetWindowOpenHandler },
+    webContents: {
+      setWindowOpenHandler: mockSetWindowOpenHandler,
+      openDevTools: jest.fn(),
+      toggleDevTools: jest.fn(),
+      on: jest.fn(),
+    },
     on: jest.fn(),
   };
   const MockBrowserWindow = jest.fn(() => mockWindow);
