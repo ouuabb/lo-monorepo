@@ -4891,7 +4891,12 @@ class Repository {
     switch (eventType) {
       case "add":
         if (ResourceType.isSupported(filePath)) {
-          await this.importFile(filePath);
+          try {
+            await this.importFile(filePath);
+          } catch (e) {
+            if (e && e.code === "LOCATION_CONFLICT") return;
+            throw e;
+          }
         }
         break;
 
