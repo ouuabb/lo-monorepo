@@ -6,7 +6,7 @@ describe('imageApi', () => {
   let createImageApi;
 
   beforeAll(async () => {
-    ({ createImageApi } = await import('../../src/renderer/src/image/imageApi.mjs'));
+    ({ createImageApi } = await import('../src/imageApi.mjs'));
   });
 
   const fakeApi = (overrides = {}) => ({

@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const IMAGE_MANAGER = path.join(
-  __dirname, '..', '..', 'src', 'renderer', 'src', 'image', 'ImageManager.jsx',
+  __dirname, '..', '..', '..', '..', 'packages', 'image-resource-manager', 'src', 'ImageManager.jsx',
 );
 const APP_JSX = path.join(__dirname, '..', '..', 'src', 'renderer', 'src', 'App.jsx');
 const NOTE_EDITOR = path.join(

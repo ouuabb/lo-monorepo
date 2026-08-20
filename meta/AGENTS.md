@@ -21,7 +21,9 @@ lo-monorepo/
 │   ├── core/                  @lo/core —— lo Core（世界模型 + 能力中心，CLI `lo` / `lo serve`，端口 8765）
 │   ├── client/                @lo/client —— Core 协议客户端（所有外部消费者统一通道）
 │   ├── plugins-sdk/           @lo/plugins-sdk —— Core 插件开发契约（进程内）
-│   └── agent-plugins-sdk/     @lo/agent-plugins-sdk —— 客户端插件开发契约（lo-agent 内）
+│   ├── agent-plugins-sdk/     @lo/agent-plugins-sdk —— 客户端插件开发契约（lo-agent 内）
+│   ├── editor-assist/         @lo/editor-assist —— 编辑器辅助纯逻辑（wikilink 补全触发/候选）
+│   └── image-resource-manager/ @lo/image-resource-manager —— 图片 Resource 管理（渲染端独立包：采集/导入/列表/预览/插入/删除）
 ├── apps/
 │   └── agent/                 lo-agent —— Electron 桌面端 + 客户端插件宿主
 ├── plugins/
@@ -151,7 +153,15 @@ Plugin → ctx.extensions（契约）→ Host ExtensionRegistry（实现）→ �
 - 插件宿主：`PluginManager/Loader/LoAdapter/ExtensionRegistry/Installer/Store`；
   服务（registerService/getService）、依赖拓扑（dependsOn）、懒激活（activationEvents）、
   mountEl UI（isolated world）。
-- 依赖：`@lo/client`、`@lo/agent-plugins-sdk` 为 `workspace:*`。
+- 依赖：`@lo/client`、`@lo/agent-plugins-sdk`、`@lo/image-resource-manager` 为 `workspace:*`。
+
+### 2.6b packages/image-resource-manager（@lo/image-resource-manager）
+- 渲染端独立包（React 19 JSX + ESM，React 为 peer）；图片 Resource 管理收敛：
+  `imageUtils`/`imageImport`（纯函数）、`imageApi`（loCore 门面 DI，宿主注入）、
+  `ImageManager`/`ImagePreviewModal`（UI）、`image-manager.css`（样式，依赖宿主 `:root` token）。
+- 数据访问链：`imageApi → loCore（preload 门面）→ @lo/client → Core`；不直接访问
+  Core HTTP / 数据库，不内嵌 `@lo/client`；CSS 不定义主题。
+- 命令：`pnpm --filter @lo/image-resource-manager test/lint/format`。
 
 ### 2.7 plugins/core（lo-plugins）
 - Core 插件源码 + 分发（epub-reader/epub-library/chrome-translate）；`scripts/build.cjs`

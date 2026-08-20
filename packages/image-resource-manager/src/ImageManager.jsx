@@ -1,5 +1,5 @@
 /**
- * ImageManager.jsx —— Image Resource Manager（lo-agent 独立图片能力）
+ * ImageManager.jsx —— Image Resource Manager（独立包 @lo/image-resource-manager）
  *
  * 流程（先导入 → 列表 → 主动选择/预览/删除 → 插入当前编辑器）：
  *   粘贴 / 拖入 / 文件选择 → importImage → Image Resource → 列表
@@ -9,6 +9,7 @@
  * 数据访问全部经 imageApi → loCore → @lo/client → Core。
  */
 import { useEffect, useState, useCallback, useRef } from 'react';
+import './image-manager.css';
 import { createImageApi } from './imageApi.mjs';
 import { collectImageFiles } from './imageImport.mjs';
 import { formatSize } from './imageUtils.mjs';

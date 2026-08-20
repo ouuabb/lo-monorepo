@@ -1,0 +1,39 @@
+{
+  "name": "@lo/image-resource-manager",
+  "version": "0.1.0",
+  "description": "图片 Resource 管理（渲染端独立包）：Image Resource Manager UI + 数据访问 + 采集纯逻辑，宿主注入 loCore 门面",
+  "type": "module",
+  "main": "src/index.mjs",
+  "types": "types/index.d.ts",
+  "files": [
+    "src/",
+    "types/",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --passWithNoTests",
+    "lint": "eslint \"src/**/*.{mjs,jsx}\" \"test/**/*.cjs\"",
+    "format": "prettier --write \"src/**/*.{mjs,jsx}\" \"test/**/*.cjs\""
+  },
+  "keywords": [
+    "lo",
+    "image",
+    "resource",
+    "renderer"
+  ],
+  "author": "lo Project",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.37.5",
+    "jest": "^29.7.0",
+    "prettier": "^3.4.2"
+  }
+}

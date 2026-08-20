@@ -15,7 +15,7 @@ import GraphView from './views/GraphView.jsx';
 import { revealFeedback } from './services/revealFeedback.mjs';
 import { createSession, toggleReadOnly as toggleSessionReadOnly, resolveReadOnly } from './services/SessionService.mjs';
 import { resolveViewerComponent } from './services/viewerRegistry.js';
-import ImageManager from './image/ImageManager.jsx';
+import ImageManager from '@lo/image-resource-manager';
 import './App.css';
 
 const api = window.loAgent && window.loAgent.loCore;

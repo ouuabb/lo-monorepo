@@ -51,7 +51,7 @@
 | 5 | **Markdown 内容是真相来源** | Relation 数据库是索引结果，Markdown 文件内容才是最终事实 |
 | 6 | **全量重建策略** | 每次解析先删后建，避免状态不一致 |
 | 7 | **不侵入 Resource Core** | 解析逻辑独立于 Resource 生命周期管理 |
-| 8 | **Image Resource Manager 收敛** | 图片采集/导入/管理在 lo-agent `image/` 模块，编辑器只做最小 RID 插入；不新增插件契约 |
+| 8 | **Image Resource Manager 收敛** | 图片采集/导入/管理在独立包 `@lo/image-resource-manager`，编辑器只做最小 RID 插入；不新增插件契约 |
 
 ---
 
@@ -168,11 +168,11 @@ serve readResourceBuffer(absPath, repo.cryptoKey)  ← 检测 LOEC → decryptFi
 | `test/repo/embedRelations.test.cjs` | ~150 | RID-only 集成测试用例 |
 | `test/utils/markdownImageParser.test.cjs` | ~110 | 21 个解析器单元测试 |
 | `src/repo/importBuffer.cjs` | ~80 | Resource 导入能力（buffer → Resource） |
-| `apps/agent/src/renderer/src/image/imageUtils.mjs` | ~60 | Image Resource Manager 纯工具（SUPPORTED_MIMES / mimeExt / base64ToUint8 / formatSize / altFromFilename） |
-| `apps/agent/src/renderer/src/image/imageImport.mjs` | ~50 | `collectImageFiles` 三入口归一（paste / drop / file-select） |
-| `apps/agent/src/renderer/src/image/imageApi.mjs` | ~80 | `createImageApi` 数据访问层（list / importImage / getBinary / remove） |
-| `apps/agent/src/renderer/src/image/ImageManager.jsx` | ~250 | Image Resource Manager UI（导入 / 列表 / 缩略图 / 预览 / 插入 / 删除） |
-| `apps/agent/src/renderer/src/image/ImagePreviewModal.jsx` | ~80 | 大图预览遮罩 |
+| `packages/image-resource-manager/src/imageUtils.mjs` | ~60 | Image Resource Manager 纯工具（SUPPORTED_MIMES / mimeExt / base64ToUint8 / formatSize / altFromFilename） |
+| `packages/image-resource-manager/src/imageImport.mjs` | ~50 | `collectImageFiles` 三入口归一（paste / drop / file-select） |
+| `packages/image-resource-manager/src/imageApi.mjs` | ~80 | `createImageApi` 数据访问层（list / importImage / getBinary / remove） |
+| `packages/image-resource-manager/src/ImageManager.jsx` | ~250 | Image Resource Manager UI（导入 / 列表 / 缩略图 / 预览 / 插入 / 删除） |
+| `packages/image-resource-manager/src/ImagePreviewModal.jsx` | ~80 | 大图预览遮罩 |
 | `apps/agent/src/renderer/src/components/MarkdownImage.jsx` | ~80 | RID → data URL → `<img>` |
 | `scripts/lo-embed-migrate.cjs` | 一次性 | 旧仓库 path 引用 → RID 迁移脚本 |
 
@@ -190,7 +190,7 @@ serve readResourceBuffer(absPath, repo.cryptoKey)  ← 检测 LOEC → decryptFi
 | `apps/agent/src/main/ipc.cjs` | 新增通道 | `lo-core:import-resource`、`lo-core:resource-binary` |
 | `apps/agent/src/main/lo-core.cjs` | 新增方法 | `importResource`、`getResourceBinary`（经 `client.resources.binary` 走 Core 解密，主进程不读盘） |
 | `apps/agent/src/renderer/src/editor/NoteEditor.jsx` | 简化 | 移除 paste / drop 采集；仅保留最小 `insertImage(rid, alt)` bridge（`executeEdits('insert-image-resource', ...)`） |
-| `apps/agent/src/renderer/src/App.jsx` | 新增 UI | `handleInsertImageToActiveEditor` + rail「图片」按钮 + `<Bar id="image">` 渲染 ImageManager |
+| `apps/agent/src/renderer/src/App.jsx` | 新增 UI | `handleInsertImageToActiveEditor` + rail「图片」按钮 + `<Bar id="image">` 渲染 ImageManager（经 `@lo/image-resource-manager`） |
 | `apps/agent/src/renderer/src/services/viewerRegistry.js` | 新增 viewer | `viewer.markdown-preview` |
 
 ---
@@ -707,7 +707,7 @@ Tests:       231 passed, 231 total
 | Phase 3 | OCR 文字识别 | 提取图片中的文字内容 |
 | Phase 3 | EXIF 信息读取 | 读取图片元数据 |
 
-> 注：图片浏览视图/预览组件已由 lo-agent Image Resource Manager 实现（`image/` 模块：列表 + 缩略图 + 大图预览）。
+> 注：图片浏览视图/预览组件已由 lo-agent Image Resource Manager 实现（`@lo/image-resource-manager` 包：列表 + 缩略图 + 大图预览）。
 
 ---
 

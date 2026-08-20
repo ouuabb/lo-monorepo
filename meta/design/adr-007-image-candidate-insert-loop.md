@@ -26,15 +26,15 @@
      `revokeObjectURL`）；不依赖 Node `Buffer`，不引入 polyfill。
   4. **光标管理边界**：插入动作发生在 renderer/editor 层（ref 桥），**Core / IPC
      不参与光标管理**；只读模式 `insertImage` 返回 false，App 给出提示。
-  5. **能力收敛**：采集/导入/管理/预览/删除全部收敛在 `image/` 模块（imageUtils /
-     imageImport / imageApi / ImageManager / ImagePreviewModal），数据访问经
-     imageApi → loCore（preload 门面）→ `@lo/client` → Core；**不新增
+  5. **能力收敛**：采集/导入/管理/预览/删除全部收敛在独立包 `@lo/image-resource-manager`
+     （imageUtils / imageImport / imageApi / ImageManager / ImagePreviewModal），
+     数据访问经 imageApi → loCore（preload 门面）→ `@lo/client` → Core；**不新增
      Agent Plugin / agent-plugins-sdk 契约**。
 - **明确不做**：MarkdownPreview 渲染 `[[rid]]` wikilink；富文本粘贴；图片维度识别；
   clipboard 图像元数据；批量删除 / 按名称检索（后续可选）。
 - **相关代码**：`packages/core/src/repo/repository.cjs`（importBuffer）、
   `packages/core/test/repo/embedRelations.test.cjs`、
-  `apps/agent/src/renderer/src/image/`（imageUtils / imageImport / imageApi /
+  `packages/image-resource-manager/`（imageUtils / imageImport / imageApi /
   ImageManager / ImagePreviewModal）、
   `apps/agent/src/renderer/src/editor/NoteEditor.jsx`（insertImage bridge）、
   `apps/agent/src/renderer/src/App.jsx`（handleInsertImageToActiveEditor + `<Bar id="image">`）。

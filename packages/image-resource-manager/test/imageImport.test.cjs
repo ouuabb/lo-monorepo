@@ -6,7 +6,7 @@ describe('imageImport', () => {
   let imageImport;
 
   beforeAll(async () => {
-    imageImport = await import('../../src/renderer/src/image/imageImport.mjs');
+    imageImport = await import('../src/imageImport.mjs');
   });
 
   describe('collectImageFiles（drop / file-select）', () => {

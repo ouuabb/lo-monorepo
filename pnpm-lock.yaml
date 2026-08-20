@@ -38,6 +38,9 @@ importers:
       '@lo/editor-assist':
         specifier: workspace:*
         version: link:../../packages/editor-assist
+      '@lo/image-resource-manager':
+        specifier: workspace:*
+        version: link:../../packages/image-resource-manager
       allotment:
         specifier: ^1.20.5
         version: 1.20.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -200,6 +203,28 @@ importers:
       eslint:
         specifier: ^8.57.0
         version: 8.57.1
+      jest:
+        specifier: ^29.7.0
+        version: 29.7.0(@types/node@26.2.0)
+      prettier:
+        specifier: ^3.4.2
+        version: 3.9.6
+
+  packages/image-resource-manager:
+    dependencies:
+      react:
+        specifier: ^19.0.0
+        version: 19.2.8
+    devDependencies:
+      cross-env:
+        specifier: ^10.1.0
+        version: 10.1.0
+      eslint:
+        specifier: ^8.57.0
+        version: 8.57.1
+      eslint-plugin-react:
+        specifier: ^7.37.5
+        version: 7.37.5(eslint@8.57.1)
       jest:
         specifier: ^29.7.0
         version: 29.7.0(@types/node@26.2.0)

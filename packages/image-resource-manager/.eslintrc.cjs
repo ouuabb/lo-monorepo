@@ -1,0 +1,63 @@
+module.exports = {
+  root: true,
+  env: {
+    node: true,
+    es2022: true,
+    jest: true,
+  },
+  parserOptions: {
+    ecmaVersion: 2022,
+    sourceType: 'script',
+  },
+  rules: {
+    'no-var': 'error',
+    'prefer-const': 'error',
+    'no-unused-vars': ['warn', { args: 'none', ignoreRestSiblings: true }],
+    'no-undef': 'error',
+    'no-dupe-keys': 'error',
+    'no-dupe-class-members': 'error',
+    'no-const-assign': 'error',
+    'no-debugger': 'warn',
+    'no-fallthrough': 'error',
+    'no-redeclare': 'error',
+    'no-extra-semi': 'warn',
+    'no-unreachable': 'warn',
+    'no-cond-assign': 'warn',
+    'no-duplicate-case': 'error',
+    'no-empty': ['warn', { allowEmptyCatch: true }],
+    'no-useless-escape': 'warn',
+    'valid-typeof': 'error',
+    'no-shadow': 'off',
+    'no-console': 'off',
+    'no-process-exit': 'off',
+    'no-async-promise-executor': 'warn',
+    'no-return-await': 'warn',
+    'prefer-template': 'warn',
+    'prefer-arrow-callback': 'warn',
+    'object-shorthand': 'warn',
+    'prefer-object-spread': 'warn',
+    'prefer-rest-params': 'warn',
+  },
+  overrides: [
+    {
+      files: ['**/test/**/*.cjs', '**/*.test.cjs', 'test/**'],
+      env: { jest: true },
+    },
+    {
+      files: ['**/src/**/*.jsx', '**/src/**/*.mjs'],
+      env: { browser: true, es2022: true },
+      parserOptions: {
+        sourceType: 'module',
+        ecmaFeatures: { jsx: true },
+      },
+      plugins: ['react'],
+      settings: {
+        react: { version: 'detect' },
+      },
+      rules: {
+        'react/jsx-uses-react': 'warn',
+        'react/jsx-uses-vars': 'error',
+      },
+    },
+  ],
+};

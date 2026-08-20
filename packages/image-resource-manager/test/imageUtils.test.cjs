@@ -6,7 +6,7 @@ describe('imageUtils', () => {
   let imageUtils;
 
   beforeAll(async () => {
-    imageUtils = await import('../../src/renderer/src/image/imageUtils.mjs');
+    imageUtils = await import('../src/imageUtils.mjs');
   });
 
   test('SUPPORTED_MIMES 覆盖常见图片格式', () => {

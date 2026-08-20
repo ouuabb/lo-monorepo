@@ -13,7 +13,7 @@
 | **Embed 身份** | `![alt](res_xxx)` **唯一合法身份引用** |
 | **非 RID 路径引用** | 在 `syncMarkdownRelations` 中显式 broken，不进入关系 |
 | **HTTP/HTTPS 图片** | Markdown 原生外部引用，**不进入** lo Resource |
-| **图片管理入口** | lo-agent **Image Resource Manager**（独立 `image/` 模块）——唯一入口 |
+| **图片管理入口** | lo-agent **Image Resource Manager**（独立包 `@lo/image-resource-manager`）——唯一入口 |
 | **资源创建** | 显式：粘贴 / 拖入 / 文件选择 → `importImage` → `lo-core:import-resource` → `resource.create` operation |
 | **插入时机** | 先导入 Resource → 出现在 Manager 列表 → 用户**主动选择**「插入」→ 当前 Markdown 光标处写 `![alt](res_xxx)` |
 | **渲染** | Renderer 走 `lo-core:resource-binary` IPC 拿 Buffer → data URL → `<img>` |
@@ -145,25 +145,24 @@
 |---|---|
 | `packages/client/src/client.cjs` | 新增 `client.resources.import({buffer, filename, metadata, type})`、`client.resources.binary(rid)` |
 
-### 4.3 Agent 侧（Image Resource Manager）
+### 4.3 Agent 侧（Image Resource Manager，独立包 `@lo/image-resource-manager`）
 
 | 文件 | 改动 |
 |---|---|
-| `apps/agent/src/renderer/src/image/imageUtils.mjs` | **新增** 纯工具（SUPPORTED_MIMES / mimeExt / base64ToUint8 / formatSize / altFromFilename） |
-| `apps/agent/src/renderer/src/image/imageImport.mjs` | **新增** `collectImageFiles` 三入口归一（paste/drop/file-select） |
-| `apps/agent/src/renderer/src/image/imageApi.mjs` | **新增** `createImageApi` 数据访问层（list / importImage / getBinary / remove） |
-| `apps/agent/src/renderer/src/image/ImageManager.jsx` | **新增** Manager UI（导入 / 列表 / 缩略图 / 预览 / 插入 / 删除） |
-| `apps/agent/src/renderer/src/image/ImagePreviewModal.jsx` | **新增** 大图预览遮罩 |
+| `packages/image-resource-manager/src/imageUtils.mjs` | **新增** 纯工具（SUPPORTED_MIMES / mimeExt / base64ToUint8 / formatSize / altFromFilename） |
+| `packages/image-resource-manager/src/imageImport.mjs` | **新增** `collectImageFiles` 三入口归一（paste/drop/file-select） |
+| `packages/image-resource-manager/src/imageApi.mjs` | **新增** `createImageApi` 数据访问层（list / importImage / getBinary / remove） |
+| `packages/image-resource-manager/src/ImageManager.jsx` | **新增** Manager UI（导入 / 列表 / 缩略图 / 预览 / 插入 / 删除） |
+| `packages/image-resource-manager/src/ImagePreviewModal.jsx` | **新增** 大图预览遮罩 |
+| `packages/image-resource-manager/test/` | **新增** imageUtils / imageImport / imageApi 单元测试 |
 | `apps/agent/src/renderer/src/components/MarkdownImage.jsx` | **保留** RID → data URL 渲染 |
 | `apps/agent/src/renderer/src/components/MarkdownPreview.jsx` | **保留** 只读 Markdown 预览（含 RID-embed 渲染） |
 | `apps/agent/src/renderer/src/editor/NoteEditor.jsx` | 仅保留最小 `insertImage(rid, alt)` bridge（`executeEdits('insert-image-resource', ...)`），移除 paste/drop 采集 |
-| `apps/agent/src/renderer/src/App.jsx` | 新增 `handleInsertImageToActiveEditor` + rail「图片」按钮 + `<Bar id="image">` 渲染 ImageManager |
+| `apps/agent/src/renderer/src/App.jsx` | 新增 `handleInsertImageToActiveEditor` + rail「图片」按钮 + `<Bar id="image">` 渲染 ImageManager（经 `@lo/image-resource-manager`） |
 | `apps/agent/src/preload/index.cjs` | 暴露 `importResource` / `getResourceBinary` |
 | `apps/agent/src/main/ipc.cjs` | 通道 `lo-core:import-resource` / `lo-core:resource-binary` |
 | `apps/agent/src/main/lo-core.cjs` | 方法 `importResource` / `getResourceBinary` |
-| `apps/agent/test/renderer/imageUtils.test.cjs` | **新增** 单元测试 |
-| `apps/agent/test/renderer/imageImport.test.cjs` | **新增** 单元测试 |
-| `apps/agent/test/renderer/imageApi.test.cjs` | **新增** 单元测试 |
+| `apps/agent/test/renderer/imageInsertContract.test.cjs` | **保留** 插入接线契约断言（ImageManager → App → NoteEditor） |
 
 ### 4.4 一次性迁移
 
@@ -315,7 +314,7 @@ node scripts/lo-embed-migrate.cjs <repo-path> [--dry-run] [--write]
 |---|---|---|
 | **lo Core** | Resource 生命周期、Operation Engine、Markdown 解析、关系、文件存储、查询、加密 | 网络下载、用户交互、自动 Semantic |
 | **lo-agent** | UI 渲染、IPC 桥、Viewer 注册、Image Resource Manager | 直接 fs、解析路径 |
-| **Image Resource Manager**（`image/` 模块） | 采集图片（paste/drop/file-select）→ 导入 Resource → 列表 → 预览/删除 → 主动插入当前编辑器 | 自动写 Markdown、绕过 IPC |
+| **Image Resource Manager**（`@lo/image-resource-manager` 包） | 采集图片（paste/drop/file-select）→ 导入 Resource → 列表 → 预览/删除 → 主动插入当前编辑器 | 自动写 Markdown、绕过 IPC |
 | **Plugin (Agent)** | `manifest.contributes.viewers` | 创建 Resource（除非 Agent 插件显式声明权限） |
 | **Plugin (Core)** | `ctx.resources/ctx.relations` | 自动化文件解析 |
 
@@ -358,9 +357,9 @@ node scripts/lo-embed-migrate.cjs <repo-path> [--dry-run] [--write]
 - `packages/core/test/repo/modeRegistration.test.cjs`（反映新 viewer）
 - `packages/core/test/repo/usageResolver.test.cjs`（反映新 viewer）
 - `packages/core/test/commands/modesHttp.test.cjs`（反映新 viewer）
-- `apps/agent/test/renderer/imageUtils.test.cjs`（新增）
-- `apps/agent/test/renderer/imageImport.test.cjs`（新增）
-- `apps/agent/test/renderer/imageApi.test.cjs`（新增）
+- `packages/image-resource-manager/test/imageUtils.test.cjs`（新增）
+- `packages/image-resource-manager/test/imageImport.test.cjs`（新增）
+- `packages/image-resource-manager/test/imageApi.test.cjs`（新增）
 
 ---
 
